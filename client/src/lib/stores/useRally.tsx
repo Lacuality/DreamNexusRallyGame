@@ -9,6 +9,7 @@ interface RallyState {
   speed: number;
   highScore: number;
   currentScore: number;
+  collectiblesCount: number;
   startTime: number;
   
   start: () => void;
@@ -18,6 +19,7 @@ interface RallyState {
   restart: () => void;
   updateDistance: (distance: number) => void;
   updateSpeed: (speed: number) => void;
+  addCollectible: () => void;
   loadHighScore: () => void;
   saveHighScore: () => void;
 }
@@ -29,6 +31,7 @@ export const useRally = create<RallyState>()(
     speed: 0,
     highScore: 0,
     currentScore: 0,
+    collectiblesCount: 0,
     startTime: 0,
     
     start: () => {
@@ -38,6 +41,7 @@ export const useRally = create<RallyState>()(
         distance: 0,
         speed: 0,
         currentScore: 0,
+        collectiblesCount: 0,
         startTime: now
       });
     },
@@ -53,7 +57,7 @@ export const useRally = create<RallyState>()(
     gameOver: () => {
       const state = get();
       if (state.phase === "playing") {
-        const finalScore = Math.floor(state.distance);
+        const finalScore = Math.floor(state.distance) + (state.collectiblesCount * 50);
         const newHighScore = Math.max(finalScore, state.highScore);
         
         set({ phase: "gameover", currentScore: finalScore, highScore: newHighScore });
@@ -65,7 +69,7 @@ export const useRally = create<RallyState>()(
     },
     
     restart: () => {
-      set({ phase: "menu", distance: 0, speed: 0, currentScore: 0 });
+      set({ phase: "menu", distance: 0, speed: 0, currentScore: 0, collectiblesCount: 0 });
     },
     
     updateDistance: (distance: number) => {
@@ -74,6 +78,13 @@ export const useRally = create<RallyState>()(
     
     updateSpeed: (speed: number) => {
       set({ speed });
+    },
+    
+    addCollectible: () => {
+      set((state) => ({
+        collectiblesCount: state.collectiblesCount + 1,
+        currentScore: state.currentScore + 50
+      }));
     },
     
     loadHighScore: () => {

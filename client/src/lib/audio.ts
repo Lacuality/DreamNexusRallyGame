@@ -2,6 +2,7 @@ export class AudioManager {
   private bgMusic: HTMLAudioElement | null = null;
   private engineSound: HTMLAudioElement | null = null;
   private crashSound: HTMLAudioElement | null = null;
+  private successSound: HTMLAudioElement | null = null;
   private isMuted: boolean = false;
   
   constructor() {
@@ -15,6 +16,9 @@ export class AudioManager {
     
     this.crashSound = new Audio("/sounds/hit.mp3");
     this.crashSound.volume = 0.5;
+    
+    this.successSound = new Audio("/sounds/success.mp3");
+    this.successSound.volume = 0.4;
   }
   
   playBackgroundMusic() {
@@ -35,6 +39,14 @@ export class AudioManager {
       const clone = this.crashSound.cloneNode() as HTMLAudioElement;
       clone.volume = 0.5;
       clone.play().catch(err => console.log("Crash sound prevented:", err));
+    }
+  }
+  
+  playSuccess() {
+    if (this.successSound && !this.isMuted) {
+      const clone = this.successSound.cloneNode() as HTMLAudioElement;
+      clone.volume = 0.4;
+      clone.play().catch(err => console.log("Success sound prevented:", err));
     }
   }
   
@@ -60,6 +72,9 @@ export class AudioManager {
     }
     if (this.crashSound) {
       this.crashSound.remove();
+    }
+    if (this.successSound) {
+      this.successSound.remove();
     }
   }
 }

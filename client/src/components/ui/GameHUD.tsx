@@ -2,7 +2,7 @@ import { useRally } from "@/lib/stores/useRally";
 import { DREAM_NEXUS_COLORS } from "@/lib/constants";
 
 export function GameHUD() {
-  const { distance, speed, highScore, pause } = useRally();
+  const { distance, speed, highScore, collectiblesCount, currentScore, pause } = useRally();
   
   return (
     <div
@@ -36,8 +36,14 @@ export function GameHUD() {
         <div style={{ marginBottom: "8px", color: DREAM_NEXUS_COLORS.warm }}>
           <strong>Speed:</strong> {Math.floor(speed)} km/h
         </div>
+        <div style={{ marginBottom: "8px", color: DREAM_NEXUS_COLORS.warm }}>
+          <strong>Arequipe Jars:</strong> {collectiblesCount}
+        </div>
+        <div style={{ marginBottom: "8px", color: DREAM_NEXUS_COLORS.cyan }}>
+          <strong>Score:</strong> {currentScore}
+        </div>
         <div style={{ color: DREAM_NEXUS_COLORS.white }}>
-          <strong>High Score:</strong> {highScore}m
+          <strong>High Score:</strong> {highScore}
         </div>
       </div>
       

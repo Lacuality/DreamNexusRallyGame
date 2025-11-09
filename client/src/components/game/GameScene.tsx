@@ -7,16 +7,22 @@ import { Road } from "./Road";
 import { Camera } from "./Camera";
 import { Environment } from "./Environment";
 import { Obstacles } from "./Obstacles";
+import { Collectibles } from "./Collectibles";
+import { SponsorBanners } from "./SponsorBanners";
 import { useRally } from "@/lib/stores/useRally";
+import { useSettings } from "@/lib/stores/useSettings";
 import { GameHUD } from "../ui/GameHUD";
 import { PauseMenu } from "../ui/PauseMenu";
 import { MobileControls } from "../ui/MobileControls";
+import { TuningPanel } from "../ui/TuningPanel";
 import { GAME_CONFIG } from "@/lib/constants";
+import { audioManager } from "@/lib/audio";
 
 export function GameScene() {
   const [carPosition, setCarPosition] = useState(new THREE.Vector3(0, 0, 0));
   const [carSpeed, setCarSpeed] = useState(0);
-  const { phase, updateDistance, updateSpeed, gameOver, pause, resume } = useRally();
+  const { phase, updateDistance, updateSpeed, gameOver, pause, resume, addCollectible } = useRally();
+  const showPhotoMode = useSettings((state) => state.showPhotoMode);
   
   useEffect(() => {
     updateDistance(carPosition.z);
@@ -41,6 +47,20 @@ export function GameScene() {
     return () => window.removeEventListener("keypress", handleKeyPress);
   }, [phase, pause, resume]);
   
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "F2") {
+        e.preventDefault();
+        const settings = require("@/lib/stores/useSettings").useSettings.getState();
+        settings.togglePhotoMode();
+        console.log("Photo mode:", !settings.showPhotoMode ? "ON" : "OFF");
+      }
+    };
+    
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+  
   const handleCollision = (obstacle: any) => {
     console.log("Collision with obstacle:", obstacle.type, "at speed:", carSpeed);
     
@@ -55,6 +75,12 @@ export function GameScene() {
     } else {
       console.log("Low-speed collision - speed penalty only");
     }
+  };
+  
+  const handleCollect = () => {
+    console.log("Collected arequipe jar! +50 points");
+    addCollectible();
+    audioManager.playSuccess();
   };
   
   const keyMap = [
@@ -82,6 +108,7 @@ export function GameScene() {
         >
           <Suspense fallback={null}>
             <Environment />
+            <SponsorBanners />
             <Road carPosition={carPosition} />
             <Car
               onPositionChange={setCarPosition}
@@ -93,15 +120,39 @@ export function GameScene() {
               carSpeed={carSpeed}
               onCollision={handleCollision}
             />
+            <Collectibles
+              carPosition={carPosition}
+              onCollect={handleCollect}
+            />
             <Camera carPosition={carPosition} />
           </Suspense>
         </Canvas>
       </KeyboardControls>
       
-      {phase === "playing" && <GameHUD />}
-      {phase === "paused" && <PauseMenu />}
+      {!showPhotoMode && phase === "playing" && <GameHUD />}
+      {!showPhotoMode && phase === "playing" && <TuningPanel />}
+      {!showPhotoMode && phase === "paused" && <PauseMenu />}
+      {!showPhotoMode && <MobileControls />}
       
-      <MobileControls />
+      {showPhotoMode && (
+        <div
+          style={{
+            position: "fixed",
+            bottom: "20px",
+            left: "50%",
+            transform: "translateX(-50%)",
+            backgroundColor: "rgba(14, 27, 36, 0.9)",
+            padding: "10px 20px",
+            borderRadius: "8px",
+            color: "#24A0CE",
+            fontFamily: "monospace",
+            fontSize: "16px",
+            zIndex: 1000,
+          }}
+        >
+          Photo Mode (Press F2 to exit)
+        </div>
+      )}
     </>
   );
 }

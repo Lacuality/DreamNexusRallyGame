@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import * as THREE from "three";
 import { DREAM_NEXUS_COLORS } from "@/lib/constants";
+import { useSettings } from "@/lib/stores/useSettings";
 
 export function Environment() {
   return (
@@ -15,21 +16,32 @@ export function Environment() {
 }
 
 function Sky() {
+  const weather = useSettings((state) => state.weather);
+  
+  const skyColor = weather === "sunny" ? DREAM_NEXUS_COLORS.navy : "#1a2633";
+  const fogNear = weather === "sunny" ? 50 : 30;
+  const fogFar = weather === "sunny" ? 150 : 100;
+  
   return (
     <>
-      <color attach="background" args={[DREAM_NEXUS_COLORS.navy]} />
-      <fog attach="fog" args={[DREAM_NEXUS_COLORS.navy, 50, 150]} />
+      <color attach="background" args={[skyColor]} />
+      <fog attach="fog" args={[skyColor, fogNear, fogFar]} />
     </>
   );
 }
 
 function Lights() {
+  const weather = useSettings((state) => state.weather);
+  
+  const sunIntensity = weather === "sunny" ? 1 : 0.6;
+  const ambientIntensity = weather === "sunny" ? 0.6 : 0.4;
+  
   return (
     <>
-      <ambientLight intensity={0.6} />
+      <ambientLight intensity={ambientIntensity} />
       <directionalLight
         position={[10, 20, 10]}
-        intensity={1}
+        intensity={sunIntensity}
         castShadow
         shadow-mapSize-width={2048}
         shadow-mapSize-height={2048}
