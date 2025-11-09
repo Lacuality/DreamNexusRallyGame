@@ -5,6 +5,7 @@ import * as THREE from "three";
 import { GAME_CONFIG } from "@/lib/constants";
 import { useRally } from "@/lib/stores/useRally";
 import { useMobileControls } from "@/lib/stores/useMobileControls";
+import { useSettings } from "@/lib/stores/useSettings";
 
 export enum Controls {
   forward = "forward",
@@ -28,6 +29,7 @@ export function Car({ onPositionChange, onSpeedChange, onCrash }: CarProps) {
   const [, getKeys] = useKeyboardControls<Controls>();
   const phase = useRally((state) => state.phase);
   const mobileControls = useMobileControls();
+  const showPhotoMode = useSettings((state) => state.showPhotoMode);
   
   useEffect(() => {
     const controls = getKeys();
@@ -40,7 +42,7 @@ export function Car({ onPositionChange, onSpeedChange, onCrash }: CarProps) {
   }, [getKeys]);
   
   useFrame((state, delta) => {
-    if (!carRef.current || phase !== "playing") return;
+    if (!carRef.current || phase !== "playing" || showPhotoMode) return;
     
     const keys = getKeys();
     const isForward = keys.forward || mobileControls.forward;

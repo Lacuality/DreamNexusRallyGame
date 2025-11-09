@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { GAME_CONFIG } from "@/lib/constants";
+import { useSettings } from "@/lib/stores/useSettings";
 
 interface Collectible {
   id: number;
@@ -18,8 +19,10 @@ export function Collectibles({ carPosition, onCollect }: CollectiblesProps) {
   const [collectibles, setCollectibles] = useState<Collectible[]>([]);
   const [nextCollectibleId, setNextCollectibleId] = useState(0);
   const [lastSpawnZ, setLastSpawnZ] = useState(0);
+  const showPhotoMode = useSettings((state) => state.showPhotoMode);
   
   useFrame((state, delta) => {
+    if (showPhotoMode) return;
     let newCollectibles = [...collectibles];
     let updatedLastSpawnZ = lastSpawnZ;
     let updatedNextId = nextCollectibleId;

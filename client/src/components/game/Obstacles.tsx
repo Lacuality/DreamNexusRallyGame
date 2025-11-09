@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { GAME_CONFIG } from "@/lib/constants";
+import { useSettings } from "@/lib/stores/useSettings";
 
 interface Obstacle {
   id: number;
@@ -19,11 +20,16 @@ export function Obstacles({ carPosition, carSpeed, onCollision }: ObstaclesProps
   const [obstacles, setObstacles] = useState<Obstacle[]>([]);
   const [nextObstacleId, setNextObstacleId] = useState(0);
   const [lastSpawnZ, setLastSpawnZ] = useState(0);
-  const [startTime] = useState(Date.now());
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const showPhotoMode = useSettings((state) => state.showPhotoMode);
   
-  useFrame(() => {
-    const elapsedTime = Date.now() - startTime;
-    const difficultyLevel = Math.floor(elapsedTime / GAME_CONFIG.DIFFICULTY_RAMP_INTERVAL);
+  useFrame((state, delta) => {
+    if (showPhotoMode) return;
+    
+    const newElapsedTime = elapsedTime + delta * 1000;
+    setElapsedTime(newElapsedTime);
+    
+    const difficultyLevel = Math.floor(newElapsedTime / GAME_CONFIG.DIFFICULTY_RAMP_INTERVAL);
     const spawnChance = GAME_CONFIG.OBSTACLE_DENSITY_BASE + 
       (difficultyLevel * GAME_CONFIG.OBSTACLE_DENSITY_INCREASE);
     

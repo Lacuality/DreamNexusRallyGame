@@ -51,9 +51,9 @@ export function GameScene() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "F2") {
         e.preventDefault();
-        const settings = require("@/lib/stores/useSettings").useSettings.getState();
-        settings.togglePhotoMode();
-        console.log("Photo mode:", !settings.showPhotoMode ? "ON" : "OFF");
+        useSettings.getState().togglePhotoMode();
+        const newPhotoMode = useSettings.getState().showPhotoMode;
+        console.log("Photo mode:", newPhotoMode ? "ON" : "OFF");
       }
     };
     
