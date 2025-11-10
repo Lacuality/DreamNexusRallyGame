@@ -1,6 +1,7 @@
 import { useRally } from "@/lib/stores/useRally";
 import { DREAM_NEXUS_COLORS } from "@/lib/constants";
 import { useEffect } from "react";
+import { Leaderboard } from "./Leaderboard";
 
 export function GameOverScreen() {
   const { currentScore, highScore, restart } = useRally();
@@ -33,6 +34,8 @@ export function GameOverScreen() {
         zIndex: 1000,
         fontFamily: "monospace",
         color: DREAM_NEXUS_COLORS.white,
+        overflow: "auto",
+        padding: "20px",
       }}
     >
       <h1
@@ -97,6 +100,8 @@ export function GameOverScreen() {
         </div>
       </div>
       
+      <Leaderboard />
+      
       <button
         onClick={restart}
         style={{
@@ -109,6 +114,7 @@ export function GameOverScreen() {
           cursor: "pointer",
           fontWeight: "bold",
           fontFamily: "monospace",
+          marginTop: "30px",
         }}
       >
         Play Again (Enter)
@@ -116,8 +122,7 @@ export function GameOverScreen() {
       
       <div
         style={{
-          position: "absolute",
-          bottom: "30px",
+          marginTop: "30px",
           display: "flex",
           alignItems: "center",
           gap: "15px",

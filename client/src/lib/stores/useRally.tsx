@@ -11,6 +11,8 @@ interface RallyState {
   currentScore: number;
   collectiblesCount: number;
   startTime: number;
+  playerName: string;
+  scoreSubmitted: boolean;
   
   start: () => void;
   pause: () => void;
@@ -22,6 +24,8 @@ interface RallyState {
   addCollectible: () => void;
   loadHighScore: () => void;
   saveHighScore: () => void;
+  setPlayerName: (name: string) => void;
+  loadPlayerName: () => void;
 }
 
 export const useRally = create<RallyState>()(
@@ -33,6 +37,8 @@ export const useRally = create<RallyState>()(
     currentScore: 0,
     collectiblesCount: 0,
     startTime: 0,
+    playerName: "",
+    scoreSubmitted: false,
     
     start: () => {
       const now = Date.now();
@@ -60,16 +66,41 @@ export const useRally = create<RallyState>()(
         const finalScore = Math.floor(state.distance) + (state.collectiblesCount * 50);
         const newHighScore = Math.max(finalScore, state.highScore);
         
-        set({ phase: "gameover", currentScore: finalScore, highScore: newHighScore });
-        
         if (newHighScore > state.highScore) {
           localStorage.setItem("dreamNexusRallyHighScore", String(newHighScore));
+        }
+        
+        set({ phase: "gameover", currentScore: finalScore, highScore: newHighScore, scoreSubmitted: false });
+        
+        if (state.playerName && finalScore > 0) {
+          fetch("/api/leaderboard", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              playerName: state.playerName,
+              score: finalScore,
+              distance: Math.floor(state.distance),
+            }),
+          })
+            .then(response => {
+              if (response.ok) {
+                return response.json();
+              }
+              throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            })
+            .then(data => {
+              console.log("Score submitted:", data);
+              set({ scoreSubmitted: true });
+            })
+            .catch(err => {
+              console.error("Failed to submit score:", err);
+            });
         }
       }
     },
     
     restart: () => {
-      set({ phase: "menu", distance: 0, speed: 0, currentScore: 0, collectiblesCount: 0 });
+      set({ phase: "menu", distance: 0, speed: 0, currentScore: 0, collectiblesCount: 0, scoreSubmitted: false });
     },
     
     updateDistance: (distance: number) => {
@@ -98,6 +129,18 @@ export const useRally = create<RallyState>()(
       const newHighScore = Math.max(currentScore, highScore);
       localStorage.setItem("dreamNexusRallyHighScore", String(newHighScore));
       set({ highScore: newHighScore });
+    },
+    
+    setPlayerName: (name: string) => {
+      set({ playerName: name });
+      localStorage.setItem("dreamNexusRallyPlayerName", name);
+    },
+    
+    loadPlayerName: () => {
+      const saved = localStorage.getItem("dreamNexusRallyPlayerName");
+      if (saved) {
+        set({ playerName: saved });
+      }
     }
   }))
 );

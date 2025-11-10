@@ -1,12 +1,13 @@
-import { users, type User, type InsertUser } from "@shared/schema";
-
-// modify the interface with any CRUD methods
-// you might need
+import { users, type User, type InsertUser, leaderboard, type Leaderboard, type InsertLeaderboard } from "@shared/schema";
+import { db } from "../db";
+import { desc, eq, sql } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  getTopLeaderboard(limit: number): Promise<Leaderboard[]>;
+  upsertLeaderboardScore(score: InsertLeaderboard): Promise<Leaderboard>;
 }
 
 export class MemStorage implements IStorage {
@@ -33,6 +34,31 @@ export class MemStorage implements IStorage {
     const user: User = { ...insertUser, id };
     this.users.set(id, user);
     return user;
+  }
+
+  async getTopLeaderboard(limit: number): Promise<Leaderboard[]> {
+    const results = await db
+      .select()
+      .from(leaderboard)
+      .orderBy(desc(leaderboard.score))
+      .limit(limit);
+    return results;
+  }
+
+  async upsertLeaderboardScore(scoreData: InsertLeaderboard): Promise<Leaderboard> {
+    const [result] = await db
+      .insert(leaderboard)
+      .values(scoreData)
+      .onConflictDoUpdate({
+        target: leaderboard.playerName,
+        set: {
+          score: sql`CASE WHEN ${leaderboard.score} < ${scoreData.score} THEN ${scoreData.score} ELSE ${leaderboard.score} END`,
+          distance: sql`CASE WHEN ${leaderboard.score} < ${scoreData.score} THEN ${scoreData.distance} ELSE ${leaderboard.distance} END`,
+          createdAt: sql`CASE WHEN ${leaderboard.score} < ${scoreData.score} THEN NOW() ELSE ${leaderboard.createdAt} END`,
+        },
+      })
+      .returning();
+    return result;
   }
 }
 

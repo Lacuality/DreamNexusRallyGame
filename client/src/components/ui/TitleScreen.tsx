@@ -1,16 +1,29 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRally } from "@/lib/stores/useRally";
 import { DREAM_NEXUS_COLORS } from "@/lib/constants";
 import { CarModelViewer } from "./CarModelViewer";
 
 export function TitleScreen() {
-  const { start, highScore, loadHighScore } = useRally();
+  const { start, highScore, loadHighScore, playerName, setPlayerName, loadPlayerName } = useRally();
+  const [nameInput, setNameInput] = useState("");
 
   useEffect(() => {
     loadHighScore();
-  }, [loadHighScore]);
+    loadPlayerName();
+  }, [loadHighScore, loadPlayerName]);
+  
+  useEffect(() => {
+    if (playerName) {
+      setNameInput(playerName);
+    }
+  }, [playerName]);
 
-  const handleStart = () => start();
+  const handleStart = () => {
+    if (nameInput.trim()) {
+      setPlayerName(nameInput.trim());
+      start();
+    }
+  };
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -213,6 +226,54 @@ export function TitleScreen() {
           </div>
         </div>
 
+        {/* Player Name Input */}
+        <div
+          style={{
+            width: "100%",
+            maxWidth: "400px",
+          }}
+        >
+          <label
+            style={{
+              display: "block",
+              fontFamily: "monospace",
+              color: DREAM_NEXUS_COLORS.cyan,
+              fontSize: "clamp(16px, 2.2vw, 20px)",
+              marginBottom: "8px",
+              textAlign: "center",
+            }}
+          >
+            Enter Your Name
+          </label>
+          <input
+            type="text"
+            value={nameInput}
+            onChange={(e) => setNameInput(e.target.value)}
+            placeholder="Player Name"
+            maxLength={20}
+            style={{
+              width: "100%",
+              fontFamily: "monospace",
+              fontSize: "clamp(16px, 2.2vw, 20px)",
+              padding: "12px 16px",
+              background: "rgba(255,255,255,0.1)",
+              border: `2px solid ${DREAM_NEXUS_COLORS.cyan}`,
+              borderRadius: "8px",
+              color: DREAM_NEXUS_COLORS.white,
+              textAlign: "center",
+              outline: "none",
+            }}
+            onFocus={(e) => {
+              e.currentTarget.style.background = "rgba(255,255,255,0.15)";
+              e.currentTarget.style.borderColor = "#5dd6ff";
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.background = "rgba(255,255,255,0.1)";
+              e.currentTarget.style.borderColor = DREAM_NEXUS_COLORS.cyan;
+            }}
+          />
+        </div>
+
         {/* High score (optional) */}
         {highScore > 0 && (
           <div
@@ -228,21 +289,25 @@ export function TitleScreen() {
         {/* Start button */}
         <button
           onClick={handleStart}
+          disabled={!nameInput.trim()}
           style={{
             fontFamily: "monospace",
             fontWeight: 700,
             fontSize: sizes.buttonFont,
             padding: `${sizes.buttonPadY} ${sizes.buttonPadX}`,
-            background:
-              `linear-gradient(180deg, ${DREAM_NEXUS_COLORS.cyan}, #5dd6ff)`,
-            color: DREAM_NEXUS_COLORS.navy,
+            background: nameInput.trim()
+              ? `linear-gradient(180deg, ${DREAM_NEXUS_COLORS.cyan}, #5dd6ff)`
+              : "rgba(150,150,150,0.5)",
+            color: nameInput.trim() ? DREAM_NEXUS_COLORS.navy : "rgba(255,255,255,0.5)",
             border: "0",
             borderRadius: "12px",
-            cursor: "pointer",
-            boxShadow:
-              "0 10px 22px rgba(0,180,220,0.30), 0 1px 0 rgba(255,255,255,0.3) inset",
+            cursor: nameInput.trim() ? "pointer" : "not-allowed",
+            boxShadow: nameInput.trim()
+              ? "0 10px 22px rgba(0,180,220,0.30), 0 1px 0 rgba(255,255,255,0.3) inset"
+              : "none",
             transform: "translateZ(0)",
             transition: "transform .18s ease, box-shadow .18s ease",
+            opacity: nameInput.trim() ? 1 : 0.6,
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.transform = "translateY(-2px)";
