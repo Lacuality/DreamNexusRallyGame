@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useRally } from "./lib/stores/useRally";
-import { TitleScreen } from "./components/ui/TitleScreen";
+import { TitleScreenImmersive } from "./components/ui/TitleScreenImmersive";
 import { GameScene } from "./components/game/GameScene";
 import { GameOverScreen } from "./components/ui/GameOverScreen";
 import { audioManager } from "./lib/audio";
@@ -28,7 +28,7 @@ function App() {
   
   return (
     <div style={{ width: '100vw', height: '100vh', position: 'relative', overflow: 'hidden' }}>
-      {phase === "menu" && <TitleScreen />}
+      {phase === "menu" && <TitleScreenImmersive />}
       {phase === "playing" && <GameScene />}
       {phase === "paused" && <GameScene />}
       {phase === "gameover" && (
