@@ -21,6 +21,7 @@ import { audioManager } from "@/lib/audio";
 export function GameScene() {
   const [carPosition, setCarPosition] = useState(new THREE.Vector3(0, 0, 0));
   const [carSpeed, setCarSpeed] = useState(0);
+  const [boostCounter, setBoostCounter] = useState(0);
   const { phase, updateDistance, updateSpeed, gameOver, pause, resume, addCollectible } = useRally();
   const showPhotoMode = useSettings((state) => state.showPhotoMode);
   
@@ -78,9 +79,10 @@ export function GameScene() {
   };
   
   const handleCollect = () => {
-    console.log("Collected arequipe jar! +50 points");
+    console.log("Collected arequipe jar! +50 points, speed burst!");
     addCollectible();
     audioManager.playSuccess();
+    setBoostCounter(prev => prev + 1);
   };
   
   const keyMap = [
@@ -114,6 +116,7 @@ export function GameScene() {
               onPositionChange={setCarPosition}
               onSpeedChange={setCarSpeed}
               onCrash={gameOver}
+              boostCounter={boostCounter}
             />
             <Obstacles
               carPosition={carPosition}

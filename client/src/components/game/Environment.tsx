@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import * as THREE from "three";
-import { DREAM_NEXUS_COLORS } from "@/lib/constants";
+import { DREAM_NEXUS_COLORS, GAME_CONFIG } from "@/lib/constants";
 import { useSettings } from "@/lib/stores/useSettings";
 
 export function Environment() {
@@ -33,8 +33,8 @@ function Sky() {
 function Lights() {
   const weather = useSettings((state) => state.weather);
   
-  const sunIntensity = weather === "sunny" ? 1 : 0.6;
-  const ambientIntensity = weather === "sunny" ? 0.6 : 0.4;
+  const sunIntensity = weather === "sunny" ? GAME_CONFIG.SUN_INTENSITY : 0.6;
+  const ambientIntensity = weather === "sunny" ? GAME_CONFIG.AMBIENT_INTENSITY : 0.3;
   
   return (
     <>
@@ -53,7 +53,7 @@ function Lights() {
       />
       <directionalLight
         position={[-10, 10, -10]}
-        intensity={0.3}
+        intensity={0.4}
       />
     </>
   );
