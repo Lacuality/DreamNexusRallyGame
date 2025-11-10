@@ -3,6 +3,7 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { GAME_CONFIG } from "@/lib/constants";
 import { useSettings } from "@/lib/stores/useSettings";
+import { CollectibleSparkles } from "./ParticleEffects";
 
 export type CollectibleType = "arequipe" | "nitro" | "shield";
 
@@ -84,7 +85,10 @@ export function Collectibles({ carPosition, onCollect }: CollectiblesProps) {
   return (
     <group>
       {collectibles.map((collectible) => (
-        <CollectibleModel key={collectible.id} collectible={collectible} />
+        <group key={collectible.id}>
+          <CollectibleModel collectible={collectible} />
+          <CollectibleSparkles position={collectible.position} />
+        </group>
       ))}
     </group>
   );

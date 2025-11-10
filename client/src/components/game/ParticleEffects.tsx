@@ -1,0 +1,265 @@
+import { useRef, useMemo } from "react";
+import { useFrame } from "@react-three/fiber";
+import * as THREE from "three";
+
+interface NitroParticlesProps {
+  active: boolean;
+  carPosition: THREE.Vector3;
+}
+
+export function NitroParticles({ active, carPosition }: NitroParticlesProps) {
+  const particlesRef = useRef<THREE.Points>(null);
+  const timeRef = useRef(0);
+  
+  const particleCount = 50;
+  
+  const { positions, colors, sizes } = useMemo(() => {
+    const positions = new Float32Array(particleCount * 3);
+    const colors = new Float32Array(particleCount * 3);
+    const sizes = new Float32Array(particleCount);
+    
+    for (let i = 0; i < particleCount; i++) {
+      positions[i * 3] = 0;
+      positions[i * 3 + 1] = 0;
+      positions[i * 3 + 2] = 0;
+      
+      const color = new THREE.Color();
+      color.setHSL(Math.random() * 0.1 + 0.05, 1, 0.5);
+      colors[i * 3] = color.r;
+      colors[i * 3 + 1] = color.g;
+      colors[i * 3 + 2] = color.b;
+      
+      sizes[i] = Math.random() * 0.2 + 0.1;
+    }
+    
+    return { positions, colors, sizes };
+  }, []);
+  
+  useFrame((state, delta) => {
+    if (!particlesRef.current || !active) return;
+    
+    timeRef.current += delta;
+    const positionAttribute = particlesRef.current.geometry.attributes.position;
+    const positions = positionAttribute.array as Float32Array;
+    
+    for (let i = 0; i < particleCount; i++) {
+      const offset = (timeRef.current + i * 0.1) % 1;
+      const spread = 0.4;
+      
+      positions[i * 3] = carPosition.x + (Math.random() - 0.5) * spread;
+      positions[i * 3 + 1] = carPosition.y - 0.3 + Math.random() * 0.2;
+      positions[i * 3 + 2] = carPosition.z - offset * 2;
+    }
+    
+    positionAttribute.needsUpdate = true;
+  });
+  
+  if (!active) return null;
+  
+  return (
+    <points ref={particlesRef}>
+      <bufferGeometry>
+        <bufferAttribute
+          attach="attributes-position"
+          count={particleCount}
+          array={positions}
+          itemSize={3}
+        />
+        <bufferAttribute
+          attach="attributes-color"
+          count={particleCount}
+          array={colors}
+          itemSize={3}
+        />
+        <bufferAttribute
+          attach="attributes-size"
+          count={particleCount}
+          array={sizes}
+          itemSize={1}
+        />
+      </bufferGeometry>
+      <pointsMaterial
+        size={0.15}
+        vertexColors
+        transparent
+        opacity={0.8}
+        sizeAttenuation
+        blending={THREE.AdditiveBlending}
+        depthWrite={false}
+      />
+    </points>
+  );
+}
+
+interface DustTrailProps {
+  carPosition: THREE.Vector3;
+  speed: number;
+}
+
+export function DustTrail({ carPosition, speed }: DustTrailProps) {
+  const particlesRef = useRef<THREE.Points>(null);
+  const timeRef = useRef(0);
+  
+  const particleCount = 30;
+  
+  const { positions, colors, sizes } = useMemo(() => {
+    const positions = new Float32Array(particleCount * 3);
+    const colors = new Float32Array(particleCount * 3);
+    const sizes = new Float32Array(particleCount);
+    
+    for (let i = 0; i < particleCount; i++) {
+      positions[i * 3] = 0;
+      positions[i * 3 + 1] = 0;
+      positions[i * 3 + 2] = 0;
+      
+      colors[i * 3] = 0.6;
+      colors[i * 3 + 1] = 0.5;
+      colors[i * 3 + 2] = 0.4;
+      
+      sizes[i] = Math.random() * 0.15 + 0.1;
+    }
+    
+    return { positions, colors, sizes };
+  }, []);
+  
+  useFrame((state, delta) => {
+    if (!particlesRef.current || speed < 5) return;
+    
+    timeRef.current += delta;
+    const positionAttribute = particlesRef.current.geometry.attributes.position;
+    const positions = positionAttribute.array as Float32Array;
+    
+    for (let i = 0; i < particleCount; i++) {
+      const offset = (timeRef.current * 2 + i * 0.1) % 1;
+      const spread = 0.6;
+      
+      positions[i * 3] = carPosition.x + (Math.random() - 0.5) * spread;
+      positions[i * 3 + 1] = 0.1 + Math.random() * 0.1;
+      positions[i * 3 + 2] = carPosition.z - offset * 3;
+    }
+    
+    positionAttribute.needsUpdate = true;
+  });
+  
+  if (speed < 5) return null;
+  
+  return (
+    <points ref={particlesRef}>
+      <bufferGeometry>
+        <bufferAttribute
+          attach="attributes-position"
+          count={particleCount}
+          array={positions}
+          itemSize={3}
+        />
+        <bufferAttribute
+          attach="attributes-color"
+          count={particleCount}
+          array={colors}
+          itemSize={3}
+        />
+        <bufferAttribute
+          attach="attributes-size"
+          count={particleCount}
+          array={sizes}
+          itemSize={1}
+        />
+      </bufferGeometry>
+      <pointsMaterial
+        size={0.1}
+        vertexColors
+        transparent
+        opacity={0.4}
+        sizeAttenuation
+        depthWrite={false}
+      />
+    </points>
+  );
+}
+
+interface CollectibleSparklesProps {
+  position: THREE.Vector3;
+}
+
+export function CollectibleSparkles({ position }: CollectibleSparklesProps) {
+  const particlesRef = useRef<THREE.Points>(null);
+  const timeRef = useRef(0);
+  
+  const particleCount = 20;
+  
+  const { positions, colors, sizes } = useMemo(() => {
+    const positions = new Float32Array(particleCount * 3);
+    const colors = new Float32Array(particleCount * 3);
+    const sizes = new Float32Array(particleCount);
+    
+    for (let i = 0; i < particleCount; i++) {
+      const angle = (i / particleCount) * Math.PI * 2;
+      const radius = 0.5;
+      
+      positions[i * 3] = Math.cos(angle) * radius;
+      positions[i * 3 + 1] = Math.sin(timeRef.current + i * 0.3) * 0.3;
+      positions[i * 3 + 2] = Math.sin(angle) * radius;
+      
+      colors[i * 3] = 1;
+      colors[i * 3 + 1] = 0.9;
+      colors[i * 3 + 2] = 0.3;
+      
+      sizes[i] = 0.08;
+    }
+    
+    return { positions, colors, sizes };
+  }, []);
+  
+  useFrame((state, delta) => {
+    if (!particlesRef.current) return;
+    
+    timeRef.current += delta * 2;
+    const positionAttribute = particlesRef.current.geometry.attributes.position;
+    const positions = positionAttribute.array as Float32Array;
+    
+    for (let i = 0; i < particleCount; i++) {
+      const angle = (i / particleCount) * Math.PI * 2 + timeRef.current;
+      const radius = 0.5 + Math.sin(timeRef.current * 2 + i) * 0.1;
+      
+      positions[i * 3] = position.x + Math.cos(angle) * radius;
+      positions[i * 3 + 1] = position.y + Math.sin(timeRef.current * 3 + i * 0.5) * 0.3;
+      positions[i * 3 + 2] = position.z + Math.sin(angle) * radius;
+    }
+    
+    positionAttribute.needsUpdate = true;
+  });
+  
+  return (
+    <points ref={particlesRef}>
+      <bufferGeometry>
+        <bufferAttribute
+          attach="attributes-position"
+          count={particleCount}
+          array={positions}
+          itemSize={3}
+        />
+        <bufferAttribute
+          attach="attributes-color"
+          count={particleCount}
+          array={colors}
+          itemSize={3}
+        />
+        <bufferAttribute
+          attach="attributes-size"
+          count={particleCount}
+          array={sizes}
+          itemSize={1}
+        />
+      </bufferGeometry>
+      <pointsMaterial
+        size={0.08}
+        vertexColors
+        transparent
+        opacity={0.9}
+        sizeAttenuation
+        blending={THREE.AdditiveBlending}
+        depthWrite={false}
+      />
+    </points>
+  );
+}

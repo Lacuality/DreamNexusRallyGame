@@ -9,6 +9,7 @@ import { Environment } from "./Environment";
 import { Obstacles } from "./Obstacles";
 import { Collectibles } from "./Collectibles";
 import { SponsorBanners } from "./SponsorBanners";
+import { NitroParticles, DustTrail } from "./ParticleEffects";
 import { useRally } from "@/lib/stores/useRally";
 import { useSettings } from "@/lib/stores/useSettings";
 import { useBiome } from "@/lib/stores/useBiome";
@@ -193,12 +194,14 @@ export function GameScene() {
               carPosition={carPosition}
               onCollect={handleCollect}
             />
+            <NitroParticles active={nitroActive} carPosition={carPosition} />
+            <DustTrail carPosition={carPosition} speed={carSpeed} />
             <Camera carPosition={carPosition} />
           </Suspense>
         </Canvas>
       </KeyboardControls>
       
-      {!showPhotoMode && phase === "playing" && <GameHUD />}
+      {!showPhotoMode && phase === "playing" && <GameHUD nitroActive={nitroActive} shieldActive={shieldActive} />}
       {!showPhotoMode && phase === "playing" && <TuningPanel />}
       {!showPhotoMode && phase === "paused" && <PauseMenu />}
       {!showPhotoMode && <MobileControls />}

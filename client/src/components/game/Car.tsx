@@ -1,6 +1,6 @@
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
-import { useKeyboardControls } from "@react-three/drei";
+import { useKeyboardControls, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import { GAME_CONFIG } from "@/lib/constants";
 import { useRally } from "@/lib/stores/useRally";
@@ -26,10 +26,24 @@ interface CarProps {
 export function Car({ onPositionChange, onSpeedChange, onCrash, boostCounter = 0, nitroActive = false, puddleSlowdown = false }: CarProps) {
   const carRef = useRef<THREE.Group>(null);
   const bodyRef = useRef<THREE.Group>(null);
+  const carModelRef = useRef<THREE.Group>(null);
   const frontLeftWheelRef = useRef<THREE.Mesh>(null);
   const frontRightWheelRef = useRef<THREE.Mesh>(null);
   const rearLeftWheelRef = useRef<THREE.Mesh>(null);
   const rearRightWheelRef = useRef<THREE.Mesh>(null);
+  
+  const { scene } = useGLTF("/models/rally-car.glb");
+  
+  const carModel = useMemo(() => {
+    const clonedScene = scene.clone();
+    clonedScene.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+      }
+    });
+    return clonedScene;
+  }, [scene]);
   
   const targetSpeedRef = useRef(0);
   const actualSpeedRef = useRef(0);
@@ -146,32 +160,26 @@ export function Car({ onPositionChange, onSpeedChange, onCrash, boostCounter = 0
   return (
     <group ref={carRef} position={[0, 0.5, 0]}>
       <group ref={bodyRef}>
-        <mesh castShadow>
-          <boxGeometry args={[1, 0.6, 2]} />
-          <meshStandardMaterial color="#24A0CE" />
-        </mesh>
-        
-        <mesh position={[0, 0.5, -0.3]} castShadow>
-          <boxGeometry args={[0.9, 0.4, 0.8]} />
-          <meshStandardMaterial color="#0E1B24" />
-        </mesh>
+        <group ref={carModelRef} scale={0.6}>
+          <primitive object={carModel} />
+        </group>
       </group>
       
       <mesh ref={frontLeftWheelRef} position={[-0.6, -0.2, 0.6]} rotation={[Math.PI / 2, 0, 0]} castShadow>
-        <cylinderGeometry args={[0.15, 0.15, 0.1, 16]} />
-        <meshStandardMaterial color="#1a1a1a" />
+        <cylinderGeometry args={[0.15, 0.15, 0.15, 16]} />
+        <meshStandardMaterial color="#1a1a1a" roughness={0.8} metalness={0.2} />
       </mesh>
       <mesh ref={frontRightWheelRef} position={[0.6, -0.2, 0.6]} rotation={[Math.PI / 2, 0, 0]} castShadow>
-        <cylinderGeometry args={[0.15, 0.15, 0.1, 16]} />
-        <meshStandardMaterial color="#1a1a1a" />
+        <cylinderGeometry args={[0.15, 0.15, 0.15, 16]} />
+        <meshStandardMaterial color="#1a1a1a" roughness={0.8} metalness={0.2} />
       </mesh>
       <mesh ref={rearLeftWheelRef} position={[-0.6, -0.2, -0.6]} rotation={[Math.PI / 2, 0, 0]} castShadow>
-        <cylinderGeometry args={[0.15, 0.15, 0.1, 16]} />
-        <meshStandardMaterial color="#1a1a1a" />
+        <cylinderGeometry args={[0.15, 0.15, 0.15, 16]} />
+        <meshStandardMaterial color="#1a1a1a" roughness={0.8} metalness={0.2} />
       </mesh>
       <mesh ref={rearRightWheelRef} position={[0.6, -0.2, -0.6]} rotation={[Math.PI / 2, 0, 0]} castShadow>
-        <cylinderGeometry args={[0.15, 0.15, 0.1, 16]} />
-        <meshStandardMaterial color="#1a1a1a" />
+        <cylinderGeometry args={[0.15, 0.15, 0.15, 16]} />
+        <meshStandardMaterial color="#1a1a1a" roughness={0.8} metalness={0.2} />
       </mesh>
     </group>
   );

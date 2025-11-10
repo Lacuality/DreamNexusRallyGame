@@ -1,7 +1,12 @@
 import { useRally } from "@/lib/stores/useRally";
 import { DREAM_NEXUS_COLORS } from "@/lib/constants";
 
-export function GameHUD() {
+interface GameHUDProps {
+  nitroActive?: boolean;
+  shieldActive?: boolean;
+}
+
+export function GameHUD({ nitroActive = false, shieldActive = false }: GameHUDProps = {}) {
   const { distance, speed, highScore, collectiblesCount, currentScore, pause } = useRally();
   
   return (
@@ -77,6 +82,69 @@ export function GameHUD() {
         style={{
           position: "absolute",
           bottom: "20px",
+          left: "20px",
+          display: "flex",
+          gap: "12px",
+        }}
+      >
+        {nitroActive && (
+          <div
+            style={{
+              backgroundColor: "rgba(255, 107, 0, 0.9)",
+              padding: "12px 18px",
+              borderRadius: "10px",
+              border: "3px solid #ff6b00",
+              color: "white",
+              fontWeight: "bold",
+              fontSize: "16px",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              animation: "pulse 0.5s ease-in-out infinite",
+            }}
+          >
+            <div style={{ 
+              width: "24px", 
+              height: "24px", 
+              background: "linear-gradient(180deg, #ffff00 0%, #ff6b00 100%)",
+              borderRadius: "50%",
+              boxShadow: "0 0 10px #ff6b00"
+            }} />
+            NITRO BOOST
+          </div>
+        )}
+        
+        {shieldActive && (
+          <div
+            style={{
+              backgroundColor: "rgba(36, 160, 206, 0.9)",
+              padding: "12px 18px",
+              borderRadius: "10px",
+              border: "3px solid #24A0CE",
+              color: "white",
+              fontWeight: "bold",
+              fontSize: "16px",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+            }}
+          >
+            <div style={{ 
+              width: "24px", 
+              height: "24px", 
+              background: "linear-gradient(135deg, #24A0CE 0%, #0E1B24 100%)",
+              borderRadius: "50%",
+              boxShadow: "0 0 10px #24A0CE"
+            }} />
+            SHIELD ACTIVE
+          </div>
+        )}
+      </div>
+      
+      <div
+        style={{
+          position: "absolute",
+          bottom: "20px",
           right: "20px",
           display: "flex",
           alignItems: "center",
@@ -97,6 +165,13 @@ export function GameHUD() {
           style={{ width: "120px", objectFit: "contain" }}
         />
       </div>
+      
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.05); }
+        }
+      `}</style>
     </div>
   );
 }

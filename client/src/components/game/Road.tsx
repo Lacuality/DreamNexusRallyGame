@@ -62,8 +62,46 @@ export function Road({ carPosition }: RoadProps) {
         />
       </mesh>
       
+      <RoadEdges carPosition={carPosition} />
       <CenterLine carPosition={carPosition} />
     </group>
+  );
+}
+
+function RoadEdges({ carPosition }: { carPosition: THREE.Vector3 }) {
+  const leftEdgeRef = useRef<THREE.Mesh>(null);
+  const rightEdgeRef = useRef<THREE.Mesh>(null);
+  
+  useFrame(() => {
+    if (leftEdgeRef.current) {
+      leftEdgeRef.current.position.z = carPosition.z - 50;
+    }
+    if (rightEdgeRef.current) {
+      rightEdgeRef.current.position.z = carPosition.z - 50;
+    }
+  });
+  
+  const edgeGeometry = useMemo(() => {
+    return new THREE.BoxGeometry(0.3, 0.15, 200);
+  }, []);
+  
+  return (
+    <>
+      <mesh
+        ref={leftEdgeRef}
+        position={[-GAME_CONFIG.LANE_WIDTH / 2, 0.1, 0]}
+        geometry={edgeGeometry}
+      >
+        <meshStandardMaterial color="#ffcc00" emissive="#ffcc00" emissiveIntensity={0.2} />
+      </mesh>
+      <mesh
+        ref={rightEdgeRef}
+        position={[GAME_CONFIG.LANE_WIDTH / 2, 0.1, 0]}
+        geometry={edgeGeometry}
+      >
+        <meshStandardMaterial color="#ffcc00" emissive="#ffcc00" emissiveIntensity={0.2} />
+      </mesh>
+    </>
   );
 }
 
