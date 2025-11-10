@@ -156,11 +156,11 @@ function CenterLine({ carPosition }: { carPosition: THREE.Vector3 }) {
 
     for (let i = 0; i < count; i++) {
       const zLocal = -ROAD_LENGTH / 2 + i * (DASH_LENGTH + DASH_GAP);
-      const { elev } = sampleCurveAndElev(zLocal);
+      const { curve, elev } = sampleCurveAndElev(zLocal);
       
       dashArray.push({
         key: i,
-        position: [0, EDGE_LIFT * 0.8 + elev, zLocal] as [number, number, number]
+        position: [curve, EDGE_LIFT * 0.8 + elev, zLocal] as [number, number, number]
       });
     }
     return dashArray;
