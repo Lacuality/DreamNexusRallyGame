@@ -10,6 +10,7 @@ import { Obstacles } from "./Obstacles";
 import { Collectibles } from "./Collectibles";
 import { SponsorBanners } from "./SponsorBanners";
 import { NitroParticles, DustTrail } from "./ParticleEffects";
+import { BiomePropsScene } from "./BiomeProps";
 import { useRally } from "@/lib/stores/useRally";
 import { useSettings } from "@/lib/stores/useSettings";
 import { useBiome } from "@/lib/stores/useBiome";
@@ -177,6 +178,7 @@ export function GameScene() {
             <Environment />
             <SponsorBanners />
             <Road carPosition={carPosition} />
+            <BiomePropsScene carPosition={carPosition} />
             <Car
               onPositionChange={setCarPosition}
               onSpeedChange={setCarSpeed}

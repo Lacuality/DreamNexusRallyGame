@@ -27,15 +27,16 @@ export function Car({ onPositionChange, onSpeedChange, onCrash, boostCounter = 0
   const carRef = useRef<THREE.Group>(null);
   const bodyRef = useRef<THREE.Group>(null);
   const carModelRef = useRef<THREE.Group>(null);
-  const frontLeftWheelRef = useRef<THREE.Mesh>(null);
-  const frontRightWheelRef = useRef<THREE.Mesh>(null);
-  const rearLeftWheelRef = useRef<THREE.Mesh>(null);
-  const rearRightWheelRef = useRef<THREE.Mesh>(null);
+  const frontLeftWheelRef = useRef<THREE.Group>(null);
+  const frontRightWheelRef = useRef<THREE.Group>(null);
+  const rearLeftWheelRef = useRef<THREE.Group>(null);
+  const rearRightWheelRef = useRef<THREE.Group>(null);
   
-  const { scene } = useGLTF("/models/rally-car.glb");
+  const { scene: carScene } = useGLTF("/models/rally-car.glb");
+  const { scene: wheelScene } = useGLTF("/models/rally-wheel.glb");
   
   const carModel = useMemo(() => {
-    const clonedScene = scene.clone();
+    const clonedScene = carScene.clone();
     clonedScene.traverse((child) => {
       if (child instanceof THREE.Mesh) {
         child.castShadow = true;
@@ -43,7 +44,16 @@ export function Car({ onPositionChange, onSpeedChange, onCrash, boostCounter = 0
       }
     });
     return clonedScene;
-  }, [scene]);
+  }, [carScene]);
+  
+  const wheelModels = useMemo(() => {
+    return {
+      frontLeft: wheelScene.clone(),
+      frontRight: wheelScene.clone(),
+      rearLeft: wheelScene.clone(),
+      rearRight: wheelScene.clone(),
+    };
+  }, [wheelScene]);
   
   const targetSpeedRef = useRef(0);
   const actualSpeedRef = useRef(0);
@@ -165,22 +175,18 @@ export function Car({ onPositionChange, onSpeedChange, onCrash, boostCounter = 0
         </group>
       </group>
       
-      <mesh ref={frontLeftWheelRef} position={[-0.6, -0.2, 0.6]} rotation={[Math.PI / 2, 0, 0]} castShadow>
-        <cylinderGeometry args={[0.15, 0.15, 0.15, 16]} />
-        <meshStandardMaterial color="#1a1a1a" roughness={0.8} metalness={0.2} />
-      </mesh>
-      <mesh ref={frontRightWheelRef} position={[0.6, -0.2, 0.6]} rotation={[Math.PI / 2, 0, 0]} castShadow>
-        <cylinderGeometry args={[0.15, 0.15, 0.15, 16]} />
-        <meshStandardMaterial color="#1a1a1a" roughness={0.8} metalness={0.2} />
-      </mesh>
-      <mesh ref={rearLeftWheelRef} position={[-0.6, -0.2, -0.6]} rotation={[Math.PI / 2, 0, 0]} castShadow>
-        <cylinderGeometry args={[0.15, 0.15, 0.15, 16]} />
-        <meshStandardMaterial color="#1a1a1a" roughness={0.8} metalness={0.2} />
-      </mesh>
-      <mesh ref={rearRightWheelRef} position={[0.6, -0.2, -0.6]} rotation={[Math.PI / 2, 0, 0]} castShadow>
-        <cylinderGeometry args={[0.15, 0.15, 0.15, 16]} />
-        <meshStandardMaterial color="#1a1a1a" roughness={0.8} metalness={0.2} />
-      </mesh>
+      <group ref={frontLeftWheelRef} position={[-0.6, -0.2, 0.6]} rotation={[0, 0, 0]}>
+        <primitive object={wheelModels.frontLeft} scale={1.8} />
+      </group>
+      <group ref={frontRightWheelRef} position={[0.6, -0.2, 0.6]} rotation={[0, 0, 0]}>
+        <primitive object={wheelModels.frontRight} scale={1.8} />
+      </group>
+      <group ref={rearLeftWheelRef} position={[-0.6, -0.2, -0.6]} rotation={[0, 0, 0]}>
+        <primitive object={wheelModels.rearLeft} scale={1.8} />
+      </group>
+      <group ref={rearRightWheelRef} position={[0.6, -0.2, -0.6]} rotation={[0, 0, 0]}>
+        <primitive object={wheelModels.rearRight} scale={1.8} />
+      </group>
     </group>
   );
 }

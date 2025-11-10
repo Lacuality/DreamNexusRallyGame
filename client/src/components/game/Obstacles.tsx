@@ -1,12 +1,13 @@
 import { useState, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
+import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import { GAME_CONFIG } from "@/lib/constants";
 import { useSettings } from "@/lib/stores/useSettings";
 
 interface Obstacle {
   id: number;
-  type: "cone" | "rock" | "puddle";
+  type: "cone" | "rock" | "puddle" | "coffee_sack";
   position: THREE.Vector3;
 }
 
@@ -40,7 +41,7 @@ export function Obstacles({ carPosition, carSpeed, onCollision }: ObstaclesProps
     if (carPosition.z > lastSpawnZ + 10) {
       if (Math.random() < spawnChance) {
         const laneOffset = (Math.random() - 0.5) * (GAME_CONFIG.LANE_WIDTH - 2);
-        const obstacleTypes: Array<"cone" | "rock" | "puddle"> = ["cone", "rock", "puddle"];
+        const obstacleTypes: Array<"cone" | "rock" | "puddle" | "coffee_sack"> = ["cone", "rock", "puddle", "coffee_sack"];
         const type = obstacleTypes[Math.floor(Math.random() * obstacleTypes.length)];
         
         newObstacles.push({
@@ -82,6 +83,8 @@ export function Obstacles({ carPosition, carSpeed, onCollision }: ObstaclesProps
 }
 
 function ObstacleModel({ obstacle }: { obstacle: Obstacle }) {
+  const { scene: coffeeSack } = useGLTF("/models/coffee-sack.glb");
+  
   const position: [number, number, number] = [
     obstacle.position.x,
     obstacle.position.y,
@@ -103,6 +106,14 @@ function ObstacleModel({ obstacle }: { obstacle: Obstacle }) {
         <dodecahedronGeometry args={[0.5, 0]} />
         <meshStandardMaterial color="#666666" roughness={0.9} />
       </mesh>
+    );
+  }
+  
+  if (obstacle.type === "coffee_sack") {
+    return (
+      <group position={position} scale={0.8}>
+        <primitive object={coffeeSack.clone()} />
+      </group>
     );
   }
   
