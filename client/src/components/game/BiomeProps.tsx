@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import { useGLTF } from "@react-three/drei";
 import { useBiome } from "@/lib/stores/useBiome";
 import * as THREE from "three";
@@ -9,192 +9,107 @@ interface BiomePropsSceneProps {
 }
 
 export function BiomePropsScene({ carPositionRef }: BiomePropsSceneProps) {
-  const currentBiome = useBiome((state) => state.currentBiome);
-  
-  if (currentBiome === "coffee_hills") {
-    return <CoffeeHillsProps carPositionRef={carPositionRef} />;
-  } else if (currentBiome === "andes_highland") {
-    return <AndesHighlandProps carPositionRef={carPositionRef} />;
-  } else {
-    return <PuebloProps carPositionRef={carPositionRef} />;
-  }
+  const currentBiome = useBiome((s) => s.currentBiome);
+  if (currentBiome === "coffee_hills") return <CoffeeHillsProps carPositionRef={carPositionRef} />;
+  if (currentBiome === "andes_highland") return <AndesHighlandProps carPositionRef={carPositionRef} />;
+  return <PuebloProps carPositionRef={carPositionRef} />;
 }
 
+/** ----------------- Coffee Hills ----------------- */
 function CoffeeHillsProps({ carPositionRef }: { carPositionRef: React.MutableRefObject<THREE.Vector3> }) {
   const { scene: coffeePlant } = useGLTF("/models/coffee-plant.glb");
   const { scene: farmFence } = useGLTF("/models/farm-fence.glb");
   const { scene: jeepWillys } = useGLTF("/models/jeep-willys.glb");
-  
   const segment = Math.floor(carPositionRef.current.z / 50);
-  
-  const props = useMemo(() => {
-    const items = [];
-    const roadEdge = GAME_CONFIG.LANE_WIDTH / 2 + 1;
-    
-    for (let i = 0; i < 20; i++) {
-      const zPos = segment * 50 + (i * 15) - 50;
+  const roadEdge = GAME_CONFIG.LANE_WIDTH / 2 + 1.4;
+
+  const data = useMemo(() => {
+    const items: { m: THREE.Object3D; pos: [number, number, number]; rotY: number; s: number }[] = [];
+    for (let i = 0; i < 24; i++) {
+      const z = segment * 50 + (i * 12) - 60;
       const side = i % 2 === 0 ? -1 : 1;
-      const seed = segment * 100 + i;
-      const pseudoRandom = Math.sin(seed) * 10000;
-      const xOffset = (pseudoRandom - Math.floor(pseudoRandom)) * 2;
-      const xPos = side * (roadEdge + xOffset);
-      
-      const propTypeSeed = Math.abs(Math.sin(seed * 1.23) * 10);
-      const propType = Math.floor(propTypeSeed);
-      
-      const rotationSeed = Math.abs(Math.sin(seed * 2.34) * Math.PI * 2);
-      const scaleSeed = 0.8 + Math.abs(Math.sin(seed * 3.45)) * 0.4;
-      
-      let model;
-      if (propType < 6) {
-        model = coffeePlant.clone(true);
-        items.push({
-          id: `coffee-${segment}-${i}`,
-          model,
-          position: [xPos, 0, zPos] as [number, number, number],
-          rotation: rotationSeed,
-          scale: scaleSeed,
-        });
-      } else if (propType < 8) {
-        model = farmFence.clone(true);
-        items.push({
-          id: `fence-${segment}-${i}`,
-          model,
-          position: [xPos, 0, zPos] as [number, number, number],
-          rotation: side > 0 ? Math.PI / 2 : -Math.PI / 2,
-          scale: 0.6,
-        });
+      const seed = segment * 97 + i;
+      const rand = (n: number) => Math.abs(Math.sin(seed * n));
+      const x = side * (roadEdge + 0.5 + rand(1.3) * 2.2);
+
+      if (rand(2.1) < 0.68) {
+        items.push({ m: coffeePlant, pos: [x, 0, z], rotY: rand(3.1) * Math.PI * 2, s: 0.75 + rand(4.2) * 0.5 });
+      } else if (rand(2.7) < 0.85) {
+        items.push({ m: farmFence, pos: [x, 0, z], rotY: side > 0 ? Math.PI / 2 : -Math.PI / 2, s: 0.66 });
       } else {
-        model = jeepWillys.clone(true);
-        items.push({
-          id: `jeep-${segment}-${i}`,
-          model,
-          position: [xPos, 0, zPos] as [number, number, number],
-          rotation: side > 0 ? Math.PI / 2 : -Math.PI / 2,
-          scale: 0.4,
-        });
+        items.push({ m: jeepWillys, pos: [x, 0, z], rotY: side > 0 ? Math.PI / 2 : -Math.PI / 2, s: 0.42 + rand(5.3) * 0.1 });
       }
     }
-    
     return items;
-  }, [segment, coffeePlant, farmFence, jeepWillys]);
-  
-  return (
-    <group>
-      {props.map((prop) => (
-        <group
-          key={prop.id}
-          position={prop.position}
-          rotation={[0, prop.rotation, 0]}
-          scale={prop.scale}
-        >
-          <primitive object={prop.model} />
-        </group>
-      ))}
-    </group>
-  );
+  }, [segment, coffeePlant, farmFence, jeepWillys, roadEdge]);
+
+  return <GenericProps items={data} />;
 }
 
+/** ----------------- Andes ----------------- */
 function AndesHighlandProps({ carPositionRef }: { carPositionRef: React.MutableRefObject<THREE.Vector3> }) {
   const { scene: andesRock } = useGLTF("/models/andes-rock.glb");
   const { scene: fraijelon } = useGLTF("/models/fraijelon.glb");
-  
-  const segment = Math.floor(carPositionRef.current.z / 60);
-  
-  const props = useMemo(() => {
-    const items = [];
-    const roadEdge = GAME_CONFIG.LANE_WIDTH / 2 + 1;
-    
-    for (let i = 0; i < 15; i++) {
-      const zPos = segment * 60 + (i * 20) - 60;
+  const segment = Math.floor(carPositionRef.current.z / 65);
+  const roadEdge = GAME_CONFIG.LANE_WIDTH / 2 + 1.6;
+
+  const data = useMemo(() => {
+    const items: { m: THREE.Object3D; pos: [number, number, number]; rotY: number; s: number }[] = [];
+    for (let i = 0; i < 18; i++) {
+      const z = segment * 65 + (i * 18) - 70;
       const side = i % 2 === 0 ? -1 : 1;
-      const seed = segment * 100 + i;
-      const xOffset = Math.abs(Math.sin(seed * 1.11) * 3);
-      const xPos = side * (roadEdge + xOffset);
-      
-      const propTypeSeed = Math.abs(Math.sin(seed * 2.22));
-      const rotationSeed = Math.abs(Math.sin(seed * 3.33) * Math.PI * 2);
-      const scaleSeed = 0.6 + Math.abs(Math.sin(seed * 4.44)) * 0.6;
-      
-      const model = propTypeSeed < 0.6 ? andesRock.clone(true) : fraijelon.clone(true);
-      
-      items.push({
-        id: `andes-${segment}-${i}`,
-        model,
-        position: [xPos, 0, zPos] as [number, number, number],
-        rotation: rotationSeed,
-        scale: scaleSeed,
-      });
+      const seed = segment * 131 + i;
+      const rand = (n: number) => Math.abs(Math.sin(seed * n));
+      const x = side * (roadEdge + 0.8 + rand(1.1) * 3.5);
+
+      const model = rand(2.2) < 0.6 ? andesRock : fraijelon;
+      items.push({ m: model, pos: [x, 0, z], rotY: rand(3.3) * Math.PI * 2, s: 0.65 + rand(4.4) * 0.6 });
     }
-    
     return items;
-  }, [segment, andesRock, fraijelon]);
-  
-  return (
-    <group>
-      {props.map((prop) => (
-        <group
-          key={prop.id}
-          position={prop.position}
-          rotation={[0, prop.rotation, 0]}
-          scale={prop.scale}
-        >
-          <primitive object={prop.model} />
-        </group>
-      ))}
-    </group>
-  );
+  }, [segment, andesRock, fraijelon, roadEdge]);
+
+  return <GenericProps items={data} />;
 }
 
+/** ----------------- Pueblo ----------------- */
 function PuebloProps({ carPositionRef }: { carPositionRef: React.MutableRefObject<THREE.Vector3> }) {
   const { scene: puebloHouse } = useGLTF("/models/pueblo-house.glb");
   const { scene: papelPicado } = useGLTF("/models/papel-picado.glb");
-  
   const segment = Math.floor(carPositionRef.current.z / 70);
-  
-  const props = useMemo(() => {
-    const items = [];
-    const roadEdge = GAME_CONFIG.LANE_WIDTH / 2 + 1;
-    
-    for (let i = 0; i < 12; i++) {
-      const zPos = segment * 70 + (i * 25) - 70;
+  const roadEdge = GAME_CONFIG.LANE_WIDTH / 2 + 1.2;
+
+  const data = useMemo(() => {
+    const items: { m: THREE.Object3D; pos: [number, number, number]; rotY: number; s: number }[] = [];
+    for (let i = 0; i < 14; i++) {
+      const z = segment * 70 + (i * 24) - 72;
       const side = i % 2 === 0 ? -1 : 1;
-      const xPos = side * (roadEdge + 0.5);
-      
-      const propType = i % 3;
-      
-      if (propType < 2) {
-        items.push({
-          id: `house-${segment}-${i}`,
-          model: puebloHouse.clone(true),
-          position: [xPos, 0, zPos] as [number, number, number],
-          rotation: side > 0 ? Math.PI / 2 : -Math.PI / 2,
-          scale: 0.7,
-        });
+      const seed = segment * 149 + i;
+      const rand = (n: number) => Math.abs(Math.sin(seed * n));
+
+      if (i % 3 !== 2) {
+        const x = side * (roadEdge + 0.6 + rand(1.7) * 1.3);
+        items.push({ m: puebloHouse, pos: [x, 0, z], rotY: side > 0 ? Math.PI / 2 : -Math.PI / 2, s: 0.68 + rand(2.4) * 0.25 });
       } else {
-        items.push({
-          id: `papel-${segment}-${i}`,
-          model: papelPicado.clone(true),
-          position: [0, 3, zPos] as [number, number, number],
-          rotation: 0,
-          scale: 1.2,
-        });
+        items.push({ m: papelPicado, pos: [0, 3.2 + rand(1.2) * 0.6, z], rotY: 0, s: 1.1 + rand(3.8) * 0.2 });
       }
     }
-    
     return items;
-  }, [segment, puebloHouse, papelPicado]);
-  
+  }, [segment, puebloHouse, papelPicado, roadEdge]);
+
+  return <GenericProps items={data} />;
+}
+
+/** ---------- Generic renderer (fast) */
+function GenericProps({
+  items,
+}: {
+  items: { m: THREE.Object3D; pos: [number, number, number]; rotY: number; s: number }[];
+}) {
   return (
     <group>
-      {props.map((prop) => (
-        <group
-          key={prop.id}
-          position={prop.position}
-          rotation={[0, prop.rotation, 0]}
-          scale={prop.scale}
-        >
-          <primitive object={prop.model} />
+      {items.map((it, i) => (
+        <group key={i} position={it.pos} rotation={[0, it.rotY, 0]} scale={it.s}>
+          <primitive object={it.m.clone(true)} />
         </group>
       ))}
     </group>

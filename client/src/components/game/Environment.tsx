@@ -1,201 +1,194 @@
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { DREAM_NEXUS_COLORS, GAME_CONFIG } from "@/lib/constants";
 import { useSettings } from "@/lib/stores/useSettings";
 import { useBiome, lerpColor, lerpNumber } from "@/lib/stores/useBiome";
 
+/**
+ * Lightweight value noise (smooth enough for rolling hills)
+ * deterministic for the same input, no dependencies.
+ */
+function snoise2(x: number, y: number) {
+  const s = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+  return (s - Math.floor(s));
+}
+function smoothNoise(x: number, y: number) {
+  // 4-sample bilinear
+  const iX = Math.floor(x), iY = Math.floor(y);
+  const fx = x - iX, fy = y - iY;
+  const n00 = snoise2(iX, iY);
+  const n10 = snoise2(iX + 1, iY);
+  const n01 = snoise2(iX, iY + 1);
+  const n11 = snoise2(iX + 1, iY + 1);
+  const nx0 = n00 * (1 - fx) + n10 * fx;
+  const nx1 = n01 * (1 - fx) + n11 * fx;
+  return nx0 * (1 - fy) + nx1 * fy;
+}
+function fbm(x: number, y: number, octaves = 4, falloff = 0.5) {
+  let amp = 1, freq = 1, sum = 0, norm = 0;
+  for (let i = 0; i < octaves; i++) {
+    sum += amp * smoothNoise(x * freq, y * freq);
+    norm += amp;
+    amp *= falloff;
+    freq *= 2;
+  }
+  return sum / norm;
+}
+
 export function Environment() {
-  const updateTransition = useBiome((state) => state.updateTransition);
-  
-  useFrame((state, delta) => {
-    updateTransition(delta);
-  });
-  
+  const updateTransition = useBiome((s) => s.updateTransition);
+  useFrame((_, delta) => updateTransition(delta));
   return (
     <>
-      <Sky />
+      <SkyAndFog />
       <Lights />
       <Terrain />
-      <PalmTrees />
-      <Mountains />
+      <BackgroundSilhouette />
     </>
   );
 }
 
-function Sky() {
-  const weather = useSettings((state) => state.weather);
-  const currentConfig = useBiome((state) => state.getCurrentConfig());
-  const previousConfig = useBiome((state) => state.getPreviousConfig());
-  const transitionProgress = useBiome((state) => state.transitionProgress);
-  const isTransitioning = useBiome((state) => state.isTransitioning);
-  
-  let skyColor = currentConfig.skyColor;
-  let fogColor = currentConfig.fogColor;
-  let fogNear = currentConfig.fogNear;
-  let fogFar = currentConfig.fogFar;
-  
-  if (isTransitioning && previousConfig) {
-    skyColor = lerpColor(previousConfig.skyColor, currentConfig.skyColor, transitionProgress);
-    fogColor = lerpColor(previousConfig.fogColor, currentConfig.fogColor, transitionProgress);
-    fogNear = lerpNumber(previousConfig.fogNear, currentConfig.fogNear, transitionProgress);
-    fogFar = lerpNumber(previousConfig.fogFar, currentConfig.fogFar, transitionProgress);
+/** ---------- Sky + Fog (biome-aware, with transitions & weather override) */
+function SkyAndFog() {
+  const weather = useSettings((s) => s.weather);
+  const current = useBiome((s) => s.getCurrentConfig());
+  const prev = useBiome((s) => s.getPreviousConfig());
+  const t = useBiome((s) => s.transitionProgress);
+  const isX = useBiome((s) => s.isTransitioning);
+
+  let sky = current.skyColor;
+  let fog = current.fogColor;
+  let near = current.fogNear;
+  let far = current.fogFar;
+
+  if (isX && prev) {
+    sky = lerpColor(prev.skyColor, current.skyColor, t);
+    fog = lerpColor(prev.fogColor, current.fogColor, t);
+    near = lerpNumber(prev.fogNear, current.fogNear, t);
+    far  = lerpNumber(prev.fogFar,  current.fogFar,  t);
   }
-  
+
   if (weather === "overcast") {
-    skyColor = "#1a2633";
-    fogColor = "#1a2633";
-    fogNear = 30;
-    fogFar = 100;
+    sky = "#1b2430";
+    fog = "#1b2430";
+    near = 28;
+    far  = 95;
   }
-  
+
   return (
     <>
-      <color attach="background" args={[skyColor]} />
-      <fog attach="fog" args={[fogColor, fogNear, fogFar]} />
+      <color attach="background" args={[sky]} />
+      <fog attach="fog" args={[fog, near, far]} />
     </>
   );
 }
 
+/** ---------- Lights (sun + fill + rim), biome-aware intensities */
 function Lights() {
-  const weather = useSettings((state) => state.weather);
-  const currentConfig = useBiome((state) => state.getCurrentConfig());
-  const previousConfig = useBiome((state) => state.getPreviousConfig());
-  const transitionProgress = useBiome((state) => state.transitionProgress);
-  const isTransitioning = useBiome((state) => state.isTransitioning);
-  
-  let sunIntensity = currentConfig.sunIntensity;
-  let ambientIntensity = currentConfig.ambientIntensity;
-  
-  if (isTransitioning && previousConfig) {
-    sunIntensity = lerpNumber(previousConfig.sunIntensity, currentConfig.sunIntensity, transitionProgress);
-    ambientIntensity = lerpNumber(previousConfig.ambientIntensity, currentConfig.ambientIntensity, transitionProgress);
+  const weather = useSettings((s) => s.weather);
+  const current = useBiome((s) => s.getCurrentConfig());
+  const prev = useBiome((s) => s.getPreviousConfig());
+  const t = useBiome((s) => s.transitionProgress);
+  const isX = useBiome((s) => s.isTransitioning);
+
+  let sun = current.sunIntensity;
+  let amb = current.ambientIntensity;
+
+  if (isX && prev) {
+    sun = lerpNumber(prev.sunIntensity, current.sunIntensity, t);
+    amb = lerpNumber(prev.ambientIntensity, current.ambientIntensity, t);
   }
-  
   if (weather === "overcast") {
-    sunIntensity = 0.6;
-    ambientIntensity = 0.3;
+    sun = 0.65;
+    amb = 0.35;
   }
-  
+
   return (
     <>
-      <ambientLight intensity={ambientIntensity} />
+      <hemisphereLight intensity={0.25} color={"#8fbcd4"} groundColor={"#3b4b3e"} />
+      <ambientLight intensity={amb} />
       <directionalLight
-        position={[10, 20, 10]}
-        intensity={sunIntensity}
+        position={[12, 18, 8]}
+        intensity={sun}
         castShadow
         shadow-mapSize-width={2048}
         shadow-mapSize-height={2048}
-        shadow-camera-far={100}
-        shadow-camera-left={-30}
-        shadow-camera-right={30}
-        shadow-camera-top={30}
-        shadow-camera-bottom={-30}
+        shadow-camera-far={120}
+        shadow-camera-left={-40}
+        shadow-camera-right={40}
+        shadow-camera-top={40}
+        shadow-camera-bottom={-40}
       />
-      <directionalLight
-        position={[-10, 10, -10]}
-        intensity={0.4}
-      />
+      {/* subtle back rim so silhouettes read against the sky */}
+      <directionalLight position={[-10, 8, -12]} intensity={0.25} />
     </>
   );
 }
 
+/** ---------- Terrain: wide rolling hills with FBM noise, biome-tinted */
 function Terrain() {
-  const currentConfig = useBiome((state) => state.getCurrentConfig());
-  const previousConfig = useBiome((state) => state.getPreviousConfig());
-  const transitionProgress = useBiome((state) => state.transitionProgress);
-  const isTransitioning = useBiome((state) => state.isTransitioning);
-  
-  let terrainColor = currentConfig.terrainColor;
-  
-  if (isTransitioning && previousConfig) {
-    terrainColor = lerpColor(previousConfig.terrainColor, currentConfig.terrainColor, transitionProgress);
-  }
-  
-  const terrainGeometry = useMemo(() => {
-    const geo = new THREE.PlaneGeometry(100, 300, 50, 100);
-    const positions = geo.attributes.position;
-    
-    for (let i = 0; i < positions.count; i++) {
-      const x = positions.getX(i);
-      const y = positions.getY(i);
-      
-      const height = Math.sin(x * 0.05) * 2 + Math.cos(y * 0.03) * 1.5;
-      positions.setZ(i, height - 2);
+  const current = useBiome((s) => s.getCurrentConfig());
+  const prev = useBiome((s) => s.getPreviousConfig());
+  const t = useBiome((s) => s.transitionProgress);
+  const isX = useBiome((s) => s.isTransitioning);
+
+  // blend terrain colors across biomes
+  let terrainColor = current.terrainColor;
+  if (isX && prev) terrainColor = lerpColor(prev.terrainColor, current.terrainColor, t);
+
+  // one big ground sheet so you always see “land” under the road
+  const geo = useMemo(() => {
+    const w = 220, h = 520, wSeg = 90, hSeg = 180;
+    const g = new THREE.PlaneGeometry(w, h, wSeg, hSeg);
+    const p = g.attributes.position as THREE.BufferAttribute;
+
+    for (let i = 0; i < p.count; i++) {
+      const x = p.getX(i);
+      const y = p.getY(i);
+
+      // gentle FBM hills; tuned to be road-friendly (no cliffs next to road)
+      const base = fbm((x + 1000) * 0.015, (y + 1000) * 0.02, 4, 0.55); // 0..1
+      const ridge = fbm((x - 50) * 0.006, (y + 200) * 0.006, 3, 0.5);
+      const height = (base * 3.2 + ridge * 1.2) - 2.6;
+
+      p.setZ(i, height);
     }
-    
-    geo.computeVertexNormals();
-    return geo;
+    g.computeVertexNormals();
+    return g;
   }, []);
-  
+
   return (
-    <mesh
-      rotation={[-Math.PI / 2, 0, 0]}
-      position={[0, -0.5, 50]}
-      receiveShadow
-    >
-      <primitive object={terrainGeometry} />
-      <meshStandardMaterial color={terrainColor} roughness={0.9} />
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.6, 60]} receiveShadow>
+      <primitive object={geo} />
+      <meshStandardMaterial color={terrainColor} roughness={0.95} metalness={0.02} />
     </mesh>
   );
 }
 
-function PalmTrees() {
-  const trees = useMemo(() => {
-    const treePositions = [];
-    for (let i = 0; i < 30; i++) {
-      const side = i % 2 === 0 ? 1 : -1;
-      treePositions.push({
-        key: i,
-        position: [
-          side * (8 + Math.random() * 5),
-          0,
-          i * 10 + Math.random() * 5
-        ] as [number, number, number]
-      });
-    }
-    return treePositions;
-  }, []);
-  
-  return (
-    <group>
-      {trees.map((tree) => (
-        <group key={tree.key} position={tree.position}>
-          <mesh position={[0, 2, 0]} castShadow>
-            <cylinderGeometry args={[0.15, 0.2, 4, 8]} />
-            <meshStandardMaterial color="#6b4423" />
-          </mesh>
-          
-          <mesh position={[0, 4.5, 0]} castShadow>
-            <coneGeometry args={[1.2, 2, 6]} />
-            <meshStandardMaterial color="#2d5016" />
-          </mesh>
-        </group>
-      ))}
-    </group>
-  );
-}
+/** ---------- Far mountains silhouettes for depth (super cheap) */
+function BackgroundSilhouette() {
+  const groupRef = useRef<THREE.Group>(null);
+  // very lightweight parallax (slow drift) to avoid “static poster” feel
+  useFrame((state) => {
+    if (groupRef.current) groupRef.current.position.z = (state.clock.getElapsedTime() * 0.25) % 80;
+  });
 
-function Mountains() {
-  const mountainPositions = useMemo(() => {
-    return [
-      { key: 0, position: [-40, -5, 50], scale: 1.5 },
-      { key: 1, position: [35, -5, 60], scale: 1.2 },
-      { key: 2, position: [-30, -5, 80], scale: 1.8 },
-      { key: 3, position: [40, -5, 100], scale: 1.3 },
-    ];
-  }, []);
-  
+  const cones = useMemo(
+    () => ([
+      { k: 0, pos: [-70, -8, -10], s: 2.5, c: "#132833" },
+      { k: 1, pos: [ 60, -8,  20], s: 2.0, c: "#163141" },
+      { k: 2, pos: [-55, -8,  55], s: 2.8, c: "#122233" },
+      { k: 3, pos: [ 75, -8,  85], s: 2.2, c: "#152a3a" },
+    ]),
+    []
+  );
+
   return (
-    <group>
-      {mountainPositions.map((mountain) => (
-        <mesh
-          key={mountain.key}
-          position={mountain.position as [number, number, number]}
-          scale={mountain.scale}
-        >
-          <coneGeometry args={[15, 20, 4]} />
-          <meshStandardMaterial color="#1a3a4a" />
+    <group ref={groupRef}>
+      {cones.map(m => (
+        <mesh key={m.k} position={m.pos as [number, number, number]} scale={m.s} receiveShadow>
+          <coneGeometry args={[22, 30, 4]} />
+          <meshStandardMaterial color={m.c} roughness={1} />
         </mesh>
       ))}
     </group>

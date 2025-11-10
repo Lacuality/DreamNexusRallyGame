@@ -21,9 +21,12 @@ import { TuningPanel } from "../ui/TuningPanel";
 import { GAME_CONFIG } from "@/lib/constants";
 import { audioManager } from "@/lib/audio";
 
-function FrameSync({ carPositionRef, carSpeedRef }: { 
-  carPositionRef: React.MutableRefObject<THREE.Vector3>, 
-  carSpeedRef: React.MutableRefObject<number> 
+function FrameSync({
+  carPositionRef,
+  carSpeedRef,
+}: {
+  carPositionRef: React.MutableRefObject<THREE.Vector3>;
+  carSpeedRef: React.MutableRefObject<number>;
 }) {
   const frameCountRef = useRef(0);
   const phase = useRally((state) => state.phase);
@@ -33,7 +36,7 @@ function FrameSync({ carPositionRef, carSpeedRef }: {
 
   useFrame(() => {
     if (phase !== "playing") return;
-    
+
     frameCountRef.current++;
     if (frameCountRef.current % 10 === 0) {
       updateDistance(carPositionRef.current.z);
@@ -54,11 +57,19 @@ export function GameScene() {
   const [puddleSlowdownActive, setPuddleSlowdownActive] = useState(false);
   const nitroTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const puddleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  
-  const { phase, updateDistance, updateSpeed, gameOver, pause, resume, addCollectible } = useRally();
+
+  const {
+    phase,
+    updateDistance,
+    updateSpeed,
+    gameOver,
+    pause,
+    resume,
+    addCollectible,
+  } = useRally();
   const showPhotoMode = useSettings((state) => state.showPhotoMode);
   const updateBiomeDistance = useBiome((state) => state.updateDistance);
-  
+
   useEffect(() => {
     if (phase === "menu" || phase === "gameover") {
       if (nitroTimeoutRef.current) {
@@ -77,7 +88,7 @@ export function GameScene() {
       carSpeedRef.current = 0;
     }
   }, [phase]);
-  
+
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
       if (e.key === "p" || e.key === "P") {
@@ -88,11 +99,11 @@ export function GameScene() {
         }
       }
     };
-    
+
     window.addEventListener("keypress", handleKeyPress);
     return () => window.removeEventListener("keypress", handleKeyPress);
   }, [phase, pause, resume]);
-  
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "F2") {
@@ -102,11 +113,11 @@ export function GameScene() {
         console.log("Photo mode:", newPhotoMode ? "ON" : "OFF");
       }
     };
-    
+
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
-  
+
   const handlePuddleHit = () => {
     console.log("Hit puddle - splash and slowdown!");
     audioManager.playSplash();
@@ -119,21 +130,26 @@ export function GameScene() {
       puddleTimeoutRef.current = null;
     }, 800);
   };
-  
+
   const handleCollision = (obstacle: any) => {
-    console.log("Collision with obstacle:", obstacle.type, "at speed:", carSpeedRef.current);
-    
+    console.log(
+      "Collision with obstacle:",
+      obstacle.type,
+      "at speed:",
+      carSpeedRef.current,
+    );
+
     if (obstacle.type === "puddle") {
       handlePuddleHit();
       return;
     }
-    
+
     if (shieldActive) {
       console.log("Shield absorbed the hit!");
       setShieldActive(false);
       return;
     }
-    
+
     if (carSpeedRef.current > GAME_CONFIG.CRASH_SPEED_THRESHOLD) {
       console.log("High-speed crash! Game over.");
       audioManager.playCrash();
@@ -143,13 +159,13 @@ export function GameScene() {
       audioManager.playCrash();
     }
   };
-  
+
   const handleCollect = (collectible: any) => {
     if (collectible.type === "arequipe") {
       console.log("Collected arequipe jar! +50 points, speed burst!");
       addCollectible();
       audioManager.playSuccess();
-      setBoostCounter(prev => prev + 1);
+      setBoostCounter((prev) => prev + 1);
     } else if (collectible.type === "nitro") {
       console.log("Collected nitro! +20% speed for 2 seconds!");
       audioManager.playNitro();
@@ -167,29 +183,26 @@ export function GameScene() {
       setShieldActive(true);
     }
   };
-  
+
   const keyMap = [
     { name: Controls.forward, keys: ["ArrowUp", "KeyW"] },
     { name: Controls.back, keys: ["ArrowDown", "KeyS"] },
     { name: Controls.left, keys: ["ArrowLeft", "KeyA"] },
     { name: Controls.right, keys: ["ArrowRight", "KeyD"] },
   ];
-  
+
   return (
     <>
       <KeyboardControls map={keyMap}>
         <Canvas
           shadows
-          camera={{
-            position: [0, 4, -8],
-            fov: 60,
-            near: 0.1,
-            far: 200,
-          }}
+          camera={{ position: [0, 4, -8], fov: 60, near: 0.1, far: 220 }}
           gl={{
             antialias: true,
             powerPreference: "high-performance",
+            toneMapping: THREE.ACESFilmicToneMapping,
           }}
+          shadows={{ type: THREE.PCFSoftShadowMap }}
         >
           <Suspense fallback={null}>
             <Environment />
@@ -213,19 +226,27 @@ export function GameScene() {
               carPositionRef={carPositionRef}
               onCollect={handleCollect}
             />
-            <NitroParticles active={nitroActive} carPositionRef={carPositionRef} />
+            <NitroParticles
+              active={nitroActive}
+              carPositionRef={carPositionRef}
+            />
             <DustTrail carPositionRef={carPositionRef} speedRef={carSpeedRef} />
             <Camera carPositionRef={carPositionRef} />
-            <FrameSync carPositionRef={carPositionRef} carSpeedRef={carSpeedRef} />
+            <FrameSync
+              carPositionRef={carPositionRef}
+              carSpeedRef={carSpeedRef}
+            />
           </Suspense>
         </Canvas>
       </KeyboardControls>
-      
-      {!showPhotoMode && phase === "playing" && <GameHUD nitroActive={nitroActive} shieldActive={shieldActive} />}
+
+      {!showPhotoMode && phase === "playing" && (
+        <GameHUD nitroActive={nitroActive} shieldActive={shieldActive} />
+      )}
       {!showPhotoMode && phase === "playing" && <TuningPanel />}
       {!showPhotoMode && phase === "paused" && <PauseMenu />}
       {!showPhotoMode && <MobileControls />}
-      
+
       {showPhotoMode && (
         <div
           style={{
