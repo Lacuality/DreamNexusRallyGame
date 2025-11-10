@@ -91,17 +91,17 @@ function RoadEdges({ carPosition }: { carPosition: THREE.Vector3 }) {
     <>
       <mesh
         ref={leftEdgeRef}
-        position={[-roadWidth / 2 + 0.15, 0.1, 0]}
+        position={[-roadWidth / 2, 0.1, 0]}
         geometry={edgeGeometry}
       >
-        <meshStandardMaterial color="#ffcc00" emissive="#ffcc00" emissiveIntensity={0.2} />
+        <meshStandardMaterial color="#ffcc00" emissive="#ffcc00" emissiveIntensity={0.3} />
       </mesh>
       <mesh
         ref={rightEdgeRef}
-        position={[roadWidth / 2 - 0.15, 0.1, 0]}
+        position={[roadWidth / 2, 0.1, 0]}
         geometry={edgeGeometry}
       >
-        <meshStandardMaterial color="#ffcc00" emissive="#ffcc00" emissiveIntensity={0.2} />
+        <meshStandardMaterial color="#ffcc00" emissive="#ffcc00" emissiveIntensity={0.3} />
       </mesh>
     </>
   );
