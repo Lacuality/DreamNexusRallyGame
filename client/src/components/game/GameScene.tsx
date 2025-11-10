@@ -195,7 +195,6 @@ export function GameScene() {
     <>
       <KeyboardControls map={keyMap}>
         <Canvas
-          shadows
           camera={{ position: [0, 4, -8], fov: 60, near: 0.1, far: 220 }}
           gl={{
             antialias: true,
