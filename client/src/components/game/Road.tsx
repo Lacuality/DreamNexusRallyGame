@@ -1,80 +1,167 @@
 // client/src/components/game/Road.tsx
-import { useRef, useMemo } from "react";
-import { useFrame, useThree } from "@react-three/fiber";
+import { useMemo, useRef } from "react";
+import { useFrame } from "@react-three/fiber";
 import { useTexture } from "@react-three/drei";
 import * as THREE from "three";
 import { GAME_CONFIG, DREAM_NEXUS_COLORS } from "@/lib/constants";
 
-interface RoadProps {
-  carPosition: THREE.Vector3;
-}
+/**
+ * Single source of truth: we sample lateral curve (x) and elevation (y)
+ * from the same function for road, edges and center dashes.
+ */
+function sampleCurveAndElev(zLocal: number) {
+  // tweakable params – gentle OutRun-style curves/hills
+  const x =
+    Math.sin(zLocal * 0.015) * 1.8 + // wide slow bend
+    Math.sin(zLocal * 0.045) * 0.6;  // small wiggle overlay
 
-// ---- Tunables -------------------------------------------------------------
-const ROAD_LENGTH = 200;            // visible chunk length
-const ROAD_Z_OFFSET = -50;          // where the chunk is positioned relative to the car
-const EDGE_WIDTH = 0.28;            // yellow curb width
-const EDGE_LIFT = 0.015;            // small lift to avoid z-fighting with asphalt
-const EDGE_EMISSIVE = "#ffcc00";    // curb emissive
-const DASH_LENGTH = 2;
-const DASH_THICK = 0.05;
-const DASH_GAP = 4.0;               // spacing between dashes
-const DASH_LIFT = 0.012;
-
-// Shared curve/elevation function so EVERYTHING matches
-function sampleCurveAndElev(t: number) {
-  // t is the local "forward" axis of the road geometry (PlaneGeometry Y)
-  const curve = Math.sin(t * 0.02) * 2.0;                   // mild lateral sway
   const elev =
-    Math.sin(t * 0.03) * 0.45 + Math.cos(t * 0.05) * 0.28;  // rolling hills
-  return { curve, elev };
+    Math.sin(zLocal * 0.022) * 0.35 + // rolling hill
+    Math.cos(zLocal * 0.035) * 0.25;  // smaller undulation
+
+  return { x, elev };
 }
 
-// Deform a PlaneGeometry so it follows our curve/elevation.
-// width: plane width (X), length: plane length (Y).
-function makeDeformedPlane(width: number, length: number, widthSegs: number, lengthSegs: number, xOffset: number, lift = 0) {
-  const geo = new THREE.PlaneGeometry(width, length, widthSegs, lengthSegs);
-  const pos = geo.attributes.position as THREE.BufferAttribute;
+type RoadProps = { carPosition: THREE.Vector3 };
 
-  for (let i = 0; i < pos.count; i++) {
-    const x = pos.getX(i) + xOffset; // move plane sideways first
-    const y = pos.getY(i);           // forward axis
-    const { curve, elev } = sampleCurveAndElev(y);
-    pos.setX(i, x + curve);          // push sideways according to curve
-    pos.setZ(i, elev + lift);        // lift with terrain
-  }
-  geo.computeVertexNormals();
-  return geo;
-}
+// ---- tunables (safe to tweak) ----
+const ROAD_LENGTH = 260;           // world units visible at once
+const ROAD_WIDTH  = GAME_CONFIG.LANE_WIDTH + 0.6;
+const LEN_SEGS    = 220;           // longitudinal resolution
+const WID_SEGS    = 2;             // cross resolution for the road (flat strip)
+
+const EDGE_WIDTH  = 0.28;
+const EDGE_OFFSET = 0.02;          // tiny push outward from the road edge
+const EDGE_LIFT   = 0.015;         // lifts above asphalt to avoid z-fighting
+
+const DASH_LENGTH = 2.0;
+const DASH_GAP    = 4.0;
+// ----------------------------------
 
 export function Road({ carPosition }: RoadProps) {
-  const roadRef = useRef<THREE.Mesh>(null);
-  const { gl } = useThree();
-  const asphaltTexture = useTexture("/textures/asphalt.png");
+  const groupRef = useRef<THREE.Group>(null);
 
+  // Asphalt
+  const asphaltTexture = useTexture("/textures/asphalt.png");
   useMemo(() => {
     asphaltTexture.wrapS = asphaltTexture.wrapT = THREE.RepeatWrapping;
-    // Tile a bit more on the forward axis so the texture doesn't stretch
-    asphaltTexture.repeat.set(4, 28);
-    asphaltTexture.anisotropy = gl.capabilities.getMaxAnisotropy?.() ?? 8;
-  }, [asphaltTexture, gl]);
+    asphaltTexture.anisotropy = 8;
+    // tile by real distance so it doesn’t smear when the curve stretches
+    asphaltTexture.repeat.set(2, ROAD_LENGTH / 8);
+  }, [asphaltTexture]);
 
+  // Shared helpers
+  const lenStep = ROAD_LENGTH / LEN_SEGS;
+  const halfWidth = ROAD_WIDTH * 0.5;
+
+  // ==== ROAD GEOMETRY (deformed strip) ====
   const roadGeometry = useMemo(() => {
-    // Wider than lane width so we have some shoulder
-    const width = GAME_CONFIG.LANE_WIDTH + 0.6;
-    return makeDeformedPlane(width, ROAD_LENGTH, 20, 200, 0, 0);
+    const geo = new THREE.PlaneGeometry(ROAD_WIDTH, ROAD_LENGTH, WID_SEGS, LEN_SEGS);
+    // We will bend the geo by moving vertices according to sampleCurveAndElev
+    const pos = geo.attributes.position as THREE.BufferAttribute;
+
+    for (let j = 0; j <= LEN_SEGS; j++) {
+      const zLocal = -ROAD_LENGTH * 0.5 + j * lenStep; // local Z along the strip
+      const { x, elev } = sampleCurveAndElev(zLocal);
+
+      for (let i = 0; i <= WID_SEGS; i++) {
+        const idx = j * (WID_SEGS + 1) + i;
+        // original plane is centered at (0,0,0) with width along X and length along Y.
+        // We rotate later, but we reshape in local plane space now.
+        const xLateral = -halfWidth + (i / WID_SEGS) * ROAD_WIDTH;
+
+        pos.setX(idx, xLateral + x);
+        pos.setY(idx, zLocal);     // use Y for length (before rotation)
+        pos.setZ(idx, elev);
+      }
+    }
+
+    // Fix UVs so V follows length
+    const uv = geo.attributes.uv as THREE.BufferAttribute;
+    for (let j = 0; j <= LEN_SEGS; j++) {
+      for (let i = 0; i <= WID_SEGS; i++) {
+        const idx = j * (WID_SEGS + 1) + i;
+        uv.setX(idx, i / WID_SEGS * 1.0);        // 0..1 across width
+        uv.setY(idx, j / LEN_SEGS * (ROAD_LENGTH / 8)); // tile along length
+      }
+    }
+
+    geo.computeVertexNormals();
+    // Rotate so Y(length) -> Z, Z(elev) -> Y (standard ground orientation)
+    geo.rotateX(-Math.PI / 2);
+    return geo;
   }, []);
 
-  useFrame(() => {
-    if (roadRef.current) {
-      roadRef.current.position.z = carPosition.z + ROAD_Z_OFFSET;
+  // ==== EDGE RIBBONS (left & right) ====
+  function buildEdgeGeometry(side: "left" | "right") {
+    const strip = new THREE.BufferGeometry();
+    // 2 vertices per segment row (inner & outer of the ribbon)
+    const verts = new Float32Array((LEN_SEGS + 1) * 2 * 3);
+    const idxs: number[] = [];
+
+    const sign = side === "left" ? -1 : 1;
+    const baseX = sign * (halfWidth + EDGE_OFFSET);
+
+    for (let j = 0; j <= LEN_SEGS; j++) {
+      const zLocal = -ROAD_LENGTH * 0.5 + j * lenStep;
+      const { x, elev } = sampleCurveAndElev(zLocal);
+
+      // inner edge (touches road)
+      const iIdx = j * 2 * 3;
+      verts[iIdx + 0] = baseX + x;                 // X
+      verts[iIdx + 1] = elev + EDGE_LIFT;          // Y (height)
+      verts[iIdx + 2] = zLocal;                    // Z (forward)
+
+      // outer edge (ribbon thickness)
+      const oIdx = iIdx + 3;
+      verts[oIdx + 0] = baseX + x + sign * EDGE_WIDTH;
+      verts[oIdx + 1] = elev + EDGE_LIFT;
+      verts[oIdx + 2] = zLocal;
+
+      // triangles along the strip
+      if (j < LEN_SEGS) {
+        const a = j * 2;
+        const b = a + 1;
+        const c = a + 2;
+        const d = a + 3;
+        idxs.push(a, b, c, b, d, c);
+      }
     }
+
+    strip.setAttribute("position", new THREE.BufferAttribute(verts, 3));
+    strip.setIndex(idxs);
+    strip.computeVertexNormals();
+    // rotate to ground orientation: Y(up) stays Y, Z(forward) stays Z (already correct)
+    return strip;
+  }
+
+  const leftEdgeGeometry  = useMemo(() => buildEdgeGeometry("left"),  []);
+  const rightEdgeGeometry = useMemo(() => buildEdgeGeometry("right"), []);
+
+  // ==== CENTER DASHES ====
+  const dashes = useMemo(() => {
+    const arr: { pos: THREE.Vector3 }[] = [];
+    const period = DASH_LENGTH + DASH_GAP;
+    const count = Math.floor(ROAD_LENGTH / period) + 6;
+
+    for (let k = -3; k < count - 3; k++) {
+      const localZ = -ROAD_LENGTH * 0.5 + k * period + DASH_GAP * 0.5;
+      const { x, elev } = sampleCurveAndElev(localZ);
+      arr.push({ pos: new THREE.Vector3(x, elev + EDGE_LIFT * 0.5, localZ) });
+    }
+    return arr;
+  }, []);
+
+  // Follow the car
+  useFrame(() => {
+    if (!groupRef.current) return;
+    groupRef.current.position.z = carPosition.z;
   });
 
   return (
-    <group>
-      {/* Asphalt */}
-      <mesh ref={roadRef} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <primitive object={roadGeometry} />
+    <group ref={groupRef}>
+      {/* ROAD */}
+      <mesh geometry={roadGeometry} receiveShadow>
         <meshStandardMaterial
           map={asphaltTexture}
           roughness={0.95}
@@ -82,108 +169,33 @@ export function Road({ carPosition }: RoadProps) {
         />
       </mesh>
 
-      {/* Curbs & center line that follow the exact same curve */}
-      <RoadEdges carPosition={carPosition} />
-      <CenterLine carPosition={carPosition} />
-    </group>
-  );
-}
-
-function RoadEdges({ carPosition }: { carPosition: THREE.Vector3 }) {
-  const leftEdgeRef = useRef<THREE.Mesh>(null);
-  const rightEdgeRef = useRef<THREE.Mesh>(null);
-
-  // Build each curb as a thin deformed plane that hugs the asphalt
-  const leftEdgeGeometry = useMemo(() => {
-    const xOffset = -(GAME_CONFIG.LANE_WIDTH / 2) - 0.02; // slight outside offset
-    return makeDeformedPlane(EDGE_WIDTH, ROAD_LENGTH, 1, 200, xOffset, EDGE_LIFT);
-  }, []);
-  const rightEdgeGeometry = useMemo(() => {
-    const xOffset = (GAME_CONFIG.LANE_WIDTH / 2) + 0.02;
-    return makeDeformedPlane(EDGE_WIDTH, ROAD_LENGTH, 1, 200, xOffset, EDGE_LIFT);
-  }, []);
-
-  useFrame(() => {
-    if (leftEdgeRef.current) leftEdgeRef.current.position.z = carPosition.z + ROAD_Z_OFFSET;
-    if (rightEdgeRef.current) rightEdgeRef.current.position.z = carPosition.z + ROAD_Z_OFFSET;
-  });
-
-  // polygonOffset removes flicker with asphalt
-  const curbMat = (
-    <meshStandardMaterial
-      color={EDGE_EMISSIVE}
-      emissive={EDGE_EMISSIVE}
-      emissiveIntensity={0.35}
-      polygonOffset
-      polygonOffsetFactor={-1}
-      polygonOffsetUnits={-1}
-    />
-  );
-
-  return (
-    <>
-      <mesh
-        ref={leftEdgeRef}
-        rotation={[-Math.PI / 2, 0, 0]}
-        geometry={leftEdgeGeometry}
-      >
-        {curbMat}
+      {/* LEFT EDGE */}
+      <mesh geometry={leftEdgeGeometry}>
+        <meshStandardMaterial
+          color={"#ffcc00"}
+          emissive={"#ffcc00"}
+          emissiveIntensity={0.35}
+          roughness={0.4}
+          metalness={0.0}
+        />
       </mesh>
-      <mesh
-        ref={rightEdgeRef}
-        rotation={[-Math.PI / 2, 0, 0]}
-        geometry={rightEdgeGeometry}
-      >
-        {curbMat}
+
+      {/* RIGHT EDGE */}
+      <mesh geometry={rightEdgeGeometry}>
+        <meshStandardMaterial
+          color={"#ffcc00"}
+          emissive={"#ffcc00"}
+          emissiveIntensity={0.35}
+          roughness={0.4}
+          metalness={0.0}
+        />
       </mesh>
-    </>
-  );
-}
 
-function CenterLine({ carPosition }: { carPosition: THREE.Vector3 }) {
-  const linesRef = useRef<THREE.Group>(null);
-
-  // Prebuild dash geometry
-  const dashGeometry = useMemo(
-    () => new THREE.BoxGeometry(0.16, DASH_THICK, DASH_LENGTH),
-    []
-  );
-
-  // Precompute dash transforms along the same curve/elevation
-  const dashes = useMemo(() => {
-    const list: { key: number; position: [number, number, number] }[] = [];
-    const count = Math.floor(ROAD_LENGTH / (DASH_LENGTH + DASH_GAP)) + 6; // extra to avoid popping
-
-    for (let i = 0; i < count; i++) {
-      const zLocal =
-        -ROAD_LENGTH / 2 + i * (DASH_LENGTH + DASH_GAP); // along the road
-      const { curve, elev } = sampleCurveAndElev(zLocal);
-      // X follows the curve, Y is slight lift, Z is along the road
-      list.push({
-        key: i,
-        position: [curve, DASH_LIFT + elev, zLocal] as [number, number, number],
-      });
-    }
-    return list;
-  }, []);
-
-  useFrame(() => {
-    if (linesRef.current) {
-      linesRef.current.position.z = carPosition.z + ROAD_Z_OFFSET;
-    }
-  });
-
-  return (
-    <group ref={linesRef}>
-      {dashes.map((dash) => (
-        <mesh key={dash.key} position={dash.position} rotation={[-Math.PI / 2, 0, 0]}>
-          <primitive object={dashGeometry} />
-          <meshStandardMaterial
-            color={DREAM_NEXUS_COLORS.roadLine}
-            polygonOffset
-            polygonOffsetFactor={-1}
-            polygonOffsetUnits={-1}
-          />
+      {/* CENTER LINE DASHES */}
+      {dashes.map((d, i) => (
+        <mesh key={i} position={d.pos}>
+          <boxGeometry args={[0.16, 0.04, DASH_LENGTH]} />
+          <meshStandardMaterial color={DREAM_NEXUS_COLORS.roadLine} />
         </mesh>
       ))}
     </group>
