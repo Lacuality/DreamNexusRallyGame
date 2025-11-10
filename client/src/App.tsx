@@ -22,20 +22,17 @@ function App() {
   useEffect(() => {
     if (phase === "playing") {
       console.log("Game started - playing phase");
-      audioManager.playBackgroundMusic();
-    } else {
-      audioManager.stopBackgroundMusic();
     }
   }, [phase]);
   
   return (
     <div ref={elementRef} style={{ width: '100vw', height: '100vh', position: 'relative', overflow: 'hidden' }}>
       {phase === "menu" && <TitleScreenImmersive isFullscreen={isFullscreen} onToggleFullscreen={toggle} isFullscreenSupported={isSupported} />}
-      {phase === "playing" && <GameScene />}
-      {phase === "paused" && <GameScene />}
+      {phase === "playing" && <GameScene isFullscreen={isFullscreen} onToggleFullscreen={toggle} />}
+      {phase === "paused" && <GameScene isFullscreen={isFullscreen} onToggleFullscreen={toggle} />}
       {phase === "gameover" && (
         <>
-          <GameScene />
+          <GameScene isFullscreen={isFullscreen} onToggleFullscreen={toggle} />
           <GameOverScreen />
         </>
       )}

@@ -49,7 +49,12 @@ function FrameSync({
   return null;
 }
 
-export function GameScene() {
+interface GameSceneProps {
+  isFullscreen?: boolean;
+  onToggleFullscreen?: () => void;
+}
+
+export function GameScene({ isFullscreen = false, onToggleFullscreen }: GameSceneProps = {}) {
   const carPositionRef = useRef(new THREE.Vector3(0, 0, 0));
   const carSpeedRef = useRef(0);
   const [boostCounter, setBoostCounter] = useState(0);
@@ -242,7 +247,12 @@ export function GameScene() {
       </KeyboardControls>
 
       {!showPhotoMode && phase === "playing" && (
-        <GameHUD nitroActive={nitroActive} shieldActive={shieldActive} />
+        <GameHUD 
+          nitroActive={nitroActive} 
+          shieldActive={shieldActive}
+          isFullscreen={isFullscreen}
+          onToggleFullscreen={onToggleFullscreen}
+        />
       )}
       {!showPhotoMode && phase === "playing" && <TuningPanel />}
       {!showPhotoMode && phase === "paused" && <PauseMenu />}

@@ -4,9 +4,11 @@ import { DREAM_NEXUS_COLORS } from "@/lib/constants";
 interface GameHUDProps {
   nitroActive?: boolean;
   shieldActive?: boolean;
+  isFullscreen?: boolean;
+  onToggleFullscreen?: () => void;
 }
 
-export function GameHUD({ nitroActive = false, shieldActive = false }: GameHUDProps = {}) {
+export function GameHUD({ nitroActive = false, shieldActive = false, isFullscreen = false, onToggleFullscreen }: GameHUDProps = {}) {
   const { distance, speed, highScore, collectiblesCount, currentScore, pause } = useRally();
   
   return (
@@ -58,8 +60,28 @@ export function GameHUD({ nitroActive = false, shieldActive = false }: GameHUDPr
           top: "20px",
           right: "20px",
           pointerEvents: "auto",
+          display: "flex",
+          gap: "10px",
         }}
       >
+        {isFullscreen && onToggleFullscreen && (
+          <button
+            onClick={onToggleFullscreen}
+            style={{
+              backgroundColor: DREAM_NEXUS_COLORS.warm,
+              color: DREAM_NEXUS_COLORS.navy,
+              border: "none",
+              borderRadius: "8px",
+              padding: "10px 20px",
+              fontSize: "16px",
+              fontWeight: "bold",
+              cursor: "pointer",
+              fontFamily: "monospace",
+            }}
+          >
+            Exit Fullscreen
+          </button>
+        )}
         <button
           onClick={pause}
           style={{

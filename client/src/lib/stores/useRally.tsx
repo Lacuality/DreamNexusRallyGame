@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
+import { audioManager } from "@/lib/audio";
 
 export type RallyPhase = "menu" | "playing" | "paused" | "gameover";
 
@@ -42,6 +43,7 @@ export const useRally = create<RallyState>()(
     
     start: () => {
       const now = Date.now();
+      audioManager.stopBackgroundMusic();
       set({
         phase: "playing",
         distance: 0,
@@ -69,6 +71,8 @@ export const useRally = create<RallyState>()(
         if (newHighScore > state.highScore) {
           localStorage.setItem("dreamNexusRallyHighScore", String(newHighScore));
         }
+        
+        audioManager.stopEngineSound();
         
         set({ phase: "gameover", currentScore: finalScore, highScore: newHighScore, scoreSubmitted: false });
         
@@ -100,6 +104,7 @@ export const useRally = create<RallyState>()(
     },
     
     restart: () => {
+      audioManager.playBackgroundMusic();
       set({ phase: "menu", distance: 0, speed: 0, currentScore: 0, collectiblesCount: 0, scoreSubmitted: false });
     },
     
