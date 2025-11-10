@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import * as THREE from "three";
 import { DREAM_NEXUS_COLORS, GAME_CONFIG } from "@/lib/constants";
 import { useSettings } from "@/lib/stores/useSettings";
+import { useBiome } from "@/lib/stores/useBiome";
 
 export function Environment() {
   return (
@@ -17,24 +18,27 @@ export function Environment() {
 
 function Sky() {
   const weather = useSettings((state) => state.weather);
+  const biomeConfig = useBiome((state) => state.getCurrentConfig());
   
-  const skyColor = weather === "sunny" ? DREAM_NEXUS_COLORS.navy : "#1a2633";
-  const fogNear = weather === "sunny" ? 50 : 30;
-  const fogFar = weather === "sunny" ? 150 : 100;
+  const skyColor = weather === "overcast" ? "#1a2633" : biomeConfig.skyColor;
+  const fogNear = weather === "overcast" ? 30 : biomeConfig.fogNear;
+  const fogFar = weather === "overcast" ? 100 : biomeConfig.fogFar;
+  const fogColor = weather === "overcast" ? "#1a2633" : biomeConfig.fogColor;
   
   return (
     <>
       <color attach="background" args={[skyColor]} />
-      <fog attach="fog" args={[skyColor, fogNear, fogFar]} />
+      <fog attach="fog" args={[fogColor, fogNear, fogFar]} />
     </>
   );
 }
 
 function Lights() {
   const weather = useSettings((state) => state.weather);
+  const biomeConfig = useBiome((state) => state.getCurrentConfig());
   
-  const sunIntensity = weather === "sunny" ? GAME_CONFIG.SUN_INTENSITY : 0.6;
-  const ambientIntensity = weather === "sunny" ? GAME_CONFIG.AMBIENT_INTENSITY : 0.3;
+  const sunIntensity = weather === "overcast" ? 0.6 : biomeConfig.sunIntensity;
+  const ambientIntensity = weather === "overcast" ? 0.3 : biomeConfig.ambientIntensity;
   
   return (
     <>
@@ -60,6 +64,8 @@ function Lights() {
 }
 
 function Terrain() {
+  const biomeConfig = useBiome((state) => state.getCurrentConfig());
+  
   const terrainGeometry = useMemo(() => {
     const geo = new THREE.PlaneGeometry(100, 300, 50, 100);
     const positions = geo.attributes.position;
@@ -83,7 +89,7 @@ function Terrain() {
       receiveShadow
     >
       <primitive object={terrainGeometry} />
-      <meshStandardMaterial color="#2a5a3a" roughness={0.9} />
+      <meshStandardMaterial color={biomeConfig.terrainColor} roughness={0.9} />
     </mesh>
   );
 }

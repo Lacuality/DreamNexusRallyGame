@@ -4,8 +4,11 @@ import * as THREE from "three";
 import { GAME_CONFIG } from "@/lib/constants";
 import { useSettings } from "@/lib/stores/useSettings";
 
+export type CollectibleType = "arequipe" | "nitro" | "shield";
+
 interface Collectible {
   id: number;
+  type: CollectibleType;
   position: THREE.Vector3;
   rotation: number;
 }
@@ -31,8 +34,19 @@ export function Collectibles({ carPosition, onCollect }: CollectiblesProps) {
       if (Math.random() < 0.3) {
         const laneOffset = (Math.random() - 0.5) * (GAME_CONFIG.LANE_WIDTH - 3);
         
+        const rand = Math.random();
+        let type: CollectibleType = "arequipe";
+        if (rand < 0.7) {
+          type = "arequipe";
+        } else if (rand < 0.85) {
+          type = "nitro";
+        } else {
+          type = "shield";
+        }
+        
         newCollectibles.push({
           id: updatedNextId,
+          type,
           position: new THREE.Vector3(laneOffset, 0.5, carPosition.z + 60),
           rotation: Math.random() * Math.PI * 2
         });
@@ -70,10 +84,20 @@ export function Collectibles({ carPosition, onCollect }: CollectiblesProps) {
   return (
     <group>
       {collectibles.map((collectible) => (
-        <ArequipeJar key={collectible.id} collectible={collectible} />
+        <CollectibleModel key={collectible.id} collectible={collectible} />
       ))}
     </group>
   );
+}
+
+function CollectibleModel({ collectible }: { collectible: Collectible }) {
+  if (collectible.type === "arequipe") {
+    return <ArequipeJar collectible={collectible} />;
+  } else if (collectible.type === "nitro") {
+    return <NitroPowerUp collectible={collectible} />;
+  } else {
+    return <ShieldPowerUp collectible={collectible} />;
+  }
 }
 
 function ArequipeJar({ collectible }: { collectible: Collectible }) {
@@ -110,6 +134,81 @@ function ArequipeJar({ collectible }: { collectible: Collectible }) {
           opacity={0.3}
           emissive="#FDC6B5"
           emissiveIntensity={0.5}
+        />
+      </mesh>
+    </group>
+  );
+}
+
+function NitroPowerUp({ collectible }: { collectible: Collectible }) {
+  const position: [number, number, number] = [
+    collectible.position.x,
+    collectible.position.y,
+    collectible.position.z
+  ];
+  
+  return (
+    <group position={position} rotation={[0, collectible.rotation, 0]}>
+      <mesh castShadow>
+        <cylinderGeometry args={[0.2, 0.2, 0.6, 8]} />
+        <meshStandardMaterial 
+          color="#ff3333"
+          emissive="#ff0000"
+          emissiveIntensity={0.5}
+          metalness={0.6}
+        />
+      </mesh>
+      
+      <mesh position={[0, 0.4, 0]}>
+        <coneGeometry args={[0.22, 0.2, 8]} />
+        <meshStandardMaterial 
+          color="#ffaa00"
+          emissive="#ff5500"
+          emissiveIntensity={0.7}
+        />
+      </mesh>
+      
+      <mesh position={[0, 0, 0]}>
+        <sphereGeometry args={[0.6, 16, 16]} />
+        <meshStandardMaterial 
+          color="#ff6633"
+          transparent
+          opacity={0.2}
+          emissive="#ff3300"
+          emissiveIntensity={0.4}
+        />
+      </mesh>
+    </group>
+  );
+}
+
+function ShieldPowerUp({ collectible }: { collectible: Collectible }) {
+  const position: [number, number, number] = [
+    collectible.position.x,
+    collectible.position.y,
+    collectible.position.z
+  ];
+  
+  return (
+    <group position={position} rotation={[0, collectible.rotation, 0]}>
+      <mesh castShadow>
+        <octahedronGeometry args={[0.3, 0]} />
+        <meshStandardMaterial 
+          color="#24A0CE"
+          emissive="#24A0CE"
+          emissiveIntensity={0.6}
+          metalness={0.8}
+        />
+      </mesh>
+      
+      <mesh position={[0, 0, 0]}>
+        <sphereGeometry args={[0.55, 16, 16]} />
+        <meshStandardMaterial 
+          color="#24A0CE"
+          transparent
+          opacity={0.25}
+          emissive="#24A0CE"
+          emissiveIntensity={0.3}
         />
       </mesh>
     </group>

@@ -19,10 +19,18 @@ interface CarProps {
   onSpeedChange: (speed: number) => void;
   onCrash: () => void;
   boostCounter?: number;
+  nitroActive?: boolean;
+  puddleSlowdown?: boolean;
 }
 
-export function Car({ onPositionChange, onSpeedChange, onCrash, boostCounter = 0 }: CarProps) {
+export function Car({ onPositionChange, onSpeedChange, onCrash, boostCounter = 0, nitroActive = false, puddleSlowdown = false }: CarProps) {
   const carRef = useRef<THREE.Group>(null);
+  const bodyRef = useRef<THREE.Group>(null);
+  const frontLeftWheelRef = useRef<THREE.Mesh>(null);
+  const frontRightWheelRef = useRef<THREE.Mesh>(null);
+  const rearLeftWheelRef = useRef<THREE.Mesh>(null);
+  const rearRightWheelRef = useRef<THREE.Mesh>(null);
+  
   const targetSpeedRef = useRef(0);
   const actualSpeedRef = useRef(0);
   const yawVelocityRef = useRef(0);
@@ -30,6 +38,8 @@ export function Car({ onPositionChange, onSpeedChange, onCrash, boostCounter = 0
   const lanePositionRef = useRef(0);
   const distanceRef = useRef(0);
   const lastBoostCounterRef = useRef(0);
+  const wheelRotationRef = useRef(0);
+  const suspensionTimeRef = useRef(0);
   
   const [, getKeys] = useKeyboardControls<Controls>();
   const phase = useRally((state) => state.phase);
@@ -55,12 +65,22 @@ export function Car({ onPositionChange, onSpeedChange, onCrash, boostCounter = 0
     const isLeft = keys.left || mobileControls.left;
     const isRight = keys.right || mobileControls.right;
     
-    const maxSpeedMs = GAME_CONFIG.MAX_SPEED_MS;
+    const maxSpeedMs = nitroActive ? GAME_CONFIG.MAX_SPEED_MS * 1.2 : GAME_CONFIG.MAX_SPEED_MS;
     const accelInput = isForward ? 1 : 0;
     const brakeInput = isBack ? 1 : 0;
     const steerInput = (isLeft ? -1 : 0) + (isRight ? 1 : 0);
     
     targetSpeedRef.current += (accelInput * GAME_CONFIG.ACCEL_RATE - brakeInput * GAME_CONFIG.BRAKE_RATE) * delta;
+    
+    if (nitroActive && targetSpeedRef.current < maxSpeedMs) {
+      targetSpeedRef.current = Math.min(maxSpeedMs, targetSpeedRef.current + GAME_CONFIG.ACCEL_RATE * delta * 0.5);
+    }
+    
+    if (puddleSlowdown) {
+      targetSpeedRef.current *= Math.pow(0.85, delta / (1/60));
+      actualSpeedRef.current *= Math.pow(0.90, delta / (1/60));
+    }
+    
     targetSpeedRef.current = Math.max(0, Math.min(targetSpeedRef.current, maxSpeedMs));
     
     if (boostCounter > lastBoostCounterRef.current) {
@@ -95,6 +115,25 @@ export function Car({ onPositionChange, onSpeedChange, onCrash, boostCounter = 0
     
     distanceRef.current += actualSpeedRef.current * delta;
     
+    const wheelRadius = 0.15;
+    const angularVelocity = actualSpeedRef.current / wheelRadius;
+    wheelRotationRef.current += angularVelocity * delta;
+    
+    if (frontLeftWheelRef.current) frontLeftWheelRef.current.rotation.x = wheelRotationRef.current;
+    if (frontRightWheelRef.current) frontRightWheelRef.current.rotation.x = wheelRotationRef.current;
+    if (rearLeftWheelRef.current) rearLeftWheelRef.current.rotation.x = wheelRotationRef.current;
+    if (rearRightWheelRef.current) rearRightWheelRef.current.rotation.x = wheelRotationRef.current;
+    
+    suspensionTimeRef.current += delta;
+    const baseMaxSpeed = GAME_CONFIG.MAX_SPEED_MS;
+    const suspensionBob = Math.sin(suspensionTimeRef.current * 8 + actualSpeedRef.current * 0.5) * 0.03 * (actualSpeedRef.current / baseMaxSpeed);
+    
+    const targetBodyRoll = steerInput * THREE.MathUtils.degToRad(4);
+    if (bodyRef.current) {
+      bodyRef.current.rotation.z += (targetBodyRoll - bodyRef.current.rotation.z) * delta * 6;
+      bodyRef.current.position.y = suspensionBob;
+    }
+    
     carRef.current.position.x = lanePositionRef.current;
     carRef.current.position.z = distanceRef.current;
     carRef.current.rotation.y = -carYawRef.current * 0.3;
@@ -106,29 +145,31 @@ export function Car({ onPositionChange, onSpeedChange, onCrash, boostCounter = 0
   
   return (
     <group ref={carRef} position={[0, 0.5, 0]}>
-      <mesh castShadow>
-        <boxGeometry args={[1, 0.6, 2]} />
-        <meshStandardMaterial color="#24A0CE" />
-      </mesh>
+      <group ref={bodyRef}>
+        <mesh castShadow>
+          <boxGeometry args={[1, 0.6, 2]} />
+          <meshStandardMaterial color="#24A0CE" />
+        </mesh>
+        
+        <mesh position={[0, 0.5, -0.3]} castShadow>
+          <boxGeometry args={[0.9, 0.4, 0.8]} />
+          <meshStandardMaterial color="#0E1B24" />
+        </mesh>
+      </group>
       
-      <mesh position={[0, 0.5, -0.3]} castShadow>
-        <boxGeometry args={[0.9, 0.4, 0.8]} />
-        <meshStandardMaterial color="#0E1B24" />
-      </mesh>
-      
-      <mesh position={[-0.6, -0.2, 0.6]} castShadow>
+      <mesh ref={frontLeftWheelRef} position={[-0.6, -0.2, 0.6]} rotation={[Math.PI / 2, 0, 0]} castShadow>
         <cylinderGeometry args={[0.15, 0.15, 0.1, 16]} />
         <meshStandardMaterial color="#1a1a1a" />
       </mesh>
-      <mesh position={[0.6, -0.2, 0.6]} castShadow>
+      <mesh ref={frontRightWheelRef} position={[0.6, -0.2, 0.6]} rotation={[Math.PI / 2, 0, 0]} castShadow>
         <cylinderGeometry args={[0.15, 0.15, 0.1, 16]} />
         <meshStandardMaterial color="#1a1a1a" />
       </mesh>
-      <mesh position={[-0.6, -0.2, -0.6]} castShadow>
+      <mesh ref={rearLeftWheelRef} position={[-0.6, -0.2, -0.6]} rotation={[Math.PI / 2, 0, 0]} castShadow>
         <cylinderGeometry args={[0.15, 0.15, 0.1, 16]} />
         <meshStandardMaterial color="#1a1a1a" />
       </mesh>
-      <mesh position={[0.6, -0.2, -0.6]} castShadow>
+      <mesh ref={rearRightWheelRef} position={[0.6, -0.2, -0.6]} rotation={[Math.PI / 2, 0, 0]} castShadow>
         <cylinderGeometry args={[0.15, 0.15, 0.1, 16]} />
         <meshStandardMaterial color="#1a1a1a" />
       </mesh>

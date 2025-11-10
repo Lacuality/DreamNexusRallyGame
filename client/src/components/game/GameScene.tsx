@@ -11,6 +11,7 @@ import { Collectibles } from "./Collectibles";
 import { SponsorBanners } from "./SponsorBanners";
 import { useRally } from "@/lib/stores/useRally";
 import { useSettings } from "@/lib/stores/useSettings";
+import { useBiome } from "@/lib/stores/useBiome";
 import { GameHUD } from "../ui/GameHUD";
 import { PauseMenu } from "../ui/PauseMenu";
 import { MobileControls } from "../ui/MobileControls";
@@ -22,12 +23,37 @@ export function GameScene() {
   const [carPosition, setCarPosition] = useState(new THREE.Vector3(0, 0, 0));
   const [carSpeed, setCarSpeed] = useState(0);
   const [boostCounter, setBoostCounter] = useState(0);
+  const [nitroActive, setNitroActive] = useState(false);
+  const [shieldActive, setShieldActive] = useState(false);
+  const [puddleSlowdownActive, setPuddleSlowdownActive] = useState(false);
+  const nitroTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const puddleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
   const { phase, updateDistance, updateSpeed, gameOver, pause, resume, addCollectible } = useRally();
   const showPhotoMode = useSettings((state) => state.showPhotoMode);
+  const updateBiomeDistance = useBiome((state) => state.updateDistance);
   
   useEffect(() => {
     updateDistance(carPosition.z);
-  }, [carPosition.z, updateDistance]);
+    updateBiomeDistance(carPosition.z);
+  }, [carPosition.z, updateDistance, updateBiomeDistance]);
+  
+  useEffect(() => {
+    if (phase === "menu" || phase === "gameover") {
+      if (nitroTimeoutRef.current) {
+        clearTimeout(nitroTimeoutRef.current);
+        nitroTimeoutRef.current = null;
+      }
+      if (puddleTimeoutRef.current) {
+        clearTimeout(puddleTimeoutRef.current);
+        puddleTimeoutRef.current = null;
+      }
+      setNitroActive(false);
+      setShieldActive(false);
+      setPuddleSlowdownActive(false);
+      setBoostCounter(0);
+    }
+  }, [phase]);
   
   useEffect(() => {
     updateSpeed(carSpeed);
@@ -62,27 +88,65 @@ export function GameScene() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
   
+  const handlePuddleHit = () => {
+    console.log("Hit puddle - splash and slowdown!");
+    audioManager.playSplash();
+    setPuddleSlowdownActive(true);
+    if (puddleTimeoutRef.current) {
+      clearTimeout(puddleTimeoutRef.current);
+    }
+    puddleTimeoutRef.current = setTimeout(() => {
+      setPuddleSlowdownActive(false);
+      puddleTimeoutRef.current = null;
+    }, 800);
+  };
+  
   const handleCollision = (obstacle: any) => {
     console.log("Collision with obstacle:", obstacle.type, "at speed:", carSpeed);
     
     if (obstacle.type === "puddle") {
-      console.log("Hit puddle - speed penalty");
+      handlePuddleHit();
+      return;
+    }
+    
+    if (shieldActive) {
+      console.log("Shield absorbed the hit!");
+      setShieldActive(false);
       return;
     }
     
     if (carSpeed > GAME_CONFIG.CRASH_SPEED_THRESHOLD) {
       console.log("High-speed crash! Game over.");
+      audioManager.playCrash();
       gameOver();
     } else {
       console.log("Low-speed collision - speed penalty only");
+      audioManager.playCrash();
     }
   };
   
-  const handleCollect = () => {
-    console.log("Collected arequipe jar! +50 points, speed burst!");
-    addCollectible();
-    audioManager.playSuccess();
-    setBoostCounter(prev => prev + 1);
+  const handleCollect = (collectible: any) => {
+    if (collectible.type === "arequipe") {
+      console.log("Collected arequipe jar! +50 points, speed burst!");
+      addCollectible();
+      audioManager.playSuccess();
+      setBoostCounter(prev => prev + 1);
+    } else if (collectible.type === "nitro") {
+      console.log("Collected nitro! +20% speed for 2 seconds!");
+      audioManager.playNitro();
+      setNitroActive(true);
+      if (nitroTimeoutRef.current) {
+        clearTimeout(nitroTimeoutRef.current);
+      }
+      nitroTimeoutRef.current = setTimeout(() => {
+        setNitroActive(false);
+        nitroTimeoutRef.current = null;
+      }, 2000);
+    } else if (collectible.type === "shield") {
+      console.log("Collected shield! Protection from 1 hit!");
+      audioManager.playShield();
+      setShieldActive(true);
+    }
   };
   
   const keyMap = [
@@ -117,6 +181,8 @@ export function GameScene() {
               onSpeedChange={setCarSpeed}
               onCrash={gameOver}
               boostCounter={boostCounter}
+              nitroActive={nitroActive}
+              puddleSlowdown={puddleSlowdownActive}
             />
             <Obstacles
               carPosition={carPosition}
