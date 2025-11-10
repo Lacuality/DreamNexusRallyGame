@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRally } from "@/lib/stores/useRally";
 import { DREAM_NEXUS_COLORS } from "@/lib/constants";
 import { CarModelViewer } from "./CarModelViewer";
+import { Leaderboard } from "./Leaderboard";
 
 export function TitleScreen() {
   const { start, highScore, loadHighScore, playerName, setPlayerName, loadPlayerName } = useRally();
@@ -226,6 +227,16 @@ export function TitleScreen() {
           </div>
         </div>
 
+        {/* Leaderboard */}
+        <div
+          style={{
+            width: "100%",
+            maxWidth: "500px",
+          }}
+        >
+          <Leaderboard />
+        </div>
+
         {/* Player Name Input */}
         <div
           style={{
@@ -282,7 +293,7 @@ export function TitleScreen() {
               color: DREAM_NEXUS_COLORS.cyan,
             }}
           >
-            High Score: {highScore}m
+            Your High Score: {highScore}m
           </div>
         )}
 
