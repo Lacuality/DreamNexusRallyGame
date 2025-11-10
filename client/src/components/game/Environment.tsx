@@ -1,10 +1,17 @@
 import { useMemo } from "react";
+import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { DREAM_NEXUS_COLORS, GAME_CONFIG } from "@/lib/constants";
 import { useSettings } from "@/lib/stores/useSettings";
-import { useBiome } from "@/lib/stores/useBiome";
+import { useBiome, lerpColor, lerpNumber } from "@/lib/stores/useBiome";
 
 export function Environment() {
+  const updateTransition = useBiome((state) => state.updateTransition);
+  
+  useFrame((state, delta) => {
+    updateTransition(delta);
+  });
+  
   return (
     <>
       <Sky />
@@ -18,12 +25,29 @@ export function Environment() {
 
 function Sky() {
   const weather = useSettings((state) => state.weather);
-  const biomeConfig = useBiome((state) => state.getCurrentConfig());
+  const currentConfig = useBiome((state) => state.getCurrentConfig());
+  const previousConfig = useBiome((state) => state.getPreviousConfig());
+  const transitionProgress = useBiome((state) => state.transitionProgress);
+  const isTransitioning = useBiome((state) => state.isTransitioning);
   
-  const skyColor = weather === "overcast" ? "#1a2633" : biomeConfig.skyColor;
-  const fogNear = weather === "overcast" ? 30 : biomeConfig.fogNear;
-  const fogFar = weather === "overcast" ? 100 : biomeConfig.fogFar;
-  const fogColor = weather === "overcast" ? "#1a2633" : biomeConfig.fogColor;
+  let skyColor = currentConfig.skyColor;
+  let fogColor = currentConfig.fogColor;
+  let fogNear = currentConfig.fogNear;
+  let fogFar = currentConfig.fogFar;
+  
+  if (isTransitioning && previousConfig) {
+    skyColor = lerpColor(previousConfig.skyColor, currentConfig.skyColor, transitionProgress);
+    fogColor = lerpColor(previousConfig.fogColor, currentConfig.fogColor, transitionProgress);
+    fogNear = lerpNumber(previousConfig.fogNear, currentConfig.fogNear, transitionProgress);
+    fogFar = lerpNumber(previousConfig.fogFar, currentConfig.fogFar, transitionProgress);
+  }
+  
+  if (weather === "overcast") {
+    skyColor = "#1a2633";
+    fogColor = "#1a2633";
+    fogNear = 30;
+    fogFar = 100;
+  }
   
   return (
     <>
@@ -35,10 +59,23 @@ function Sky() {
 
 function Lights() {
   const weather = useSettings((state) => state.weather);
-  const biomeConfig = useBiome((state) => state.getCurrentConfig());
+  const currentConfig = useBiome((state) => state.getCurrentConfig());
+  const previousConfig = useBiome((state) => state.getPreviousConfig());
+  const transitionProgress = useBiome((state) => state.transitionProgress);
+  const isTransitioning = useBiome((state) => state.isTransitioning);
   
-  const sunIntensity = weather === "overcast" ? 0.6 : biomeConfig.sunIntensity;
-  const ambientIntensity = weather === "overcast" ? 0.3 : biomeConfig.ambientIntensity;
+  let sunIntensity = currentConfig.sunIntensity;
+  let ambientIntensity = currentConfig.ambientIntensity;
+  
+  if (isTransitioning && previousConfig) {
+    sunIntensity = lerpNumber(previousConfig.sunIntensity, currentConfig.sunIntensity, transitionProgress);
+    ambientIntensity = lerpNumber(previousConfig.ambientIntensity, currentConfig.ambientIntensity, transitionProgress);
+  }
+  
+  if (weather === "overcast") {
+    sunIntensity = 0.6;
+    ambientIntensity = 0.3;
+  }
   
   return (
     <>
@@ -64,7 +101,16 @@ function Lights() {
 }
 
 function Terrain() {
-  const biomeConfig = useBiome((state) => state.getCurrentConfig());
+  const currentConfig = useBiome((state) => state.getCurrentConfig());
+  const previousConfig = useBiome((state) => state.getPreviousConfig());
+  const transitionProgress = useBiome((state) => state.transitionProgress);
+  const isTransitioning = useBiome((state) => state.isTransitioning);
+  
+  let terrainColor = currentConfig.terrainColor;
+  
+  if (isTransitioning && previousConfig) {
+    terrainColor = lerpColor(previousConfig.terrainColor, currentConfig.terrainColor, transitionProgress);
+  }
   
   const terrainGeometry = useMemo(() => {
     const geo = new THREE.PlaneGeometry(100, 300, 50, 100);
@@ -89,7 +135,7 @@ function Terrain() {
       receiveShadow
     >
       <primitive object={terrainGeometry} />
-      <meshStandardMaterial color={biomeConfig.terrainColor} roughness={0.9} />
+      <meshStandardMaterial color={terrainColor} roughness={0.9} />
     </mesh>
   );
 }
