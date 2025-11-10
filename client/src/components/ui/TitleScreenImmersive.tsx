@@ -5,13 +5,17 @@ import { TitleScene3D } from "./TitleScene3D";
 import { HolographicPanel } from "./HolographicPanel";
 import { Leaderboard } from "./Leaderboard";
 import { FullscreenButton } from "./FullscreenButton";
-import { useFullscreen } from "@/hooks/useFullscreen";
 import { audioManager } from "@/lib/audio";
 
-export function TitleScreenImmersive() {
+interface TitleScreenImmersiveProps {
+  isFullscreen: boolean;
+  onToggleFullscreen: () => void;
+  isFullscreenSupported: boolean;
+}
+
+export function TitleScreenImmersive({ isFullscreen, onToggleFullscreen, isFullscreenSupported }: TitleScreenImmersiveProps) {
   const { start, highScore, loadHighScore, playerName, setPlayerName, loadPlayerName } = useRally();
   const [nameInput, setNameInput] = useState("");
-  const { elementRef, isFullscreen, toggle, isSupported } = useFullscreen();
   const [isMobile, setIsMobile] = useState(false);
   const [showControls, setShowControls] = useState(false);
   const musicStartedRef = useRef(false);
@@ -74,7 +78,6 @@ export function TitleScreenImmersive() {
 
   return (
     <div
-      ref={elementRef}
       onClick={handleStartMusic}
       style={{
         position: "fixed",
@@ -87,7 +90,7 @@ export function TitleScreenImmersive() {
     >
       <TitleScene3D />
 
-      <FullscreenButton isFullscreen={isFullscreen} onClick={toggle} isSupported={isSupported} />
+      <FullscreenButton isFullscreen={isFullscreen} onClick={onToggleFullscreen} isSupported={isFullscreenSupported} />
 
       <div
         style={{

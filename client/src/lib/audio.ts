@@ -19,6 +19,11 @@ export class AudioManager {
     this.bgMusic.loop = true;
     this.bgMusic.volume = 0.3;
     
+    this.engineSound = new Audio("/sounds/background.mp3");
+    this.engineSound.loop = true;
+    this.engineSound.volume = 0.15;
+    this.engineSound.playbackRate = 0.8;
+    
     this.crashSound = new Audio("/sounds/hit.mp3");
     this.crashSound.volume = 0.5;
     

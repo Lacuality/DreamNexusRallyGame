@@ -11,6 +11,7 @@ import { Collectibles } from "./Collectibles";
 import { SponsorBanners } from "./SponsorBanners";
 import { NitroParticles, DustTrail } from "./ParticleEffects";
 import { BiomePropsScene } from "./BiomeProps";
+import { AtmosphericParticles } from "./AtmosphericParticles";
 import { useRally } from "@/lib/stores/useRally";
 import { useSettings } from "@/lib/stores/useSettings";
 import { useBiome } from "@/lib/stores/useBiome";
@@ -230,6 +231,7 @@ export function GameScene() {
               carPositionRef={carPositionRef}
             />
             <DustTrail carPositionRef={carPositionRef} speedRef={carSpeedRef} />
+            <AtmosphericParticles carPositionRef={carPositionRef} />
             <Camera carPositionRef={carPositionRef} />
             <FrameSync
               carPositionRef={carPositionRef}

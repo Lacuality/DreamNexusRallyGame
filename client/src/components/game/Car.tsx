@@ -6,6 +6,7 @@ import { GAME_CONFIG } from "@/lib/constants";
 import { useRally } from "@/lib/stores/useRally";
 import { useMobileControls } from "@/lib/stores/useMobileControls";
 import { useSettings } from "@/lib/stores/useSettings";
+import { audioManager } from "@/lib/audio";
 
 export enum Controls {
   forward = "forward",
@@ -79,6 +80,15 @@ export function Car({ carPositionRef, carSpeedRef, onCrash, boostCounter = 0, ni
       right: controls.right
     });
   }, [getKeys]);
+
+  useEffect(() => {
+    if (phase === "playing") {
+      audioManager.startEngineSound();
+    }
+    return () => {
+      audioManager.stopEngineSound();
+    };
+  }, [phase]);
   
   useFrame((state, delta) => {
     if (!carRef.current || phase !== "playing" || showPhotoMode) return;
@@ -165,6 +175,8 @@ export function Car({ carPositionRef, carSpeedRef, onCrash, boostCounter = 0, ni
     const speedKmh = actualSpeedRef.current * 3.6;
     carSpeedRef.current = speedKmh;
     carPositionRef.current.copy(carRef.current.position);
+    
+    audioManager.updateEngineSound(speedKmh);
   });
   
   return (

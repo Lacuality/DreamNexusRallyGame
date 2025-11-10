@@ -185,28 +185,23 @@ function CenterLine({
     }
   });
 
+  const meshCallbackRef = (meshRef: THREE.InstancedMesh | null) => {
+    if (!meshRef) return;
+    for (let i = 0; i < dashCount; i++) {
+      meshRef.setMatrixAt(i, matrices[i]);
+    }
+    meshRef.instanceMatrix.needsUpdate = true;
+  };
+
   return (
     <group ref={groupRef} rotation={[-Math.PI / 2, 0, 0]}>
-      <instancedMesh args={[dashGeometry, undefined as any, dashCount]}>
-        {/* material lifted a hair + polygonOffset to avoid z-fighting with asphalt */}
+      <instancedMesh ref={meshCallbackRef} args={[dashGeometry, undefined as any, dashCount]}>
         <meshStandardMaterial
           color={DREAM_NEXUS_COLORS.roadLine}
           polygonOffset
           polygonOffsetFactor={-1}
           polygonOffsetUnits={-1}
         />
-        {/* fill instance matrices */}
-        {(() => {
-          // @ts-expect-error – we will set matrices imperatively once
-          return (meshRef => {
-            if (!meshRef) return null;
-            for (let i = 0; i < dashCount; i++) {
-              meshRef.setMatrixAt(i, matrices[i]);
-            }
-            meshRef.instanceMatrix.needsUpdate = true;
-            return null;
-          }) as any}
-        )()}
       </instancedMesh>
     </group>
   );

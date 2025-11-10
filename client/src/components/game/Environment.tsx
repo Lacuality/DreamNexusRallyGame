@@ -3,6 +3,7 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { useSettings } from "@/lib/stores/useSettings";
 import { useBiome, lerpColor, lerpNumber } from "@/lib/stores/useBiome";
+import { Sky } from "./Sky";
 
 /**
  * Lightweight value noise (smooth enough for rolling hills)
@@ -40,6 +41,7 @@ export function Environment() {
   useFrame((_, delta) => updateTransition(delta));
   return (
     <>
+      <Sky />
       <SkyAndFog />
       <Lights />
       <Terrain />
