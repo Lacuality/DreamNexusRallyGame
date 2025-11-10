@@ -59,6 +59,7 @@ function makeDeformedPlane(
 export function Road({ carPositionRef }: RoadProps) {
   const roadRef = useRef<THREE.Mesh>(null);
   const asphaltTexture = useTexture("/textures/asphalt.png");
+  const scrollOffset = useRef(0);
 
   useMemo(() => {
     asphaltTexture.wrapS = asphaltTexture.wrapT = THREE.RepeatWrapping;
@@ -75,6 +76,9 @@ export function Road({ carPositionRef }: RoadProps) {
   useFrame(() => {
     if (roadRef.current) {
       roadRef.current.position.z = carPositionRef.current.z - 50;
+      
+      scrollOffset.current = carPositionRef.current.z * 0.125;
+      asphaltTexture.offset.y = scrollOffset.current;
     }
   });
 

@@ -9,7 +9,7 @@ import { Environment } from "./Environment";
 import { Obstacles } from "./Obstacles";
 import { Collectibles } from "./Collectibles";
 import { SponsorBanners } from "./SponsorBanners";
-import { NitroParticles, DustTrail } from "./ParticleEffects";
+import { NitroParticles, DustTrail, ExhaustSmoke, CollisionSparks } from "./ParticleEffects";
 import { BiomePropsScene } from "./BiomeProps";
 import { AtmosphericParticles } from "./AtmosphericParticles";
 import { useRally } from "@/lib/stores/useRally";
@@ -61,6 +61,9 @@ export function GameScene({ isFullscreen = false, onToggleFullscreen }: GameScen
   const [nitroActive, setNitroActive] = useState(false);
   const [shieldActive, setShieldActive] = useState(false);
   const [puddleSlowdownActive, setPuddleSlowdownActive] = useState(false);
+  const [collisionSparkPosition, setCollisionSparkPosition] = useState(new THREE.Vector3(0, 0, 0));
+  const [showCollisionSparks, setShowCollisionSparks] = useState(false);
+  const [cameraShakeIntensity, setCameraShakeIntensity] = useState(0);
   const nitroTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const puddleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -150,6 +153,14 @@ export function GameScene({ isFullscreen = false, onToggleFullscreen }: GameScen
       return;
     }
 
+    setCollisionSparkPosition(obstacle.position.clone());
+    setShowCollisionSparks(true);
+    setTimeout(() => setShowCollisionSparks(false), 600);
+
+    const shakeAmount = shieldActive ? 0.8 : 1.5;
+    setCameraShakeIntensity(shakeAmount);
+    setTimeout(() => setCameraShakeIntensity(0), 500);
+
     if (shieldActive) {
       console.log("Shield absorbed the hit!");
       setShieldActive(false);
@@ -236,8 +247,10 @@ export function GameScene({ isFullscreen = false, onToggleFullscreen }: GameScen
               carPositionRef={carPositionRef}
             />
             <DustTrail carPositionRef={carPositionRef} speedRef={carSpeedRef} />
+            <ExhaustSmoke carPositionRef={carPositionRef} speedRef={carSpeedRef} />
+            <CollisionSparks position={collisionSparkPosition} active={showCollisionSparks} />
             <AtmosphericParticles carPositionRef={carPositionRef} />
-            <Camera carPositionRef={carPositionRef} />
+            <Camera carPositionRef={carPositionRef} shakeIntensity={cameraShakeIntensity} />
             <FrameSync
               carPositionRef={carPositionRef}
               carSpeedRef={carSpeedRef}

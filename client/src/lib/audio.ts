@@ -19,16 +19,16 @@ export class AudioManager {
     this.bgMusic.loop = true;
     this.bgMusic.volume = 0.3;
     
-    this.engineSound = new Audio("/sounds/background.mp3");
+    this.engineSound = new Audio("/sounds/hit.mp3");
     this.engineSound.loop = true;
-    this.engineSound.volume = 0.15;
+    this.engineSound.volume = 0.4;
     this.engineSound.playbackRate = 0.8;
     
     this.crashSound = new Audio("/sounds/hit.mp3");
-    this.crashSound.volume = 0.5;
+    this.crashSound.volume = 0.6;
     
     this.successSound = new Audio("/sounds/success.mp3");
-    this.successSound.volume = 0.4;
+    this.successSound.volume = 0.5;
   }
   
   playBackgroundMusic() {
@@ -77,14 +77,14 @@ export class AudioManager {
   updateEngineSound(speed: number) {
     if (!this.engineSound || this.isMuted) return;
     const maxSpeed = 180;
-    const minPitch = 0.6;
-    const maxPitch = 1.8;
+    const minPitch = 0.8;
+    const maxPitch = 2.5;
     const pitchRange = maxPitch - minPitch;
     const speedRatio = Math.min(speed / maxSpeed, 1);
     const pitchFactor = minPitch + speedRatio * pitchRange;
     
     this.engineSound.playbackRate = pitchFactor;
-    this.engineSound.volume = 0.15 + speedRatio * 0.15;
+    this.engineSound.volume = 0.4 + speedRatio * 0.3;
   }
   
   playNitro() {

@@ -30,15 +30,21 @@ export function Obstacles({ carPositionRef, carSpeedRef, onCollision }: Obstacle
     const newElapsedTime = elapsedTime + delta * 1000;
     setElapsedTime(newElapsedTime);
     
+    const distance = carPositionRef.current.z;
     const difficultyLevel = Math.floor(newElapsedTime / GAME_CONFIG.DIFFICULTY_RAMP_INTERVAL);
-    const spawnChance = GAME_CONFIG.OBSTACLE_DENSITY_BASE + 
+    const baseSpawnChance = GAME_CONFIG.OBSTACLE_DENSITY_BASE + 
       (difficultyLevel * GAME_CONFIG.OBSTACLE_DENSITY_INCREASE);
+    
+    const distanceFactor = Math.min(distance / 3000, 1.0);
+    const spawnChance = baseSpawnChance + (distanceFactor * 0.25);
+    
+    const minSpacing = Math.max(10 - distanceFactor * 4, 6);
     
     let newObstacles = [...obstacles];
     let updatedLastSpawnZ = lastSpawnZ;
     let updatedNextId = nextObstacleId;
     
-    if (carPositionRef.current.z > lastSpawnZ + 10) {
+    if (carPositionRef.current.z > lastSpawnZ + minSpacing) {
       if (Math.random() < spawnChance) {
         const laneOffset = (Math.random() - 0.5) * (GAME_CONFIG.LANE_WIDTH - 2);
         const obstacleTypes: Array<"cone" | "rock" | "puddle" | "coffee_sack"> = ["cone", "rock", "puddle", "coffee_sack"];

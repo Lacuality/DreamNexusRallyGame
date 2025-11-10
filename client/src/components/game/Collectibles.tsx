@@ -31,15 +31,23 @@ export function Collectibles({ carPositionRef, onCollect }: CollectiblesProps) {
     let updatedLastSpawnZ = lastSpawnZ;
     let updatedNextId = nextCollectibleId;
     
+    const distance = carPositionRef.current.z;
+    const baseSpawnChance = 0.3;
+    const difficultyFactor = Math.min(distance / 5000, 0.6);
+    const adjustedSpawnChance = baseSpawnChance * (1 - difficultyFactor);
+    
     if (carPositionRef.current.z > lastSpawnZ + 20) {
-      if (Math.random() < 0.3) {
+      if (Math.random() < adjustedSpawnChance) {
         const laneOffset = (Math.random() - 0.5) * (GAME_CONFIG.LANE_WIDTH - 3);
+        
+        const shieldChance = Math.max(0.15 - difficultyFactor * 0.1, 0.05);
+        const nitroChance = Math.max(0.15 - difficultyFactor * 0.05, 0.08);
         
         const rand = Math.random();
         let type: CollectibleType = "arequipe";
-        if (rand < 0.7) {
+        if (rand < 1 - shieldChance - nitroChance) {
           type = "arequipe";
-        } else if (rand < 0.85) {
+        } else if (rand < 1 - shieldChance) {
           type = "nitro";
         } else {
           type = "shield";
