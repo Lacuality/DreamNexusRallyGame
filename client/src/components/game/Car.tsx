@@ -170,22 +170,22 @@ export function Car({ onPositionChange, onSpeedChange, onCrash, boostCounter = 0
   return (
     <group ref={carRef} position={[0, 0.5, 0]}>
       <group ref={bodyRef}>
-        <group ref={carModelRef} scale={1.4}>
+        <group ref={carModelRef} scale={2.5}>
           <primitive object={carModel} />
         </group>
       </group>
       
-      <group ref={frontLeftWheelRef} position={[-0.6, -0.2, 0.6]} rotation={[0, 0, 0]}>
-        <primitive object={wheelModels.frontLeft} scale={0.7} />
+      <group ref={frontLeftWheelRef} position={[-0.7, -0.3, 0.8]} rotation={[0, 0, 0]}>
+        <primitive object={wheelModels.frontLeft} scale={0.5} />
       </group>
-      <group ref={frontRightWheelRef} position={[0.6, -0.2, 0.6]} rotation={[0, 0, 0]}>
-        <primitive object={wheelModels.frontRight} scale={0.7} />
+      <group ref={frontRightWheelRef} position={[0.7, -0.3, 0.8]} rotation={[0, 0, 0]}>
+        <primitive object={wheelModels.frontRight} scale={0.5} />
       </group>
-      <group ref={rearLeftWheelRef} position={[-0.6, -0.2, -0.6]} rotation={[0, 0, 0]}>
-        <primitive object={wheelModels.rearLeft} scale={0.7} />
+      <group ref={rearLeftWheelRef} position={[-0.7, -0.3, -0.8]} rotation={[0, 0, 0]}>
+        <primitive object={wheelModels.rearLeft} scale={0.5} />
       </group>
-      <group ref={rearRightWheelRef} position={[0.6, -0.2, -0.6]} rotation={[0, 0, 0]}>
-        <primitive object={wheelModels.rearRight} scale={0.7} />
+      <group ref={rearRightWheelRef} position={[0.7, -0.3, -0.8]} rotation={[0, 0, 0]}>
+        <primitive object={wheelModels.rearRight} scale={0.5} />
       </group>
     </group>
   );

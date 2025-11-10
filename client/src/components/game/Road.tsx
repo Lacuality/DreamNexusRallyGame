@@ -19,7 +19,7 @@ export function Road({ carPosition }: RoadProps) {
   
   const roadGeometry = useMemo(() => {
     const geometry = new THREE.PlaneGeometry(
-      GAME_CONFIG.LANE_WIDTH + 2,
+      GAME_CONFIG.LANE_WIDTH + 4,
       200,
       20,
       200
@@ -85,18 +85,20 @@ function RoadEdges({ carPosition }: { carPosition: THREE.Vector3 }) {
     return new THREE.BoxGeometry(0.3, 0.15, 200);
   }, []);
   
+  const roadWidth = GAME_CONFIG.LANE_WIDTH + 4;
+  
   return (
     <>
       <mesh
         ref={leftEdgeRef}
-        position={[-GAME_CONFIG.LANE_WIDTH / 2, 0.1, 0]}
+        position={[-roadWidth / 2 + 0.5, 0.1, 0]}
         geometry={edgeGeometry}
       >
         <meshStandardMaterial color="#ffcc00" emissive="#ffcc00" emissiveIntensity={0.2} />
       </mesh>
       <mesh
         ref={rightEdgeRef}
-        position={[GAME_CONFIG.LANE_WIDTH / 2, 0.1, 0]}
+        position={[roadWidth / 2 - 0.5, 0.1, 0]}
         geometry={edgeGeometry}
       >
         <meshStandardMaterial color="#ffcc00" emissive="#ffcc00" emissiveIntensity={0.2} />
