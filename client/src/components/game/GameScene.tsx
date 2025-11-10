@@ -1,4 +1,4 @@
-import { Canvas } from "@react-three/fiber";
+import { Canvas, useFrame } from "@react-three/fiber";
 import { KeyboardControls } from "@react-three/drei";
 import { Suspense, useState, useRef, useEffect } from "react";
 import * as THREE from "three";
@@ -21,9 +21,33 @@ import { TuningPanel } from "../ui/TuningPanel";
 import { GAME_CONFIG } from "@/lib/constants";
 import { audioManager } from "@/lib/audio";
 
+function FrameSync({ carPositionRef, carSpeedRef }: { 
+  carPositionRef: React.MutableRefObject<THREE.Vector3>, 
+  carSpeedRef: React.MutableRefObject<number> 
+}) {
+  const frameCountRef = useRef(0);
+  const phase = useRally((state) => state.phase);
+  const updateDistance = useRally((state) => state.updateDistance);
+  const updateSpeed = useRally((state) => state.updateSpeed);
+  const updateBiomeDistance = useBiome((state) => state.updateDistance);
+
+  useFrame(() => {
+    if (phase !== "playing") return;
+    
+    frameCountRef.current++;
+    if (frameCountRef.current % 10 === 0) {
+      updateDistance(carPositionRef.current.z);
+      updateBiomeDistance(carPositionRef.current.z);
+      updateSpeed(carSpeedRef.current);
+    }
+  });
+
+  return null;
+}
+
 export function GameScene() {
-  const [carPosition, setCarPosition] = useState(new THREE.Vector3(0, 0, 0));
-  const [carSpeed, setCarSpeed] = useState(0);
+  const carPositionRef = useRef(new THREE.Vector3(0, 0, 0));
+  const carSpeedRef = useRef(0);
   const [boostCounter, setBoostCounter] = useState(0);
   const [nitroActive, setNitroActive] = useState(false);
   const [shieldActive, setShieldActive] = useState(false);
@@ -34,11 +58,6 @@ export function GameScene() {
   const { phase, updateDistance, updateSpeed, gameOver, pause, resume, addCollectible } = useRally();
   const showPhotoMode = useSettings((state) => state.showPhotoMode);
   const updateBiomeDistance = useBiome((state) => state.updateDistance);
-  
-  useEffect(() => {
-    updateDistance(carPosition.z);
-    updateBiomeDistance(carPosition.z);
-  }, [carPosition.z, updateDistance, updateBiomeDistance]);
   
   useEffect(() => {
     if (phase === "menu" || phase === "gameover") {
@@ -54,12 +73,10 @@ export function GameScene() {
       setShieldActive(false);
       setPuddleSlowdownActive(false);
       setBoostCounter(0);
+      carPositionRef.current.set(0, 0, 0);
+      carSpeedRef.current = 0;
     }
   }, [phase]);
-  
-  useEffect(() => {
-    updateSpeed(carSpeed);
-  }, [carSpeed, updateSpeed]);
   
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
@@ -104,7 +121,7 @@ export function GameScene() {
   };
   
   const handleCollision = (obstacle: any) => {
-    console.log("Collision with obstacle:", obstacle.type, "at speed:", carSpeed);
+    console.log("Collision with obstacle:", obstacle.type, "at speed:", carSpeedRef.current);
     
     if (obstacle.type === "puddle") {
       handlePuddleHit();
@@ -117,7 +134,7 @@ export function GameScene() {
       return;
     }
     
-    if (carSpeed > GAME_CONFIG.CRASH_SPEED_THRESHOLD) {
+    if (carSpeedRef.current > GAME_CONFIG.CRASH_SPEED_THRESHOLD) {
       console.log("High-speed crash! Game over.");
       audioManager.playCrash();
       gameOver();
@@ -177,28 +194,29 @@ export function GameScene() {
           <Suspense fallback={null}>
             <Environment />
             <SponsorBanners />
-            <Road carPosition={carPosition} />
-            <BiomePropsScene carPosition={carPosition} />
+            <Road carPositionRef={carPositionRef} />
+            <BiomePropsScene carPositionRef={carPositionRef} />
             <Car
-              onPositionChange={setCarPosition}
-              onSpeedChange={setCarSpeed}
+              carPositionRef={carPositionRef}
+              carSpeedRef={carSpeedRef}
               onCrash={gameOver}
               boostCounter={boostCounter}
               nitroActive={nitroActive}
               puddleSlowdown={puddleSlowdownActive}
             />
             <Obstacles
-              carPosition={carPosition}
-              carSpeed={carSpeed}
+              carPositionRef={carPositionRef}
+              carSpeedRef={carSpeedRef}
               onCollision={handleCollision}
             />
             <Collectibles
-              carPosition={carPosition}
+              carPositionRef={carPositionRef}
               onCollect={handleCollect}
             />
-            <NitroParticles active={nitroActive} carPosition={carPosition} />
-            <DustTrail carPosition={carPosition} speed={carSpeed} />
-            <Camera carPosition={carPosition} />
+            <NitroParticles active={nitroActive} carPositionRef={carPositionRef} />
+            <DustTrail carPositionRef={carPositionRef} speedRef={carSpeedRef} />
+            <Camera carPositionRef={carPositionRef} />
+            <FrameSync carPositionRef={carPositionRef} carSpeedRef={carSpeedRef} />
           </Suspense>
         </Canvas>
       </KeyboardControls>

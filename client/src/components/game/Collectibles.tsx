@@ -15,11 +15,11 @@ interface Collectible {
 }
 
 interface CollectiblesProps {
-  carPosition: THREE.Vector3;
+  carPositionRef: React.MutableRefObject<THREE.Vector3>;
   onCollect: (collectible: Collectible) => void;
 }
 
-export function Collectibles({ carPosition, onCollect }: CollectiblesProps) {
+export function Collectibles({ carPositionRef, onCollect }: CollectiblesProps) {
   const [collectibles, setCollectibles] = useState<Collectible[]>([]);
   const [nextCollectibleId, setNextCollectibleId] = useState(0);
   const [lastSpawnZ, setLastSpawnZ] = useState(0);
@@ -31,7 +31,7 @@ export function Collectibles({ carPosition, onCollect }: CollectiblesProps) {
     let updatedLastSpawnZ = lastSpawnZ;
     let updatedNextId = nextCollectibleId;
     
-    if (carPosition.z > lastSpawnZ + 20) {
+    if (carPositionRef.current.z > lastSpawnZ + 20) {
       if (Math.random() < 0.3) {
         const laneOffset = (Math.random() - 0.5) * (GAME_CONFIG.LANE_WIDTH - 3);
         
@@ -48,19 +48,19 @@ export function Collectibles({ carPosition, onCollect }: CollectiblesProps) {
         newCollectibles.push({
           id: updatedNextId,
           type,
-          position: new THREE.Vector3(laneOffset, 0.5, carPosition.z + 60),
+          position: new THREE.Vector3(laneOffset, 0.5, carPositionRef.current.z + 60),
           rotation: Math.random() * Math.PI * 2
         });
         
         updatedNextId++;
       }
-      updatedLastSpawnZ = carPosition.z;
+      updatedLastSpawnZ = carPositionRef.current.z;
     }
     
     newCollectibles = newCollectibles.filter((collectible) => {
       const distanceToCar = new THREE.Vector2(
-        carPosition.x - collectible.position.x,
-        carPosition.z - collectible.position.z
+        carPositionRef.current.x - collectible.position.x,
+        carPositionRef.current.z - collectible.position.z
       ).length();
       
       if (distanceToCar < 1.2) {
@@ -68,7 +68,7 @@ export function Collectibles({ carPosition, onCollect }: CollectiblesProps) {
         return false;
       }
       
-      return collectible.position.z > carPosition.z - 20;
+      return collectible.position.z > carPositionRef.current.z - 20;
     });
     
     newCollectibles.forEach((collectible) => {

@@ -5,7 +5,7 @@ import * as THREE from "three";
 import { GAME_CONFIG, DREAM_NEXUS_COLORS } from "@/lib/constants";
 
 interface RoadProps {
-  carPosition: THREE.Vector3;
+  carPositionRef: React.MutableRefObject<THREE.Vector3>;
 }
 
 const ROAD_LENGTH = 200;
@@ -46,7 +46,7 @@ function makeDeformedPlane(
   return geo;
 }
 
-export function Road({ carPosition }: RoadProps) {
+export function Road({ carPositionRef }: RoadProps) {
   const roadRef = useRef<THREE.Mesh>(null);
   const asphaltTexture = useTexture("/textures/asphalt.png");
 
@@ -62,7 +62,7 @@ export function Road({ carPosition }: RoadProps) {
 
   useFrame(() => {
     if (roadRef.current) {
-      roadRef.current.position.z = carPosition.z - 50;
+      roadRef.current.position.z = carPositionRef.current.z - 50;
     }
   });
 
@@ -81,13 +81,13 @@ export function Road({ carPosition }: RoadProps) {
         />
       </mesh>
 
-      <RoadEdges carPosition={carPosition} />
-      <CenterLine carPosition={carPosition} />
+      <RoadEdges carPositionRef={carPositionRef} />
+      <CenterLine carPositionRef={carPositionRef} />
     </group>
   );
 }
 
-function RoadEdges({ carPosition }: { carPosition: THREE.Vector3 }) {
+function RoadEdges({ carPositionRef }: { carPositionRef: React.MutableRefObject<THREE.Vector3> }) {
   const leftEdgeRef = useRef<THREE.Mesh>(null);
   const rightEdgeRef = useRef<THREE.Mesh>(null);
 
@@ -103,10 +103,10 @@ function RoadEdges({ carPosition }: { carPosition: THREE.Vector3 }) {
 
   useFrame(() => {
     if (leftEdgeRef.current) {
-      leftEdgeRef.current.position.z = carPosition.z - 50;
+      leftEdgeRef.current.position.z = carPositionRef.current.z - 50;
     }
     if (rightEdgeRef.current) {
-      rightEdgeRef.current.position.z = carPosition.z - 50;
+      rightEdgeRef.current.position.z = carPositionRef.current.z - 50;
     }
   });
 
@@ -143,7 +143,7 @@ function RoadEdges({ carPosition }: { carPosition: THREE.Vector3 }) {
   );
 }
 
-function CenterLine({ carPosition }: { carPosition: THREE.Vector3 }) {
+function CenterLine({ carPositionRef }: { carPositionRef: React.MutableRefObject<THREE.Vector3> }) {
   const linesRef = useRef<THREE.Group>(null);
 
   const dashGeometry = useMemo(() => {
@@ -156,11 +156,11 @@ function CenterLine({ carPosition }: { carPosition: THREE.Vector3 }) {
 
     for (let i = 0; i < count; i++) {
       const zLocal = -ROAD_LENGTH / 2 + i * (DASH_LENGTH + DASH_GAP);
-      const { elev } = sampleCurveAndElev(zLocal);
+      const { curve, elev } = sampleCurveAndElev(zLocal);
       
       dashArray.push({
         key: i,
-        position: [0, EDGE_LIFT * 0.8 + elev, zLocal] as [number, number, number]
+        position: [curve, EDGE_LIFT * 0.8 + elev, zLocal] as [number, number, number]
       });
     }
     return dashArray;
@@ -168,7 +168,7 @@ function CenterLine({ carPosition }: { carPosition: THREE.Vector3 }) {
 
   useFrame(() => {
     if (linesRef.current) {
-      linesRef.current.position.z = carPosition.z - 50;
+      linesRef.current.position.z = carPositionRef.current.z - 50;
     }
   });
 

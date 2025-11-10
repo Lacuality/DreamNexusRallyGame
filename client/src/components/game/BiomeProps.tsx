@@ -5,27 +5,27 @@ import * as THREE from "three";
 import { GAME_CONFIG } from "@/lib/constants";
 
 interface BiomePropsSceneProps {
-  carPosition: THREE.Vector3;
+  carPositionRef: React.MutableRefObject<THREE.Vector3>;
 }
 
-export function BiomePropsScene({ carPosition }: BiomePropsSceneProps) {
+export function BiomePropsScene({ carPositionRef }: BiomePropsSceneProps) {
   const currentBiome = useBiome((state) => state.currentBiome);
   
   if (currentBiome === "coffee_hills") {
-    return <CoffeeHillsProps carPosition={carPosition} />;
+    return <CoffeeHillsProps carPositionRef={carPositionRef} />;
   } else if (currentBiome === "andes_highland") {
-    return <AndesHighlandProps carPosition={carPosition} />;
+    return <AndesHighlandProps carPositionRef={carPositionRef} />;
   } else {
-    return <PuebloProps carPosition={carPosition} />;
+    return <PuebloProps carPositionRef={carPositionRef} />;
   }
 }
 
-function CoffeeHillsProps({ carPosition }: { carPosition: THREE.Vector3 }) {
+function CoffeeHillsProps({ carPositionRef }: { carPositionRef: React.MutableRefObject<THREE.Vector3> }) {
   const { scene: coffeePlant } = useGLTF("/models/coffee-plant.glb");
   const { scene: farmFence } = useGLTF("/models/farm-fence.glb");
   const { scene: jeepWillys } = useGLTF("/models/jeep-willys.glb");
   
-  const segment = Math.floor(carPosition.z / 50);
+  const segment = Math.floor(carPositionRef.current.z / 50);
   
   const props = useMemo(() => {
     const items = [];
@@ -95,11 +95,11 @@ function CoffeeHillsProps({ carPosition }: { carPosition: THREE.Vector3 }) {
   );
 }
 
-function AndesHighlandProps({ carPosition }: { carPosition: THREE.Vector3 }) {
+function AndesHighlandProps({ carPositionRef }: { carPositionRef: React.MutableRefObject<THREE.Vector3> }) {
   const { scene: andesRock } = useGLTF("/models/andes-rock.glb");
   const { scene: fraijelon } = useGLTF("/models/fraijelon.glb");
   
-  const segment = Math.floor(carPosition.z / 60);
+  const segment = Math.floor(carPositionRef.current.z / 60);
   
   const props = useMemo(() => {
     const items = [];
@@ -146,11 +146,11 @@ function AndesHighlandProps({ carPosition }: { carPosition: THREE.Vector3 }) {
   );
 }
 
-function PuebloProps({ carPosition }: { carPosition: THREE.Vector3 }) {
+function PuebloProps({ carPositionRef }: { carPositionRef: React.MutableRefObject<THREE.Vector3> }) {
   const { scene: puebloHouse } = useGLTF("/models/pueblo-house.glb");
   const { scene: papelPicado } = useGLTF("/models/papel-picado.glb");
   
-  const segment = Math.floor(carPosition.z / 70);
+  const segment = Math.floor(carPositionRef.current.z / 70);
   
   const props = useMemo(() => {
     const items = [];

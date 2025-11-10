@@ -4,10 +4,10 @@ import * as THREE from "three";
 
 interface NitroParticlesProps {
   active: boolean;
-  carPosition: THREE.Vector3;
+  carPositionRef: React.MutableRefObject<THREE.Vector3>;
 }
 
-export function NitroParticles({ active, carPosition }: NitroParticlesProps) {
+export function NitroParticles({ active, carPositionRef }: NitroParticlesProps) {
   const particlesRef = useRef<THREE.Points>(null);
   const timeRef = useRef(0);
   
@@ -46,9 +46,9 @@ export function NitroParticles({ active, carPosition }: NitroParticlesProps) {
       const offset = (timeRef.current + i * 0.1) % 1;
       const spread = 0.4;
       
-      positions[i * 3] = carPosition.x + (Math.random() - 0.5) * spread;
-      positions[i * 3 + 1] = carPosition.y - 0.3 + Math.random() * 0.2;
-      positions[i * 3 + 2] = carPosition.z - offset * 2;
+      positions[i * 3] = carPositionRef.current.x + (Math.random() - 0.5) * spread;
+      positions[i * 3 + 1] = carPositionRef.current.y - 0.3 + Math.random() * 0.2;
+      positions[i * 3 + 2] = carPositionRef.current.z - offset * 2;
     }
     
     positionAttribute.needsUpdate = true;
@@ -92,11 +92,11 @@ export function NitroParticles({ active, carPosition }: NitroParticlesProps) {
 }
 
 interface DustTrailProps {
-  carPosition: THREE.Vector3;
-  speed: number;
+  carPositionRef: React.MutableRefObject<THREE.Vector3>;
+  speedRef: React.MutableRefObject<number>;
 }
 
-export function DustTrail({ carPosition, speed }: DustTrailProps) {
+export function DustTrail({ carPositionRef, speedRef }: DustTrailProps) {
   const particlesRef = useRef<THREE.Points>(null);
   const timeRef = useRef(0);
   
@@ -123,7 +123,7 @@ export function DustTrail({ carPosition, speed }: DustTrailProps) {
   }, []);
   
   useFrame((state, delta) => {
-    if (!particlesRef.current || speed < 5) return;
+    if (!particlesRef.current || speedRef.current < 5) return;
     
     timeRef.current += delta;
     const positionAttribute = particlesRef.current.geometry.attributes.position;
@@ -133,15 +133,15 @@ export function DustTrail({ carPosition, speed }: DustTrailProps) {
       const offset = (timeRef.current * 2 + i * 0.1) % 1;
       const spread = 0.6;
       
-      positions[i * 3] = carPosition.x + (Math.random() - 0.5) * spread;
+      positions[i * 3] = carPositionRef.current.x + (Math.random() - 0.5) * spread;
       positions[i * 3 + 1] = 0.1 + Math.random() * 0.1;
-      positions[i * 3 + 2] = carPosition.z - offset * 3;
+      positions[i * 3 + 2] = carPositionRef.current.z - offset * 3;
     }
     
     positionAttribute.needsUpdate = true;
   });
   
-  if (speed < 5) return null;
+  if (speedRef.current < 5) return null;
   
   return (
     <points ref={particlesRef}>

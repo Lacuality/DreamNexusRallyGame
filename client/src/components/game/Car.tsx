@@ -15,15 +15,15 @@ export enum Controls {
 }
 
 interface CarProps {
-  onPositionChange: (position: THREE.Vector3) => void;
-  onSpeedChange: (speed: number) => void;
+  carPositionRef: React.MutableRefObject<THREE.Vector3>;
+  carSpeedRef: React.MutableRefObject<number>;
   onCrash: () => void;
   boostCounter?: number;
   nitroActive?: boolean;
   puddleSlowdown?: boolean;
 }
 
-export function Car({ onPositionChange, onSpeedChange, onCrash, boostCounter = 0, nitroActive = false, puddleSlowdown = false }: CarProps) {
+export function Car({ carPositionRef, carSpeedRef, onCrash, boostCounter = 0, nitroActive = false, puddleSlowdown = false }: CarProps) {
   const carRef = useRef<THREE.Group>(null);
   const bodyRef = useRef<THREE.Group>(null);
   const carModelRef = useRef<THREE.Group>(null);
@@ -163,8 +163,8 @@ export function Car({ onPositionChange, onSpeedChange, onCrash, boostCounter = 0
     carRef.current.rotation.y = -carYawRef.current * 0.3;
     
     const speedKmh = actualSpeedRef.current * 3.6;
-    onSpeedChange(speedKmh);
-    onPositionChange(carRef.current.position.clone());
+    carSpeedRef.current = speedKmh;
+    carPositionRef.current.copy(carRef.current.position);
   });
   
   return (

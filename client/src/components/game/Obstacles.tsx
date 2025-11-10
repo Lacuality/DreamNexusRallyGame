@@ -12,12 +12,12 @@ interface Obstacle {
 }
 
 interface ObstaclesProps {
-  carPosition: THREE.Vector3;
-  carSpeed: number;
+  carPositionRef: React.MutableRefObject<THREE.Vector3>;
+  carSpeedRef: React.MutableRefObject<number>;
   onCollision: (obstacle: Obstacle) => void;
 }
 
-export function Obstacles({ carPosition, carSpeed, onCollision }: ObstaclesProps) {
+export function Obstacles({ carPositionRef, carSpeedRef, onCollision }: ObstaclesProps) {
   const [obstacles, setObstacles] = useState<Obstacle[]>([]);
   const [nextObstacleId, setNextObstacleId] = useState(0);
   const [lastSpawnZ, setLastSpawnZ] = useState(0);
@@ -38,7 +38,7 @@ export function Obstacles({ carPosition, carSpeed, onCollision }: ObstaclesProps
     let updatedLastSpawnZ = lastSpawnZ;
     let updatedNextId = nextObstacleId;
     
-    if (carPosition.z > lastSpawnZ + 10) {
+    if (carPositionRef.current.z > lastSpawnZ + 10) {
       if (Math.random() < spawnChance) {
         const laneOffset = (Math.random() - 0.5) * (GAME_CONFIG.LANE_WIDTH - 2);
         const obstacleTypes: Array<"cone" | "rock" | "puddle" | "coffee_sack"> = ["cone", "rock", "puddle", "coffee_sack"];
@@ -47,23 +47,23 @@ export function Obstacles({ carPosition, carSpeed, onCollision }: ObstaclesProps
         newObstacles.push({
           id: updatedNextId,
           type,
-          position: new THREE.Vector3(laneOffset, 0, carPosition.z + 50)
+          position: new THREE.Vector3(laneOffset, 0, carPositionRef.current.z + 50)
         });
         
         updatedNextId++;
       }
-      updatedLastSpawnZ = carPosition.z;
+      updatedLastSpawnZ = carPositionRef.current.z;
     }
     
     newObstacles = newObstacles.filter((obstacle) => {
-      const distanceToCar = carPosition.distanceTo(obstacle.position);
+      const distanceToCar = carPositionRef.current.distanceTo(obstacle.position);
       
       if (distanceToCar < GAME_CONFIG.HIT_RADIUS) {
         onCollision(obstacle);
         return false;
       }
       
-      return obstacle.position.z > carPosition.z - 20;
+      return obstacle.position.z > carPositionRef.current.z - 20;
     });
     
     if (newObstacles.length !== obstacles.length || updatedLastSpawnZ !== lastSpawnZ) {
