@@ -19,7 +19,7 @@ export function Road({ carPosition }: RoadProps) {
   
   const roadGeometry = useMemo(() => {
     const geometry = new THREE.PlaneGeometry(
-      GAME_CONFIG.LANE_WIDTH,
+      GAME_CONFIG.LANE_WIDTH + 2,
       200,
       20,
       200
