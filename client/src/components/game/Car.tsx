@@ -92,7 +92,7 @@ export function Car({ carPositionRef, carSpeedRef, onCrash, boostCounter = 0, ni
     const maxSpeedMs = nitroActive ? GAME_CONFIG.MAX_SPEED_MS * 1.2 : GAME_CONFIG.MAX_SPEED_MS;
     const accelInput = isForward ? 1 : 0;
     const brakeInput = isBack ? 1 : 0;
-    const steerInput = (isLeft ? -1 : 0) + (isRight ? 1 : 0);
+    const steerInput = (isLeft ? 1 : 0) + (isRight ? -1 : 0);
     
     targetSpeedRef.current += (accelInput * GAME_CONFIG.ACCEL_RATE - brakeInput * GAME_CONFIG.BRAKE_RATE) * delta;
     
