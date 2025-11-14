@@ -1,6 +1,4 @@
 import { users, type User, type InsertUser, leaderboard, type Leaderboard, type InsertLeaderboard } from "@shared/schema";
-import { db } from "../db";
-import { desc, eq, sql } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
@@ -12,11 +10,15 @@ export interface IStorage {
 
 export class MemStorage implements IStorage {
   private users: Map<number, User>;
+  private leaderboardScores: Map<string, Leaderboard>;
   currentId: number;
+  currentLeaderboardId: number;
 
   constructor() {
     this.users = new Map();
+    this.leaderboardScores = new Map();
     this.currentId = 1;
+    this.currentLeaderboardId = 1;
   }
 
   async getUser(id: number): Promise<User | undefined> {
@@ -37,28 +39,29 @@ export class MemStorage implements IStorage {
   }
 
   async getTopLeaderboard(limit: number): Promise<Leaderboard[]> {
-    const results = await db
-      .select()
-      .from(leaderboard)
-      .orderBy(desc(leaderboard.score))
-      .limit(limit);
-    return results;
+    const scores = Array.from(this.leaderboardScores.values())
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit);
+    return scores;
   }
 
   async upsertLeaderboardScore(scoreData: InsertLeaderboard): Promise<Leaderboard> {
-    const [result] = await db
-      .insert(leaderboard)
-      .values(scoreData)
-      .onConflictDoUpdate({
-        target: leaderboard.playerName,
-        set: {
-          score: sql`CASE WHEN ${leaderboard.score} < ${scoreData.score} THEN ${scoreData.score} ELSE ${leaderboard.score} END`,
-          distance: sql`CASE WHEN ${leaderboard.score} < ${scoreData.score} THEN ${scoreData.distance} ELSE ${leaderboard.distance} END`,
-          createdAt: sql`CASE WHEN ${leaderboard.score} < ${scoreData.score} THEN NOW() ELSE ${leaderboard.createdAt} END`,
-        },
-      })
-      .returning();
-    return result;
+    const existing = this.leaderboardScores.get(scoreData.playerName);
+
+    if (existing && existing.score >= scoreData.score) {
+      return existing;
+    }
+
+    const newScore: Leaderboard = {
+      id: existing?.id || this.currentLeaderboardId++,
+      playerName: scoreData.playerName,
+      score: scoreData.score,
+      distance: scoreData.distance,
+      createdAt: new Date(),
+    };
+
+    this.leaderboardScores.set(scoreData.playerName, newScore);
+    return newScore;
   }
 }
 
