@@ -168,7 +168,7 @@ export function Car({ carPositionRef, carSpeedRef, onCrash, boostCounter = 0, ni
   return (
     <group ref={carRef} position={[0, 0.5, 0]}>
       <group ref={bodyRef}>
-        <group ref={carModelRef} scale={2.0} rotation={[0, Math.PI / 2, 0]}>
+        <group ref={carModelRef} scale={2.0} rotation={[0, 0, 0]}>
           <primitive object={carModel} />
         </group>
       </group>
