@@ -12,6 +12,7 @@ import { SponsorBanners } from "./SponsorBanners";
 import { NitroParticles, DustTrail, ExhaustSmoke, CollisionSparks } from "./ParticleEffects";
 import { BiomePropsScene } from "./BiomeProps";
 import { AtmosphericParticles } from "./AtmosphericParticles";
+import { SpeedLines } from "./SpeedLines";
 import { useRally } from "@/lib/stores/useRally";
 import { useSettings } from "@/lib/stores/useSettings";
 import { useBiome } from "@/lib/stores/useBiome";
@@ -76,6 +77,12 @@ export function GameScene({ isFullscreen = false, onToggleFullscreen }: GameScen
     resume,
     addCollectible,
   } = useRally();
+
+  const incrementNitroUse = () => {
+    useRally.setState((state) => ({
+      nitroUsesThisRun: state.nitroUsesThisRun + 1
+    }));
+  };
   const showPhotoMode = useSettings((state) => state.showPhotoMode);
   const updateBiomeDistance = useBiome((state) => state.updateDistance);
 
@@ -187,6 +194,7 @@ export function GameScene({ isFullscreen = false, onToggleFullscreen }: GameScen
       console.log("Collected nitro! +20% speed for 2 seconds!");
       audioManager.playNitro();
       setNitroActive(true);
+      incrementNitroUse();
       if (nitroTimeoutRef.current) {
         clearTimeout(nitroTimeoutRef.current);
       }
@@ -212,7 +220,7 @@ export function GameScene({ isFullscreen = false, onToggleFullscreen }: GameScen
     <>
       <KeyboardControls map={keyMap}>
         <Canvas
-          camera={{ position: [0, 4, -8], fov: 60, near: 0.1, far: 220 }}
+          camera={{ position: [0, 6, -12], fov: 65, near: 0.1, far: 250 }}
           gl={{
             antialias: true,
             powerPreference: "high-performance",
@@ -250,6 +258,7 @@ export function GameScene({ isFullscreen = false, onToggleFullscreen }: GameScen
             <ExhaustSmoke carPositionRef={carPositionRef} speedRef={carSpeedRef} />
             <CollisionSparks position={collisionSparkPosition} active={showCollisionSparks} />
             <AtmosphericParticles carPositionRef={carPositionRef} />
+            <SpeedLines carPositionRef={carPositionRef} speedRef={carSpeedRef} />
             <Camera carPositionRef={carPositionRef} shakeIntensity={cameraShakeIntensity} />
             <FrameSync
               carPositionRef={carPositionRef}

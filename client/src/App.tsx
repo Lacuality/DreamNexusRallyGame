@@ -1,23 +1,35 @@
 import { useEffect } from "react";
 import { useRally } from "./lib/stores/useRally";
+import { useAchievements } from "./lib/stores/useAchievements";
 import { TitleScreenImmersive } from "./components/ui/TitleScreenImmersive";
 import { GameScene } from "./components/game/GameScene";
 import { GameOverScreen } from "./components/ui/GameOverScreen";
+import { AchievementNotification } from "./components/ui/AchievementNotification";
 import { audioManager } from "./lib/audio";
 import { useFullscreen } from "./hooks/useFullscreen";
 import "@fontsource/inter";
 
 function App() {
   const phase = useRally((state) => state.phase);
+  const playerName = useRally((state) => state.playerName);
   const { elementRef, isFullscreen, toggle, isSupported } = useFullscreen();
-  
+  const loadAchievements = useAchievements((state) => state.loadAchievements);
+  const loadPlayerStats = useAchievements((state) => state.loadPlayerStats);
+
   useEffect(() => {
     console.log("Dream Nexus Rally initialized. Phase:", phase);
-    
+    loadAchievements();
+
     return () => {
       audioManager.cleanup();
     };
-  }, []);
+  }, [loadAchievements]);
+
+  useEffect(() => {
+    if (playerName) {
+      loadPlayerStats(playerName);
+    }
+  }, [playerName, loadPlayerStats]);
   
   useEffect(() => {
     if (phase === "playing") {
@@ -36,6 +48,7 @@ function App() {
           <GameOverScreen />
         </>
       )}
+      <AchievementNotification />
     </div>
   );
 }

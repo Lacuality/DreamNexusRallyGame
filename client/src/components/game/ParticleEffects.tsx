@@ -47,8 +47,8 @@ export function NitroParticles({ active, carPositionRef }: NitroParticlesProps) 
       const spread = 0.4;
       
       positions[i * 3] = carPositionRef.current.x + (Math.random() - 0.5) * spread;
-      positions[i * 3 + 1] = carPositionRef.current.y - 0.3 + Math.random() * 0.2;
-      positions[i * 3 + 2] = carPositionRef.current.z - offset * 2;
+      positions[i * 3 + 1] = carPositionRef.current.y + 0.5 + Math.random() * 0.3;
+      positions[i * 3 + 2] = carPositionRef.current.z - offset * 3;
     }
     
     positionAttribute.needsUpdate = true;
@@ -79,7 +79,7 @@ export function NitroParticles({ active, carPositionRef }: NitroParticlesProps) 
         />
       </bufferGeometry>
       <pointsMaterial
-        size={0.15}
+        size={0.25}
         vertexColors
         transparent
         opacity={0.8}
@@ -133,9 +133,9 @@ export function DustTrail({ carPositionRef, speedRef }: DustTrailProps) {
       const offset = (timeRef.current * 2 + i * 0.1) % 1;
       const spread = 0.6;
       
-      positions[i * 3] = carPositionRef.current.x + (Math.random() - 0.5) * spread;
-      positions[i * 3 + 1] = 0.1 + Math.random() * 0.1;
-      positions[i * 3 + 2] = carPositionRef.current.z - offset * 3;
+      positions[i * 3] = carPositionRef.current.x + (Math.random() - 0.5) * spread * 1.5;
+      positions[i * 3 + 1] = 0.2 + Math.random() * 0.2;
+      positions[i * 3 + 2] = carPositionRef.current.z - offset * 4;
     }
     
     positionAttribute.needsUpdate = true;
@@ -312,8 +312,8 @@ export function ExhaustSmoke({ carPositionRef, speedRef }: ExhaustSmokeProps) {
       const spread = life * 0.8;
       
       positions[i * 3] = carPositionRef.current.x + (Math.random() - 0.5) * spread;
-      positions[i * 3 + 1] = 0.2 + life * 0.5;
-      positions[i * 3 + 2] = carPositionRef.current.z - 1.2 - life * 2;
+      positions[i * 3 + 1] = 0.3 + life * 0.6;
+      positions[i * 3 + 2] = carPositionRef.current.z - 2.5 - life * 2.5;
     }
     
     positionAttribute.needsUpdate = true;

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
 import { audioManager } from "@/lib/audio";
+import { useAchievements } from "./useAchievements";
 
 export type RallyPhase = "menu" | "playing" | "paused" | "gameover";
 
@@ -14,6 +15,8 @@ interface RallyState {
   startTime: number;
   playerName: string;
   scoreSubmitted: boolean;
+  maxSpeedThisRun: number;
+  nitroUsesThisRun: number;
   
   start: () => void;
   pause: () => void;
@@ -40,6 +43,8 @@ export const useRally = create<RallyState>()(
     startTime: 0,
     playerName: "",
     scoreSubmitted: false,
+    maxSpeedThisRun: 0,
+    nitroUsesThisRun: 0,
     
     start: () => {
       const now = Date.now();
@@ -50,7 +55,9 @@ export const useRally = create<RallyState>()(
         speed: 0,
         currentScore: 0,
         collectiblesCount: 0,
-        startTime: now
+        startTime: now,
+        maxSpeedThisRun: 0,
+        nitroUsesThisRun: 0
       });
     },
     
@@ -67,15 +74,17 @@ export const useRally = create<RallyState>()(
       if (state.phase === "playing") {
         const finalScore = Math.floor(state.distance) + (state.collectiblesCount * 50);
         const newHighScore = Math.max(finalScore, state.highScore);
-        
+
         if (newHighScore > state.highScore) {
           localStorage.setItem("dreamNexusRallyHighScore", String(newHighScore));
         }
-        
+
         audioManager.stopEngineSound();
-        
+
+        const playtimeSeconds = Math.floor((Date.now() - state.startTime) / 1000);
+
         set({ phase: "gameover", currentScore: finalScore, highScore: newHighScore, scoreSubmitted: false });
-        
+
         if (state.playerName && finalScore > 0) {
           fetch("/api/leaderboard", {
             method: "POST",
@@ -99,13 +108,23 @@ export const useRally = create<RallyState>()(
             .catch(err => {
               console.error("Failed to submit score:", err);
             });
+
+          useAchievements.getState().updatePlayerStats(state.playerName, {
+            player_name: state.playerName,
+            total_distance: Math.floor(state.distance),
+            max_speed: state.maxSpeedThisRun,
+            total_collectibles: state.collectiblesCount,
+            total_games: 1,
+            total_crashes: 1,
+            playtime_seconds: playtimeSeconds
+          });
         }
       }
     },
     
     restart: () => {
       audioManager.playBackgroundMusic();
-      set({ phase: "menu", distance: 0, speed: 0, currentScore: 0, collectiblesCount: 0, scoreSubmitted: false });
+      set({ phase: "menu", distance: 0, speed: 0, currentScore: 0, collectiblesCount: 0, scoreSubmitted: false, maxSpeedThisRun: 0, nitroUsesThisRun: 0 });
     },
     
     updateDistance: (distance: number) => {
@@ -113,7 +132,10 @@ export const useRally = create<RallyState>()(
     },
     
     updateSpeed: (speed: number) => {
-      set({ speed });
+      set((state) => ({
+        speed,
+        maxSpeedThisRun: Math.max(state.maxSpeedThisRun, Math.floor(speed))
+      }));
     },
     
     addCollectible: () => {

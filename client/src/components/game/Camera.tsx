@@ -10,7 +10,7 @@ interface CameraProps {
 export function Camera({ carPositionRef, shakeIntensity = 0 }: CameraProps) {
   const { camera } = useThree();
   const targetPosition = useRef(new THREE.Vector3());
-  const currentPosition = useRef(new THREE.Vector3(0, 4, -8));
+  const currentPosition = useRef(new THREE.Vector3(0, 6, -12));
   const shakeOffset = useRef(new THREE.Vector3());
   const shakeDecay = useRef(0);
   const previousIntensity = useRef(0);
@@ -18,8 +18,8 @@ export function Camera({ carPositionRef, shakeIntensity = 0 }: CameraProps) {
   useFrame(() => {
     targetPosition.current.set(
       carPositionRef.current.x * 0.5,
-      carPositionRef.current.y + 4,
-      carPositionRef.current.z - 8
+      carPositionRef.current.y + 6,
+      carPositionRef.current.z - 12
     );
     
     currentPosition.current.lerp(targetPosition.current, 0.1);
@@ -44,7 +44,7 @@ export function Camera({ carPositionRef, shakeIntensity = 0 }: CameraProps) {
     }
     
     camera.position.copy(currentPosition.current).add(shakeOffset.current);
-    camera.lookAt(carPositionRef.current.x, carPositionRef.current.y + 0.5, carPositionRef.current.z + 2);
+    camera.lookAt(carPositionRef.current.x, carPositionRef.current.y + 1.5, carPositionRef.current.z + 3);
   });
   
   return null;

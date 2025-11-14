@@ -1,5 +1,6 @@
 import { useRally } from "@/lib/stores/useRally";
 import { DREAM_NEXUS_COLORS } from "@/lib/constants";
+import { useEffect, useState } from "react";
 
 interface GameHUDProps {
   nitroActive?: boolean;
@@ -10,6 +11,17 @@ interface GameHUDProps {
 
 export function GameHUD({ nitroActive = false, shieldActive = false, isFullscreen = false, onToggleFullscreen }: GameHUDProps = {}) {
   const { distance, speed, highScore, collectiblesCount, currentScore, pause } = useRally();
+  const [nitroProgress, setNitroProgress] = useState(100);
+
+  useEffect(() => {
+    if (nitroActive) {
+      setNitroProgress(100);
+      const interval = setInterval(() => {
+        setNitroProgress(prev => Math.max(0, prev - 5));
+      }, 100);
+      return () => clearInterval(interval);
+    }
+  }, [nitroActive]);
   
   return (
     <div
@@ -120,19 +132,36 @@ export function GameHUD({ nitroActive = false, shieldActive = false, isFullscree
               fontWeight: "bold",
               fontSize: "16px",
               display: "flex",
-              alignItems: "center",
-              gap: "8px",
+              flexDirection: "column",
+              gap: "6px",
+              minWidth: "180px",
               animation: "pulse 0.5s ease-in-out infinite",
             }}
           >
-            <div style={{ 
-              width: "24px", 
-              height: "24px", 
-              background: "linear-gradient(180deg, #ffff00 0%, #ff6b00 100%)",
-              borderRadius: "50%",
-              boxShadow: "0 0 10px #ff6b00"
-            }} />
-            NITRO BOOST
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <div style={{
+                width: "24px",
+                height: "24px",
+                background: "linear-gradient(180deg, #ffff00 0%, #ff6b00 100%)",
+                borderRadius: "50%",
+                boxShadow: "0 0 10px #ff6b00"
+              }} />
+              NITRO BOOST
+            </div>
+            <div style={{
+              width: "100%",
+              height: "6px",
+              backgroundColor: "rgba(0, 0, 0, 0.3)",
+              borderRadius: "3px",
+              overflow: "hidden"
+            }}>
+              <div style={{
+                width: `${nitroProgress}%`,
+                height: "100%",
+                background: "linear-gradient(90deg, #ffff00 0%, #ff6b00 100%)",
+                transition: "width 0.1s linear"
+              }} />
+            </div>
           </div>
         )}
         
