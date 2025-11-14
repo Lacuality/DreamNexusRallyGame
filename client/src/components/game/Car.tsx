@@ -2,7 +2,7 @@ import { useRef, useEffect, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
 import { useKeyboardControls, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
-import { GAME_CONFIG } from "@/lib/constants";
+import { GAME_CONFIG, CARS } from "@/lib/constants";
 import { useRally } from "@/lib/stores/useRally";
 import { useMobileControls } from "@/lib/stores/useMobileControls";
 import { useSettings } from "@/lib/stores/useSettings";
@@ -29,7 +29,10 @@ export function Car({ carPositionRef, carSpeedRef, onCrash, boostCounter = 0, ni
   const bodyRef = useRef<THREE.Group>(null);
   const carModelRef = useRef<THREE.Group>(null);
 
-  const { scene: carScene } = useGLTF("/models/rally-car.glb");
+  const selectedCarId = useRally((state) => state.selectedCar);
+  const carConfig = CARS[selectedCarId] || CARS["classic-rally"];
+
+  const { scene: carScene } = useGLTF(carConfig.model);
 
   const carModel = useMemo(() => {
     const clonedScene = carScene.clone();
@@ -91,13 +94,17 @@ export function Car({ carPositionRef, carSpeedRef, onCrash, boostCounter = 0, ni
     const isBack = keys.back || mobileControls.back;
     const isLeft = keys.left || mobileControls.left;
     const isRight = keys.right || mobileControls.right;
-    
-    const maxSpeedMs = nitroActive ? GAME_CONFIG.MAX_SPEED_MS * 1.2 : GAME_CONFIG.MAX_SPEED_MS;
+
+    const baseMaxSpeedMs = (carConfig.maxSpeedKmh / 3.6);
+    const maxSpeedMs = nitroActive ? baseMaxSpeedMs * 1.2 : baseMaxSpeedMs;
+    const accelRate = GAME_CONFIG.ACCEL_RATE * carConfig.acceleration;
+    const steerStrength = GAME_CONFIG.STEER_STRENGTH * carConfig.handling;
+
     const accelInput = isForward ? 1 : 0;
     const brakeInput = isBack ? 1 : 0;
     const steerInput = (isLeft ? 1 : 0) + (isRight ? -1 : 0);
-    
-    targetSpeedRef.current += (accelInput * GAME_CONFIG.ACCEL_RATE - brakeInput * GAME_CONFIG.BRAKE_RATE) * delta;
+
+    targetSpeedRef.current += (accelInput * accelRate - brakeInput * GAME_CONFIG.BRAKE_RATE) * delta;
     
     if (nitroActive && targetSpeedRef.current < maxSpeedMs) {
       targetSpeedRef.current = Math.min(maxSpeedMs, targetSpeedRef.current + GAME_CONFIG.ACCEL_RATE * delta * 0.5);
@@ -118,9 +125,9 @@ export function Car({ carPositionRef, carSpeedRef, onCrash, boostCounter = 0, ni
     }
     
     actualSpeedRef.current += (targetSpeedRef.current - actualSpeedRef.current) * 0.12;
-    
+
     const speedFactor = 0.7 + 0.3 * (actualSpeedRef.current / maxSpeedMs);
-    const targetYaw = steerInput * GAME_CONFIG.STEER_STRENGTH * speedFactor;
+    const targetYaw = steerInput * steerStrength * speedFactor;
     yawVelocityRef.current += (targetYaw - yawVelocityRef.current) * 0.15;
     carYawRef.current += yawVelocityRef.current * delta;
     

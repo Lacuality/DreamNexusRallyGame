@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
 import { audioManager } from "@/lib/audio";
 import { useAchievements } from "./useAchievements";
+import { CARS } from "@/lib/constants";
 
 export type RallyPhase = "menu" | "playing" | "paused" | "gameover";
 
@@ -17,6 +18,9 @@ interface RallyState {
   scoreSubmitted: boolean;
   maxSpeedThisRun: number;
   nitroUsesThisRun: number;
+  selectedCar: string;
+  unlockedCars: Set<string>;
+  totalCareerDistance: number;
   
   start: () => void;
   pause: () => void;
@@ -30,6 +34,10 @@ interface RallyState {
   saveHighScore: () => void;
   setPlayerName: (name: string) => void;
   loadPlayerName: () => void;
+  selectCar: (carId: string) => void;
+  checkUnlocks: () => void;
+  loadCareerProgress: () => void;
+  saveCareerProgress: () => void;
 }
 
 export const useRally = create<RallyState>()(
@@ -45,6 +53,9 @@ export const useRally = create<RallyState>()(
     scoreSubmitted: false,
     maxSpeedThisRun: 0,
     nitroUsesThisRun: 0,
+    selectedCar: "classic-rally",
+    unlockedCars: new Set(["classic-rally"]),
+    totalCareerDistance: 0,
     
     start: () => {
       const now = Date.now();
@@ -83,7 +94,17 @@ export const useRally = create<RallyState>()(
 
         const playtimeSeconds = Math.floor((Date.now() - state.startTime) / 1000);
 
-        set({ phase: "gameover", currentScore: finalScore, highScore: newHighScore, scoreSubmitted: false });
+        const newCareerDistance = state.totalCareerDistance + Math.floor(state.distance);
+        set({
+          phase: "gameover",
+          currentScore: finalScore,
+          highScore: newHighScore,
+          scoreSubmitted: false,
+          totalCareerDistance: newCareerDistance
+        });
+
+        get().saveCareerProgress();
+        get().checkUnlocks();
 
         if (state.playerName && finalScore > 0) {
           fetch("/api/leaderboard", {
@@ -168,6 +189,53 @@ export const useRally = create<RallyState>()(
       if (saved) {
         set({ playerName: saved });
       }
+    },
+
+    selectCar: (carId: string) => {
+      const state = get();
+      if (state.unlockedCars.has(carId)) {
+        set({ selectedCar: carId });
+        localStorage.setItem("dreamNexusRallySelectedCar", carId);
+      }
+    },
+
+    checkUnlocks: () => {
+      const state = get();
+      const newUnlocked = new Set(state.unlockedCars);
+      let hasNewUnlocks = false;
+
+      Object.values(CARS).forEach((car) => {
+        if (!newUnlocked.has(car.id) && state.totalCareerDistance >= car.unlockDistance) {
+          newUnlocked.add(car.id);
+          hasNewUnlocks = true;
+        }
+      });
+
+      if (hasNewUnlocks) {
+        set({ unlockedCars: newUnlocked });
+        get().saveCareerProgress();
+      }
+    },
+
+    loadCareerProgress: () => {
+      const savedDistance = localStorage.getItem("dreamNexusRallyCareerDistance");
+      const savedCar = localStorage.getItem("dreamNexusRallySelectedCar");
+      const savedUnlocked = localStorage.getItem("dreamNexusRallyUnlockedCars");
+
+      const totalCareerDistance = savedDistance ? parseInt(savedDistance, 10) : 0;
+      const selectedCar = savedCar || "classic-rally";
+      const unlockedCars = savedUnlocked
+        ? new Set(JSON.parse(savedUnlocked))
+        : new Set(["classic-rally"]);
+
+      set({ totalCareerDistance, selectedCar, unlockedCars });
+    },
+
+    saveCareerProgress: () => {
+      const state = get();
+      localStorage.setItem("dreamNexusRallyCareerDistance", String(state.totalCareerDistance));
+      localStorage.setItem("dreamNexusRallySelectedCar", state.selectedCar);
+      localStorage.setItem("dreamNexusRallyUnlockedCars", JSON.stringify([...state.unlockedCars]));
     }
   }))
 );

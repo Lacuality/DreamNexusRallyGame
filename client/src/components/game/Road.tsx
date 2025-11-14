@@ -13,14 +13,15 @@ interface RoadProps {
 const ROAD_LENGTH = 200;
 const ROAD_WIDTH  = GAME_CONFIG.LANE_WIDTH + 0.6;
 
+const ROAD_LIFT   = 0.15;     // lift road surface above terrain to prevent grass clipping
 const EDGE_WIDTH  = 0.28;
 const EDGE_OFFSET = 0.02;     // small inset so edges sit inside the road
-const EDGE_LIFT   = 0.012;    // just enough to avoid z-fighting
+const EDGE_LIFT   = 0.18;     // edges raised above road surface
 
 const DASH_LEN    = 2;
 const DASH_GAP    = 4;
 const DASH_WIDTH  = 0.16;
-const DASH_LIFT   = 0.011;    // slightly below edges so ordering is stable
+const DASH_LIFT   = 0.16;     // center line at same level as road surface
 
 /* --------- One single source of truth for road shape --------- */
 function sampleCurveAndElev(z: number) {
@@ -69,7 +70,7 @@ export function Road({ carPositionRef }: RoadProps) {
 
   // road surface
   const roadGeometry = useMemo(
-    () => makeDeformedPlane(ROAD_WIDTH, ROAD_LENGTH, 20, 200, 0, 0),
+    () => makeDeformedPlane(ROAD_WIDTH, ROAD_LENGTH, 20, 200, 0, ROAD_LIFT),
     []
   );
 

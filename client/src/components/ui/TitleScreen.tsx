@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRally } from "@/lib/stores/useRally";
 import { DREAM_NEXUS_COLORS } from "@/lib/constants";
-import { CarModelViewer } from "./CarModelViewer";
+import { CarSelector } from "./CarSelector";
 import { Leaderboard } from "./Leaderboard";
 
 export function TitleScreen() {
@@ -12,6 +12,7 @@ export function TitleScreen() {
     playerName,
     setPlayerName,
     loadPlayerName,
+    loadCareerProgress,
   } = useRally();
   const [nameInput, setNameInput] = useState("");
   const [isDesktop, setIsDesktop] = useState<boolean>(
@@ -21,7 +22,8 @@ export function TitleScreen() {
   useEffect(() => {
     loadHighScore();
     loadPlayerName();
-  }, [loadHighScore, loadPlayerName]);
+    loadCareerProgress();
+  }, [loadHighScore, loadPlayerName, loadCareerProgress]);
 
   useEffect(() => {
     if (playerName) setNameInput(playerName);
@@ -173,32 +175,14 @@ export function TitleScreen() {
             </p>
           </div>
 
-          {/* Car Viewer */}
+          {/* Car Selector */}
           <div
             style={{
               justifySelf: "center",
-              width: "min(440px, 100%)",
-              background: "rgba(255,255,255,0.08)",
-              border: "1px solid rgba(255,255,255,0.12)",
-              backdropFilter: "blur(6px)",
-              padding: s.pad,
-              borderRadius: "14px",
-              boxShadow: "0 10px 30px rgba(0,0,0,0.25)",
+              width: "min(500px, 100%)",
             }}
           >
-            <h3
-              style={{
-                margin: 0,
-                marginBottom: "0.6em",
-                fontFamily: "monospace",
-                color: DREAM_NEXUS_COLORS.cyan,
-                fontSize: "clamp(16px, 2.2vw, 20px)",
-                textAlign: "center",
-              }}
-            >
-              Your Rally Car — Drag to Rotate
-            </h3>
-            <CarModelViewer width="100%" height={s.carH} />
+            <CarSelector />
           </div>
 
           {/* Controls */}
