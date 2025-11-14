@@ -4,9 +4,9 @@ import { storage } from "./storage";
 import { insertLeaderboardSchema } from "../shared/schema";
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL!;
-const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabaseUrl = process.env.VITE_SUPABASE_URL || "";
+const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || "";
+const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 
 export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/leaderboard", async (req, res) => {
@@ -36,13 +36,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/achievements", async (req, res) => {
     try {
+      if (!supabase) {
+        return res.status(500).json({ error: "Database not configured" });
+      }
       const { data, error } = await supabase
         .from("achievements")
         .select("*")
         .order("points", { ascending: true });
 
       if (error) throw error;
-      res.json(data);
+      res.json(data || []);
     } catch (error) {
       console.error("Error fetching achievements:", error);
       res.status(500).json({ error: "Failed to fetch achievements" });
@@ -51,6 +54,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/player-achievements/:playerName", async (req, res) => {
     try {
+      if (!supabase) {
+        return res.status(500).json({ error: "Database not configured" });
+      }
       const { playerName } = req.params;
       const { data, error } = await supabase
         .from("player_achievements")
@@ -58,7 +64,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .eq("player_name", playerName);
 
       if (error) throw error;
-      res.json(data);
+      res.json(data || []);
     } catch (error) {
       console.error("Error fetching player achievements:", error);
       res.status(500).json({ error: "Failed to fetch player achievements" });
@@ -67,6 +73,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/player-achievements", async (req, res) => {
     try {
+      if (!supabase) {
+        return res.status(500).json({ error: "Database not configured" });
+      }
       const { player_name, achievement_id, progress } = req.body;
       const { data, error } = await supabase
         .from("player_achievements")
@@ -84,6 +93,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/player-stats/:playerName", async (req, res) => {
     try {
+      if (!supabase) {
+        return res.status(500).json({ error: "Database not configured" });
+      }
       const { playerName } = req.params;
       const { data, error } = await supabase
         .from("player_stats")
@@ -115,6 +127,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/player-stats", async (req, res) => {
     try {
+      if (!supabase) {
+        return res.status(500).json({ error: "Database not configured" });
+      }
       const stats = req.body;
       const { data: existing } = await supabase
         .from("player_stats")
