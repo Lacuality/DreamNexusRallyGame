@@ -1,6 +1,6 @@
 import { useRef, useEffect, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
-import { useKeyboardControls, useGLTF } from "@react-three/drei";
+import { useKeyboardControls } from "@react-three/drei";
 import * as THREE from "three";
 import { GAME_CONFIG } from "@/lib/constants";
 import { useRally } from "@/lib/stores/useRally";
@@ -32,29 +32,78 @@ export function Car({ carPositionRef, carSpeedRef, onCrash, boostCounter = 0, ni
   const frontRightWheelRef = useRef<THREE.Group>(null);
   const rearLeftWheelRef = useRef<THREE.Group>(null);
   const rearRightWheelRef = useRef<THREE.Group>(null);
-  
-  const { scene: carScene } = useGLTF("/models/rally-car.glb");
-  const { scene: wheelScene } = useGLTF("/models/rally-wheel.glb");
-  
+
   const carModel = useMemo(() => {
-    const clonedScene = carScene.clone();
-    clonedScene.traverse((child) => {
-      if (child instanceof THREE.Mesh) {
-        child.castShadow = true;
-        child.receiveShadow = true;
-      }
+    const group = new THREE.Group();
+
+    const bodyGeometry = new THREE.BoxGeometry(0.8, 0.3, 1.2);
+    const bodyMaterial = new THREE.MeshStandardMaterial({
+      color: nitroActive ? 0xff4444 : 0xff6b35,
+      metalness: 0.6,
+      roughness: 0.4
     });
-    return clonedScene;
-  }, [carScene]);
-  
+    const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+    body.castShadow = true;
+    body.receiveShadow = true;
+    body.position.y = 0.15;
+    group.add(body);
+
+    const roofGeometry = new THREE.BoxGeometry(0.6, 0.25, 0.6);
+    const roofMaterial = new THREE.MeshStandardMaterial({
+      color: 0x333333,
+      metalness: 0.3,
+      roughness: 0.7
+    });
+    const roof = new THREE.Mesh(roofGeometry, roofMaterial);
+    roof.castShadow = true;
+    roof.position.y = 0.425;
+    roof.position.z = -0.1;
+    group.add(roof);
+
+    const hoodGeometry = new THREE.BoxGeometry(0.7, 0.15, 0.4);
+    const hood = new THREE.Mesh(hoodGeometry, bodyMaterial);
+    hood.castShadow = true;
+    hood.position.y = 0.225;
+    hood.position.z = 0.5;
+    group.add(hood);
+
+    return group;
+  }, [nitroActive]);
+
   const wheelModels = useMemo(() => {
-    return {
-      frontLeft: wheelScene.clone(),
-      frontRight: wheelScene.clone(),
-      rearLeft: wheelScene.clone(),
-      rearRight: wheelScene.clone(),
+    const createWheel = () => {
+      const group = new THREE.Group();
+      const wheelGeometry = new THREE.CylinderGeometry(0.15, 0.15, 0.1, 16);
+      const wheelMaterial = new THREE.MeshStandardMaterial({
+        color: 0x222222,
+        metalness: 0.8,
+        roughness: 0.3
+      });
+      const wheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
+      wheel.rotation.z = Math.PI / 2;
+      wheel.castShadow = true;
+      group.add(wheel);
+
+      const rimGeometry = new THREE.CylinderGeometry(0.08, 0.08, 0.12, 8);
+      const rimMaterial = new THREE.MeshStandardMaterial({
+        color: 0xaaaaaa,
+        metalness: 0.9,
+        roughness: 0.1
+      });
+      const rim = new THREE.Mesh(rimGeometry, rimMaterial);
+      rim.rotation.z = Math.PI / 2;
+      group.add(rim);
+
+      return group;
     };
-  }, [wheelScene]);
+
+    return {
+      frontLeft: createWheel(),
+      frontRight: createWheel(),
+      rearLeft: createWheel(),
+      rearRight: createWheel(),
+    };
+  }, []);
   
   const targetSpeedRef = useRef(0);
   const actualSpeedRef = useRef(0);
