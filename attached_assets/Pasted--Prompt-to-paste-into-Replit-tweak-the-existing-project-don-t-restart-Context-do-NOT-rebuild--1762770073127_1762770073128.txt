@@ -1,0 +1,259 @@
+📋 Prompt to paste into Replit (tweak the existing project, don’t restart)
+
+Context (do NOT rebuild from scratch):
+You’re working on an ongoing WebGL/Three.js/Unity-WebGL racing prototype called Dream Nexus Rally hosted on Replit. Keep the current project structure and assets. Make incremental changes only. Preserve the existing scene and main loop. The current issues are: the car looks wheel-less (no rolling feel), the menu looks basic, the environment is repetitive, there are few obstacles, and feedback (SFX/VFX) is minimal.
+
+Overall goal:
+Transform the current build into a polished arcade runner with a strong sensation of wheels-on-road, better UI, Colombian-flavored scenery variety, progressive difficulty, and clear audio/visual feedback—while keeping the codebase and improving it in place.
+
+1) Vehicle feel: add wheels and “rolling on road” sensation
+
+Tasks
+
+Add four visible wheels to the car model (simple cylinders or low-poly meshes are fine if no wheel assets exist).
+
+Each wheel must rotate based on car linear speed (wheelAngularSpeed = linearSpeed / wheelRadius).
+
+Apply a subtle suspension/bob and body roll:
+
+Suspension: small vertical oscillation proportional to road noise + speed (amplitude ~0.02–0.04 world units).
+
+Body roll: slight roll on steering input (lerped; ±3–5 degrees).
+
+Steering should not reset speed. Keep acceleration and steering independent.
+
+Add tyre-road audio: loop a quiet rolling sound that ramps pitch with speed (plus a light skid sound when turning hard).
+
+Acceptance criteria
+
+Wheels visibly rotate; rotation speed increases with car speed.
+
+Car feels “planted”—tiny suspension bounce and gentle roll while cornering.
+
+Steering never cuts acceleration to 0.
+
+Suggested hooks (pseudo-names; adapt to your code):
+
+// Called each frame
+updateCar(dt) {
+  // speed integration (keep your current system)
+  this.speed = clamp(this.speed + accelInput*ACCEL - brakeInput*BRAKE - FRICTION, 0, MAX_SPEED);
+
+  // wheel rotation
+  const angVel = this.speed / this.wheelRadius; // rad/s
+  this.frontLeft.rotation.x += angVel * dt;
+  this.frontRight.rotation.x += angVel * dt;
+  this.rearLeft.rotation.x += angVel * dt;
+  this.rearRight.rotation.x += angVel * dt;
+
+  // body roll & suspension
+  const targetRoll = lerp(this.body.rotation.z, steerInput * radians(5), dt*6);
+  this.body.rotation.z = targetRoll;
+  const bounce = noise1D(time*3) * 0.03; // small vertical jiggle
+  this.body.position.y = this.baseRideHeight + bounce;
+}
+
+2) Road & scenery variety (Colombia vibe)
+
+Tasks
+
+Keep your current procedural road, but add section themes that cycle every ~400–600 m:
+
+Coffee hills (wax palms, gentle green tones)
+
+Andes highland (cooler palette, taller mountains)
+
+Pueblo (low walls, flags/banderines, warm lights)
+
+Each section alters fog color/sky gradient slightly and tweaks curve frequency/height.
+
+Guarantee playable curvature (no hairpins; max lateral curvature budget per segment).
+
+Add ambient parallax: a few far-mountain layers moving slightly slower than the road.
+
+Acceptance criteria
+
+At least 3 distinct biomes, switching seamlessly.
+
+Curves remain fair and readable.
+
+Performance 60 fps on desktop; no stutters on section switch.
+
+3) Obstacles & power-ups
+
+Tasks
+
+Obstacles: cones, small rocks, puddles (slippery).
+
+Cones/rocks: slow the car; at high speed, trigger Game Over.
+
+Puddles: apply brief lateral slide (reduced friction) + splash VFX + splash SFX.
+
+Power-ups:
+
+Arequipe jar (already in): +50 score + little speed boost + sparkle VFX.
+
+Nitro (new): grants 2s of +20% top speed, with motion blur/post-effect.
+
+Shield (new): protect from 1 obstacle hit.
+
+Spawn rules: increase density with distance; avoid impossible layouts.
+
+Acceptance criteria
+
+At least 3 obstacle types and 2 power-ups.
+
+Visual/audible feedback on pickup/hit.
+
+No unavoidable obstacle clusters.
+
+4) Difficulty scaling
+
+Tasks
+
+Every 20–30 s or 300–400 m:
+
++max speed slightly, +curve frequency a bit, +spawn rate of obstacles.
+
+Narrow the road very slightly at higher tiers (never unfair).
+
+Display a subtle “Stage X” toast when a tier changes.
+
+Acceptance criteria
+
+Player clearly feels progression; early game is forgiving, later game is spicy.
+
+5) SFX, music, and screen feedback
+
+Tasks
+
+Add background music loop (arcade/Latin vibe).
+
+SFX:
+
+engine/tyre hum (pitch = clamp(map(speed), …))
+
+pickup chime, nitro whoosh, shield pop, cone hit thud, puddle splash.
+
+VFX:
+
+Pickup sparkle (2–3 sprites + quick scale).
+
+Subtle motion blur vignette when nitro is active.
+
+Screen shake (small) on collisions.
+
+Acceptance criteria
+
+Mute/unmute button in HUD.
+
+All core actions have matching SFX/VFX.
+
+6) HUD & menu polish (no rebuild)
+
+Tasks
+
+Keep current layout but restyle with a cleaner, bolder look:
+
+Title with Dream Nexus logo and Pixel Bunny portrait on menu.
+
+Animated Start button (hover/press states).
+
+In-game HUD: distance, speed, jars, score, high score; add small icons for jars, nitro, shield.
+
+Add Pause menu with sliders for: steering sensitivity, acceleration strength, SFX/music volume.
+
+Store preferences in localStorage.
+
+Drop-in CSS (tailor selectors to yours):
+
+:root{
+  --nx-cyan:#24A0CE; --nx-pink:#FDC6B5; --nx-bg:#0E1A22; --glass:rgba(255,255,255,.07);
+}
+body{ background:linear-gradient(180deg,#0b151c,#0e1a22); color:#d9e7ef; font-family:Inter,system-ui,sans-serif; }
+.menu { text-align:center; padding:48px 16px; }
+.menu .title{ font-size:clamp(36px,6vw,64px); color:var(--nx-cyan); letter-spacing:.04em; }
+.menu .subtitle{ color:#ffddb9; margin:.5rem 0 1.5rem; }
+.card{ background:var(--glass); backdrop-filter: blur(10px); border:1px solid rgba(255,255,255,.08); border-radius:16px; padding:16px 20px; display:inline-block; }
+.btn{ background:var(--nx-cyan); color:#03141b; font-weight:700; border-radius:14px; padding:14px 24px; border:none; cursor:pointer; transition:transform .1s ease, box-shadow .2s; }
+.btn:hover{ transform:translateY(-1px); box-shadow:0 10px 28px rgba(36,160,206,.35); }
+.hud{ position:fixed; top:16px; left:16px; background:var(--glass); border:1px solid rgba(255,255,255,.08); padding:10px 14px; border-radius:12px; }
+.hud .row{ display:flex; gap:12px; align-items:center; }
+.badge{ background:#1f2a33; padding:4px 8px; border-radius:8px; }
+
+
+Menu HTML shell (adjust IDs to your app):
+
+<div class="menu" id="mainMenu">
+  <img src="dream_nexus_logo.svg" alt="Dream Nexus" style="height:96px;opacity:.9"/>
+  <h1 class="title">Dream Nexus Rally</h1>
+  <div><img src="pixel_bunny.png" alt="Pixel" style="height:72px;margin:8px 0 16px"/></div>
+  <p class="subtitle">Help Pixel the Bunny race through Colombia!</p>
+  <div class="card">
+    <div>↑/W Accelerate — ↓/S Brake — ←/A →/D Steer — P Pause</div>
+  </div>
+  <div style="margin:24px 0">
+    <button class="btn" id="startBtn">START</button>
+  </div>
+</div>
+
+
+Hook up:
+
+document.getElementById('startBtn').onclick = () => { hideMenu(); startGame(); };
+
+7) Performance constraints
+
+Keep draw calls low; batch props; reuse meshes/materials.
+
+Use simple unlit/lambert materials where possible; limit lights/shadows.
+
+Test desktop Chrome (60 fps) and mobile Chrome/Safari (30–60 fps).
+
+8) Saved data
+
+Keep and update High Score in localStorage.
+
+Save user tuning and audio prefs.
+
+9) Test checklist (must pass)
+
+Wheels rotate with speed; body roll & suspension are visible.
+
+Steering never zeroes speed.
+
+3 biomes rotate in play; fog/sky tweak per biome.
+
+Cones/rocks/puddles behave as specified; nitro & shield work.
+
+SFX & VFX on all key actions; mute works.
+
+Menu/HUD styled as above; Sliders persist between sessions.
+
+Desktop 60 fps; no memory spikes on long runs.
+
+Notes
+
+Keep file and variable names consistent with the current code; if something doesn’t exist, create a small module and import it (e.g., vehicle/CarVisual.js, world/Biomes.js, systems/AudioBus.js).
+
+If the car model cannot easily host four wheel meshes, create four cylinder wheels parented to logical wheel empties.
+
+Do not change the core game loop signature; slot updates into the existing tick/update pipeline.
+
+Deliverables in this PR/commit:
+
+Wheel meshes + rotation + suspension/roll.
+
+Biome system with 3 themes.
+
+Obstacles (cone/rock/puddle) and power-ups (nitro/shield).
+
+Difficulty scaler.
+
+SFX + simple VFX.
+
+Polished menu + HUD (CSS/HTML above integrated).
+
+LocalStorage settings + high score.
+
+Perf pass.
