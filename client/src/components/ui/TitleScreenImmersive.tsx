@@ -4,7 +4,6 @@ import { DREAM_NEXUS_COLORS } from "@/lib/constants";
 import { TitleScene3D } from "./TitleScene3D";
 import { HolographicPanel } from "./HolographicPanel";
 import { Leaderboard } from "./Leaderboard";
-import { CarSelector } from "./CarSelector";
 import { FullscreenButton } from "./FullscreenButton";
 import { audioManager } from "@/lib/audio";
 
@@ -15,7 +14,7 @@ interface TitleScreenImmersiveProps {
 }
 
 export function TitleScreenImmersive({ isFullscreen, onToggleFullscreen, isFullscreenSupported }: TitleScreenImmersiveProps) {
-  const { start, highScore, loadHighScore, playerName, setPlayerName, loadPlayerName, loadCareerProgress } = useRally();
+  const { start, highScore, loadHighScore, playerName, setPlayerName, loadPlayerName } = useRally();
   const [nameInput, setNameInput] = useState("");
   const [isMobile, setIsMobile] = useState(false);
   const [showControls, setShowControls] = useState(false);
@@ -31,8 +30,7 @@ export function TitleScreenImmersive({ isFullscreen, onToggleFullscreen, isFulls
   useEffect(() => {
     loadHighScore();
     loadPlayerName();
-    loadCareerProgress();
-  }, [loadHighScore, loadPlayerName, loadCareerProgress]);
+  }, [loadHighScore, loadPlayerName]);
 
   useEffect(() => {
     if (playerName) setNameInput(playerName);
@@ -182,25 +180,11 @@ export function TitleScreenImmersive({ isFullscreen, onToggleFullscreen, isFulls
               </div>
             )}
 
-            {/* Car Selector - Middle Center */}
-            <div style={{
-              position: "absolute",
-              top: "50%",
-              left: "50%",
-              transform: "translate(-50%, -50%)",
-              pointerEvents: "auto",
-              width: "calc(100% - 20px)",
-              maxWidth: "400px",
-              zIndex: 5,
-            }}>
-              <CarSelector />
-            </div>
-
             {/* Name Input & Start - Bottom Center */}
-            <div style={{
-              position: "absolute",
-              bottom: "10px",
-              left: "50%",
+            <div style={{ 
+              position: "absolute", 
+              bottom: "10px", 
+              left: "50%", 
               transform: "translateX(-50%)",
               display: "flex",
               flexDirection: "column",
@@ -389,23 +373,10 @@ export function TitleScreenImmersive({ isFullscreen, onToggleFullscreen, isFulls
               </HolographicPanel>
             </div>
 
-            {/* Car Selector - Center Left */}
-            <div style={{
-              position: "absolute",
-              top: "50%",
-              left: "20px",
-              transform: "translateY(-50%)",
-              maxWidth: "500px",
-              pointerEvents: "auto",
-              zIndex: 5,
-            }}>
-              <CarSelector />
-            </div>
-
             {/* Leaderboard - Top Right */}
-            <div style={{
-              position: "absolute",
-              top: "20px",
+            <div style={{ 
+              position: "absolute", 
+              top: "20px", 
               right: "20px",
               maxWidth: "320px",
               pointerEvents: "auto",
@@ -415,7 +386,7 @@ export function TitleScreenImmersive({ isFullscreen, onToggleFullscreen, isFulls
               </HolographicPanel>
             </div>
 
-            {/* Name Input & Start Button - Bottom Center */
+            {/* Name Input & Start Button - Bottom Center */}
             <div style={{ 
               position: "absolute", 
               bottom: "20px", 
@@ -427,112 +398,112 @@ export function TitleScreenImmersive({ isFullscreen, onToggleFullscreen, isFulls
               gap: "16px",
               pointerEvents: "auto",
             }}>
-              <HolographicPanel
+          <HolographicPanel
+            style={{
+              maxWidth: "400px",
+              width: "100%",
+            }}
+          >
+            <label
+              htmlFor="player-name-input"
+              style={{
+                display: "block",
+                fontFamily: "monospace",
+                color: DREAM_NEXUS_COLORS.cyan,
+                fontSize: "clamp(14px, 1.8vw, 16px)",
+                marginBottom: "10px",
+                textAlign: "center",
+                textShadow: "0 0 10px rgba(36, 160, 206, 0.5)",
+              }}
+            >
+              🏁 Enter Your Name
+            </label>
+            <input
+              id="player-name-input"
+              type="text"
+              value={nameInput}
+              onChange={(e) => setNameInput(e.target.value)}
+              placeholder="Racer Name"
+              maxLength={20}
+              aria-label="Enter your racer name"
+              aria-required="true"
+              style={{
+                width: "100%",
+                fontFamily: "monospace",
+                fontSize: "clamp(14px, 1.8vw, 16px)",
+                padding: "10px 14px",
+                background: "rgba(36, 160, 206, 0.1)",
+                border: `2px solid ${DREAM_NEXUS_COLORS.cyan}`,
+                borderRadius: "10px",
+                color: DREAM_NEXUS_COLORS.white,
+                textAlign: "center",
+                outline: "none",
+                boxShadow: "inset 0 2px 10px rgba(0,0,0,0.3)",
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.background = "rgba(36, 160, 206, 0.2)";
+                e.currentTarget.style.borderColor = "#5dd6ff";
+                e.currentTarget.style.boxShadow = "0 0 20px rgba(36, 160, 206, 0.4), inset 0 2px 10px rgba(0,0,0,0.3)";
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.background = "rgba(36, 160, 206, 0.1)";
+                e.currentTarget.style.borderColor = DREAM_NEXUS_COLORS.cyan;
+                e.currentTarget.style.boxShadow = "inset 0 2px 10px rgba(0,0,0,0.3)";
+              }}
+            />
+            
+            {highScore > 0 && (
+              <div
                 style={{
-                  maxWidth: "400px",
-                  width: "100%",
+                  fontSize: "clamp(12px, 1.5vw, 14px)",
+                  color: DREAM_NEXUS_COLORS.warm,
+                  marginTop: "10px",
+                  textAlign: "center",
                 }}
               >
-                <label
-                  htmlFor="player-name-input"
-                  style={{
-                    display: "block",
-                    fontFamily: "monospace",
-                    color: DREAM_NEXUS_COLORS.cyan,
-                    fontSize: "clamp(14px, 1.8vw, 16px)",
-                    marginBottom: "10px",
-                    textAlign: "center",
-                    textShadow: "0 0 10px rgba(36, 160, 206, 0.5)",
-                  }}
-                >
-                  🏁 Enter Your Name
-                </label>
-                <input
-                  id="player-name-input"
-                  type="text"
-                  value={nameInput}
-                  onChange={(e) => setNameInput(e.target.value)}
-                  placeholder="Racer Name"
-                  maxLength={20}
-                  aria-label="Enter your racer name"
-                  aria-required="true"
-                  style={{
-                    width: "100%",
-                    fontFamily: "monospace",
-                    fontSize: "clamp(14px, 1.8vw, 16px)",
-                    padding: "10px 14px",
-                    background: "rgba(36, 160, 206, 0.1)",
-                    border: `2px solid ${DREAM_NEXUS_COLORS.cyan}`,
-                    borderRadius: "10px",
-                    color: DREAM_NEXUS_COLORS.white,
-                    textAlign: "center",
-                    outline: "none",
-                    boxShadow: "inset 0 2px 10px rgba(0,0,0,0.3)",
-                  }}
-                  onFocus={(e) => {
-                    e.currentTarget.style.background = "rgba(36, 160, 206, 0.2)";
-                    e.currentTarget.style.borderColor = "#5dd6ff";
-                    e.currentTarget.style.boxShadow = "0 0 20px rgba(36, 160, 206, 0.4), inset 0 2px 10px rgba(0,0,0,0.3)";
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.background = "rgba(36, 160, 206, 0.1)";
-                    e.currentTarget.style.borderColor = DREAM_NEXUS_COLORS.cyan;
-                    e.currentTarget.style.boxShadow = "inset 0 2px 10px rgba(0,0,0,0.3)";
-                  }}
-                />
+                Your Best: {highScore}m
+              </div>
+            )}
+          </HolographicPanel>
 
-                {highScore > 0 && (
-                  <div
-                    style={{
-                      fontSize: "clamp(12px, 1.5vw, 14px)",
-                      color: DREAM_NEXUS_COLORS.warm,
-                      marginTop: "10px",
-                      textAlign: "center",
-                    }}
-                  >
-                    Your Best: {highScore}m
-                  </div>
-                )}
-              </HolographicPanel>
-
-              <button
-                onClick={handleStart}
-                disabled={!nameInput.trim()}
-                style={{
-                  fontFamily: "monospace",
-                  fontWeight: 700,
-                  fontSize: "clamp(16px, 2.2vw, 22px)",
-                  padding: "clamp(12px, 1.8vw, 16px) clamp(36px, 5vw, 56px)",
-                  background: nameInput.trim()
-                    ? `linear-gradient(135deg, ${DREAM_NEXUS_COLORS.cyan}, #5dd6ff)`
-                    : "rgba(100,100,100,0.4)",
-                  color: nameInput.trim() ? DREAM_NEXUS_COLORS.navy : "rgba(255,255,255,0.4)",
-                  border: nameInput.trim() ? `2px solid #5dd6ff` : "2px solid rgba(150,150,150,0.3)",
-                  borderRadius: "14px",
-                  cursor: nameInput.trim() ? "pointer" : "not-allowed",
-                  boxShadow: nameInput.trim()
-                    ? "0 0 30px rgba(36, 160, 206, 0.6), 0 10px 25px rgba(0,0,0,0.4)"
-                    : "none",
-                  transform: "translateZ(0)",
-                  transition: "all 0.3s ease",
-                  opacity: nameInput.trim() ? 1 : 0.5,
-                  textShadow: nameInput.trim() ? "0 2px 5px rgba(0,0,0,0.3)" : "none",
-                }}
-                onMouseEnter={(e) => {
-                  if (nameInput.trim()) {
-                    e.currentTarget.style.transform = "translateY(-3px) scale(1.05)";
-                    e.currentTarget.style.boxShadow = "0 0 40px rgba(36, 160, 206, 0.8), 0 15px 30px rgba(0,0,0,0.5)";
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (nameInput.trim()) {
-                    e.currentTarget.style.transform = "translateY(0) scale(1)";
-                    e.currentTarget.style.boxShadow = "0 0 30px rgba(36, 160, 206, 0.6), 0 10px 25px rgba(0,0,0,0.4)";
-                  }
-                }}
-              >
-                🚀 START RACE
-              </button>
+          <button
+            onClick={handleStart}
+            disabled={!nameInput.trim()}
+            style={{
+              fontFamily: "monospace",
+              fontWeight: 700,
+              fontSize: "clamp(16px, 2.2vw, 22px)",
+              padding: "clamp(12px, 1.8vw, 16px) clamp(36px, 5vw, 56px)",
+              background: nameInput.trim()
+                ? `linear-gradient(135deg, ${DREAM_NEXUS_COLORS.cyan}, #5dd6ff)`
+                : "rgba(100,100,100,0.4)",
+              color: nameInput.trim() ? DREAM_NEXUS_COLORS.navy : "rgba(255,255,255,0.4)",
+              border: nameInput.trim() ? `2px solid #5dd6ff` : "2px solid rgba(150,150,150,0.3)",
+              borderRadius: "14px",
+              cursor: nameInput.trim() ? "pointer" : "not-allowed",
+              boxShadow: nameInput.trim()
+                ? "0 0 30px rgba(36, 160, 206, 0.6), 0 10px 25px rgba(0,0,0,0.4)"
+                : "none",
+              transform: "translateZ(0)",
+              transition: "all 0.3s ease",
+              opacity: nameInput.trim() ? 1 : 0.5,
+              textShadow: nameInput.trim() ? "0 2px 5px rgba(0,0,0,0.3)" : "none",
+            }}
+            onMouseEnter={(e) => {
+              if (nameInput.trim()) {
+                e.currentTarget.style.transform = "translateY(-3px) scale(1.05)";
+                e.currentTarget.style.boxShadow = "0 0 40px rgba(36, 160, 206, 0.8), 0 15px 30px rgba(0,0,0,0.5)";
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (nameInput.trim()) {
+                e.currentTarget.style.transform = "translateY(0) scale(1)";
+                e.currentTarget.style.boxShadow = "0 0 30px rgba(36, 160, 206, 0.6), 0 10px 25px rgba(0,0,0,0.4)";
+              }
+            }}
+          >
+            🚀 START RACE
+          </button>
 
               <div
                 style={{
