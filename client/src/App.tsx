@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useRally } from "./lib/stores/useRally";
 import { useAchievements } from "./lib/stores/useAchievements";
-import { TitleScreenImmersive } from "./components/ui/TitleScreenImmersive";
+import { TitleScreen } from "./components/ui/TitleScreen";
 import { GameScene } from "./components/game/GameScene";
 import { GameOverScreen } from "./components/ui/GameOverScreen";
 import { AchievementNotification } from "./components/ui/AchievementNotification";
@@ -39,7 +39,7 @@ function App() {
   
   return (
     <div ref={elementRef} style={{ width: '100vw', height: '100vh', position: 'relative', overflow: 'hidden' }}>
-      {phase === "menu" && <TitleScreenImmersive isFullscreen={isFullscreen} onToggleFullscreen={toggle} isFullscreenSupported={isSupported} />}
+      {phase === "menu" && <TitleScreen />}
       {phase === "playing" && <GameScene isFullscreen={isFullscreen} onToggleFullscreen={toggle} />}
       {phase === "paused" && <GameScene isFullscreen={isFullscreen} onToggleFullscreen={toggle} />}
       {phase === "gameover" && (
