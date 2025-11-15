@@ -1,3 +1,5 @@
+import { ASSETS } from './assets';
+
 export class AudioManager {
   private bgMusic: HTMLAudioElement | null = null;
   private engineSound: HTMLAudioElement | null = null;
@@ -9,25 +11,25 @@ export class AudioManager {
   private pickupSound: HTMLAudioElement | null = null;
   private isMuted: boolean = false;
   private enginePlaying: boolean = false;
-  
+
   constructor() {
     this.initAudio();
   }
-  
+
   private initAudio() {
-    this.bgMusic = new Audio("/sounds/background.mp3");
+    this.bgMusic = new Audio(ASSETS.audio.background());
     this.bgMusic.loop = true;
     this.bgMusic.volume = 0.3;
-    
-    this.engineSound = new Audio("/sounds/hit.mp3");
+
+    this.engineSound = new Audio(ASSETS.audio.hit());
     this.engineSound.loop = true;
     this.engineSound.volume = 0.4;
     this.engineSound.playbackRate = 0.8;
-    
-    this.crashSound = new Audio("/sounds/hit.mp3");
+
+    this.crashSound = new Audio(ASSETS.audio.hit());
     this.crashSound.volume = 0.6;
-    
-    this.successSound = new Audio("/sounds/success.mp3");
+
+    this.successSound = new Audio(ASSETS.audio.success());
     this.successSound.volume = 0.5;
   }
   

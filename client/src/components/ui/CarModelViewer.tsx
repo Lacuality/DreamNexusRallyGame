@@ -2,9 +2,10 @@ import { Canvas } from "@react-three/fiber";
 import { OrbitControls, useGLTF } from "@react-three/drei";
 import { useMemo } from "react";
 import * as THREE from "three";
+import { ASSETS } from "@/lib/assets";
 
 function CarModel() {
-  const { scene } = useGLTF("/models/rally-car.glb");
+  const { scene } = useGLTF(ASSETS.models.rallycar());
   
   const carModel = useMemo(() => {
     const clonedScene = scene.clone();
