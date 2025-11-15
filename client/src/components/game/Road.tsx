@@ -4,6 +4,7 @@ import { useFrame } from "@react-three/fiber";
 import { useTexture } from "@react-three/drei";
 import * as THREE from "three";
 import { GAME_CONFIG, DREAM_NEXUS_COLORS } from "@/lib/constants";
+import { ASSETS } from "@/lib/assets";
 
 interface RoadProps {
   carPositionRef: React.MutableRefObject<THREE.Vector3>;
@@ -59,7 +60,7 @@ function makeDeformedPlane(
 
 export function Road({ carPositionRef }: RoadProps) {
   const roadRef = useRef<THREE.Mesh>(null);
-  const asphaltTexture = useTexture("/textures/asphalt.png");
+  const asphaltTexture = useTexture(ASSETS.textures.asphalt());
   const scrollOffset = useRef(0);
 
   useMemo(() => {
