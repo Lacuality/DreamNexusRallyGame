@@ -1,5 +1,3 @@
-import { ASSETS } from './assets';
-
 export const GAME_CONFIG = {
   LANE_WIDTH: 9,
   ROAD_SEGMENT_LENGTH: 10,
@@ -49,7 +47,7 @@ export const CARS: Record<string, CarConfig> = {
   "classic-rally": {
     id: "classic-rally",
     name: "Classic Rally",
-    model: ASSETS.models.rallycar(),
+    model: "/models/rally-car.glb",
     maxSpeedKmh: 200,
     acceleration: 1.0,
     handling: 1.0,
@@ -60,7 +58,7 @@ export const CARS: Record<string, CarConfig> = {
   "willys-jeep": {
     id: "willys-jeep",
     name: "Willys Jeep",
-    model: ASSETS.models.rallycar(),
+    model: "/models/jeep-willys.glb",
     maxSpeedKmh: 180,
     acceleration: 0.85,
     handling: 1.3,
@@ -71,7 +69,7 @@ export const CARS: Record<string, CarConfig> = {
   "colombian-speedster": {
     id: "colombian-speedster",
     name: "Colombian Speedster",
-    model: ASSETS.models.rallycar(),
+    model: "/models/rally-car.glb",
     maxSpeedKmh: 240,
     acceleration: 1.4,
     handling: 0.9,
@@ -82,7 +80,7 @@ export const CARS: Record<string, CarConfig> = {
   "andes-climber": {
     id: "andes-climber",
     name: "Andes Climber",
-    model: ASSETS.models.rallycar(),
+    model: "/models/jeep-willys.glb",
     maxSpeedKmh: 190,
     acceleration: 1.1,
     handling: 1.2,

@@ -3,7 +3,6 @@ import { useGLTF, PerspectiveCamera, Environment as DreiEnvironment, Float, Html
 import { Suspense, useRef, useMemo, useState, useEffect } from "react";
 import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
-import { ASSETS } from "@/lib/assets";
 
 function LoadingFallback() {
   return (
@@ -16,7 +15,7 @@ function LoadingFallback() {
 }
 
 function PixelBunny() {
-  const { scene } = useGLTF(ASSETS.models.pixelBunny());
+  const { scene } = useGLTF("/pixel-bunny-3d.glb");
   const bunnyRef = useRef<THREE.Group>(null);
 
   useFrame((state) => {
@@ -34,7 +33,7 @@ function PixelBunny() {
 }
 
 function RallyCar() {
-  const { scene } = useGLTF(ASSETS.models.rallycar());
+  const { scene } = useGLTF("/models/rally-car.glb");
   const carRef = useRef<THREE.Group>(null);
 
   useFrame((state) => {

@@ -8,9 +8,7 @@
     "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "start": "NODE_ENV=production node dist/index.js",
     "check": "tsc",
-    "db:push": "drizzle-kit push",
-    "setup-storage": "tsx scripts/setup-storage.ts",
-    "upload-assets": "tsx scripts/upload-assets.ts"
+    "db:push": "drizzle-kit push"
   },
   "dependencies": {
     "@fontsource/inter": "^5.2.5",
@@ -53,7 +51,6 @@
     "cmdk": "^1.0.0",
     "connect-pg-simple": "^10.0.0",
     "date-fns": "^3.6.0",
-    "dotenv": "^17.2.3",
     "drizzle-orm": "^0.39.1",
     "drizzle-zod": "^0.7.0",
     "embla-carousel-react": "^8.3.0",
