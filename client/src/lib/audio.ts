@@ -1,3 +1,4 @@
+import { asset } from "./env";
 /**
  * Sound for Dream Nexus Rally.
  *
@@ -47,7 +48,7 @@ export class AudioManager {
 
   constructor() {
     if (typeof window === "undefined") return;
-    this.music = new Audio("/sounds/background.mp3");
+    this.music = new Audio(asset("/sounds/background.mp3"));
     this.music.loop = true;
     this.music.preload = "auto";
     this.music.crossOrigin = "anonymous";

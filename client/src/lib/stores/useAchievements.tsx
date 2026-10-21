@@ -1,3 +1,4 @@
+import { HAS_SERVER } from "@/lib/env";
 import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
 
@@ -44,6 +45,7 @@ export const useAchievements = create<AchievementsState>()(
     recentUnlock: null,
 
     loadAchievements: async () => {
+      if (!HAS_SERVER) return;
       try {
         const response = await fetch("/api/achievements");
         if (!response.ok) throw new Error("Failed to load achievements");
@@ -55,6 +57,7 @@ export const useAchievements = create<AchievementsState>()(
     },
 
     loadPlayerStats: async (playerName: string) => {
+      if (!HAS_SERVER) return;
       if (!playerName) return;
 
       try {
@@ -74,6 +77,7 @@ export const useAchievements = create<AchievementsState>()(
     },
 
     checkAndUnlockAchievements: async (playerName: string) => {
+      if (!HAS_SERVER) return;
       if (!playerName) return;
 
       const { achievements, unlockedAchievements, playerStats } = get();
@@ -134,6 +138,7 @@ export const useAchievements = create<AchievementsState>()(
     },
 
     updatePlayerStats: async (playerName: string, stats: Partial<PlayerStats>) => {
+      if (!HAS_SERVER) return;
       if (!playerName) return;
 
       try {

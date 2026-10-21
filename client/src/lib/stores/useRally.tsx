@@ -1,3 +1,4 @@
+import { HAS_SERVER, addLocalScore } from "@/lib/env";
 import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
 import { audioManager } from "@/lib/audio";
@@ -201,7 +202,12 @@ export const useRally = create<RallyState>()(
         scoreSubmitted: false,
       });
 
-      if (state.playerName && finalScore > 0) {
+      if (finalScore > 0 && !HAS_SERVER) {
+        addLocalScore(state.playerName, finalScore, Math.floor(run.z));
+        set({ scoreSubmitted: true });
+      }
+
+      if (HAS_SERVER && state.playerName && finalScore > 0) {
         fetch("/api/leaderboard", {
           method: "POST",
           headers: { "Content-Type": "application/json" },

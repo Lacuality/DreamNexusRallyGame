@@ -1,3 +1,4 @@
+import { asset } from "@/lib/env";
 import { useEffect, useState } from "react";
 import { RotateCcw, Home, Trophy } from "lucide-react";
 import { useRally } from "@/lib/stores/useRally";
@@ -74,7 +75,7 @@ export function GameOverScreen() {
     >
       <div style={{ width: "min(520px, 100%)", textAlign: "center", animation: "dnrFadeIn 0.35s ease-out", margin: "auto 0" }}>
         <img
-          src="/pixel-bunny.png"
+          src={asset("/pixel-bunny.png")}
           alt="Pixel the Bunny"
           style={{ display: "block", margin: "0 auto", width: 92, height: 92, objectFit: "cover", objectPosition: "50% 20%", borderRadius: "50%", border: "4px solid #5fd8ff", boxShadow: "0 0 24px rgba(95,216,255,0.5)", animation: "dnrFloat 2s ease-in-out infinite" }}
         />

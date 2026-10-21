@@ -9,6 +9,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 export default defineConfig({
+  // GitHub Pages serves the game from /DreamNexusRallyGame/
+  base: process.env.GITHUB_PAGES ? "/DreamNexusRallyGame/" : "/",
   plugins: [
     react(),
     runtimeErrorOverlay(),

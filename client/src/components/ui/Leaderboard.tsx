@@ -1,3 +1,4 @@
+import { HAS_SERVER, readLocalBoard } from "@/lib/env";
 import { useEffect, useState } from "react";
 import { DREAM_NEXUS_COLORS } from "@/lib/constants";
 import { useRally } from "@/lib/stores/useRally";
@@ -19,6 +20,11 @@ export function Leaderboard() {
   const fetchLeaderboard = async () => {
     try {
       setLoading(true);
+      if (!HAS_SERVER) {
+        setLeaderboard(readLocalBoard());
+        setError(null);
+        return;
+      }
       const response = await fetch("/api/leaderboard");
       if (!response.ok) throw new Error("Failed to fetch leaderboard");
       const data = await response.json();
@@ -89,7 +95,7 @@ export function Leaderboard() {
           textAlign: "center",
         }}
       >
-        🏆 Top 10 Leaderboard
+        🏆 {HAS_SERVER ? "Top 10 Leaderboard" : "Your Top 10 Runs"}
       </h3>
 
       {leaderboard.length === 0 ? (

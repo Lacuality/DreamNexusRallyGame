@@ -1,3 +1,4 @@
+import { asset } from "@/lib/env";
 import { useEffect, useState } from "react";
 import { Volume2, VolumeX, Trophy, Maximize, Minimize, X, Flag } from "lucide-react";
 import { useRally } from "@/lib/stores/useRally";
@@ -126,7 +127,7 @@ export function TitleScreenImmersive({ isFullscreen, onToggleFullscreen, isFulls
         }}
       >
         <img
-          src="/dream-nexus-logo.png"
+          src={asset("/dream-nexus-logo.png")}
           alt="Dream Nexus"
           style={{
             width: touch ? "clamp(120px, 40vw, 180px)" : "clamp(150px, 16vw, 230px)",

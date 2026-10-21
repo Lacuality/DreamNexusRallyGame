@@ -1,3 +1,4 @@
+import { asset } from "@/lib/env";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useGLTF, Float } from "@react-three/drei";
 import { Component, Suspense, useMemo, useRef, type ReactNode } from "react";
@@ -34,7 +35,7 @@ function CameraFit() {
 function PixelBunny() {
   const { size } = useThree();
   const narrow = size.width / size.height < 1;
-  const { scene } = useGLTF("/pixel-bunny-3d.glb");
+  const { scene } = useGLTF(asset("/pixel-bunny-3d.glb"));
   const model = useMemo(() => {
     const s = scene.clone(true);
     s.traverse((o) => {
