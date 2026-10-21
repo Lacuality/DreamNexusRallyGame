@@ -143,6 +143,19 @@ export function GameStyles() {
         30% { transform: translate(-50%, 0) scale(1); }
         100% { transform: translate(-50%, -70px) scale(1); opacity: 0; }
       }
+      @keyframes dnrPopupSide {
+        0% { transform: translateX(-12px); opacity: 0; }
+        15% { transform: none; opacity: 1; }
+        70% { opacity: 0.9; }
+        100% { transform: translateY(-10px); opacity: 0; }
+      }
+      @keyframes dnrPopupTop {
+        0% { transform: scale(0.6); opacity: 0; }
+        15% { transform: scale(1.08); opacity: 1; }
+        30% { transform: scale(1); }
+        75% { opacity: 0.85; }
+        100% { transform: translateY(-12px); opacity: 0; }
+      }
       @keyframes dnrCount {
         0% { transform: translate(-50%, -50%) scale(2.2); opacity: 0; }
         25% { transform: translate(-50%, -50%) scale(1); opacity: 1; }

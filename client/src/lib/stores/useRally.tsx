@@ -255,7 +255,7 @@ export const useRally = create<RallyState>()(
       set((s) => ({ popups: [...s.popups.slice(-5), { id, text, color, big }] }));
       setTimeout(() => {
         set((s) => ({ popups: s.popups.filter((p) => p.id !== id) }));
-      }, 1100);
+      }, 1000);
     },
 
     showBanner: (title, subtitle) => {

@@ -87,6 +87,20 @@ export function MobileControls() {
     return () => window.removeEventListener("touchstart", onTouch);
   }, []);
 
+  // iOS ignores CSS alone for long presses; cancel the native gesture here
+  useEffect(() => {
+    const stop = (e: TouchEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (el && el.closest("[data-touch-controls]")) e.preventDefault();
+    };
+    document.addEventListener("touchstart", stop, { passive: false });
+    document.addEventListener("touchmove", stop, { passive: false });
+    return () => {
+      document.removeEventListener("touchstart", stop);
+      document.removeEventListener("touchmove", stop);
+    };
+  }, []);
+
   if (!show) return null;
   const ready = nitro >= 1 && !nitroActive;
   const vmin = Math.min(window.innerWidth, window.innerHeight);
@@ -103,6 +117,7 @@ export function MobileControls() {
         zIndex: 200,
         pointerEvents: "none",
       }}
+      data-touch-controls
     >
       {/* steering: left thumb */}
       <div

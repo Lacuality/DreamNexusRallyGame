@@ -220,7 +220,7 @@ export function GameHUD({ isFullscreen = false, onToggleFullscreen }: GameHUDPro
             }}
           >
             <Zap size={22} strokeWidth={3} fill="currentColor" />
-            {hud.nitroActive ? "BOOOOST!" : nitroReady ? "NITRO READY — PRESS SPACE" : "NITRO"}
+            {hud.nitroActive ? "BOOST! UNBREAKABLE · x2 POINTS" : nitroReady ? "NITRO READY — PRESS SPACE" : "NITRO — COLLECT JARS TO FILL"}
           </div>
           <div
             style={{
@@ -262,26 +262,69 @@ export function GameHUD({ isFullscreen = false, onToggleFullscreen }: GameHUDPro
         </div>
       )}
 
-      {/* ---- floating popups ---- */}
-      <div style={{ position: "absolute", top: "34%", left: 0, right: 0 }}>
-        {popups.map((p, i) => (
-          <div
-            key={p.id}
-            style={{
-              position: "absolute",
-              left: "50%",
-              top: (i % 3) * 40,
-              whiteSpace: "nowrap",
-              fontFamily: UI.display,
-              fontSize: p.big ? (touch ? 28 : 40) : touch ? 20 : 26,
-              color: p.color,
-              textShadow: "0 3px 0 rgba(0,0,0,0.55), 0 0 20px rgba(0,0,0,0.3)",
-              animation: "dnrPopup 1.1s ease-out forwards",
-            }}
-          >
-            {p.text}
-          </div>
-        ))}
+      {/* ---- popups: kept out of the driving view ----
+          small ones (+50, near miss) stack under the score panel,
+          big ones (combo, nitro, power-ups) sit just below the hearts */}
+      <div
+        style={{
+          position: "absolute",
+          top: touch ? "calc(max(12px, env(safe-area-inset-top)) + 96px)" : 178,
+          left: 14,
+          display: "flex",
+          flexDirection: "column",
+          gap: 2,
+          alignItems: "flex-start",
+        }}
+      >
+        {popups
+          .filter((p) => !p.big)
+          .slice(-3)
+          .map((p) => (
+            <div
+              key={p.id}
+              style={{
+                whiteSpace: "nowrap",
+                fontFamily: UI.display,
+                fontSize: touch ? 16 : 20,
+                color: p.color,
+                textShadow: "0 2px 0 rgba(0,0,0,0.6)",
+                animation: "dnrPopupSide 0.9s ease-out forwards",
+              }}
+            >
+              {p.text}
+            </div>
+          ))}
+      </div>
+      <div
+        style={{
+          position: "absolute",
+          top: touch ? "calc(max(12px, env(safe-area-inset-top)) + 140px)" : 66,
+          left: "50%",
+          transform: "translateX(-50%)",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 2,
+        }}
+      >
+        {popups
+          .filter((p) => p.big)
+          .slice(-2)
+          .map((p) => (
+            <div
+              key={p.id}
+              style={{
+                whiteSpace: "nowrap",
+                fontFamily: UI.display,
+                fontSize: touch ? 20 : 28,
+                color: p.color,
+                textShadow: "0 3px 0 rgba(0,0,0,0.6)",
+                animation: "dnrPopupTop 1s ease-out forwards",
+              }}
+            >
+              {p.text}
+            </div>
+          ))}
       </div>
 
       {/* ---- biome banner ---- */}

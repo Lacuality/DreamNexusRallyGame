@@ -319,7 +319,7 @@ function buildRock() {
 
 function buildSacks() {
   const g = new THREE.Group();
-  const burlap = mat("#b08a5a", { roughness: 1 });
+  const burlap = mat("#7d6a52", { roughness: 1 });
   const tex = canvasTex(128, 64, (ctx) => {
     ctx.fillStyle = "#b08a5a";
     ctx.fillRect(0, 0, 128, 64);
@@ -450,17 +450,67 @@ function glowRing(color: string) {
     new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }),
   );
   ring.rotation.x = -Math.PI / 2;
-  ring.position.y = -0.85;
+  ring.position.y = 0.06;
   ring.name = "ring";
   return ring;
+}
+
+/** Tall light beam so pickups read as "good stuff" from far away. */
+function lightBeam(color: string) {
+  const geo = new THREE.CylinderGeometry(0.12, 0.3, 5, 12, 1, true);
+  geo.translate(0, 4.4, 0); // starts above the item so the item stays visible
+  // fade out toward the top using vertex colours
+  const colors: number[] = [];
+  const pos = geo.attributes.position;
+  const c = new THREE.Color(color);
+  for (let i = 0; i < pos.count; i++) {
+    const t = Math.max(0, 1 - (pos.getY(i) - 1.9) / 5);
+    colors.push(c.r * t, c.g * t, c.b * t);
+  }
+  geo.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+  const beam = new THREE.Mesh(
+    geo,
+    new THREE.MeshBasicMaterial({
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.4,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      fog: false,
+      toneMapped: false,
+    }),
+  );
+  beam.name = "beam";
+  return beam;
+}
+
+/** Red warning mark on the road under things that hurt you. */
+function dangerMark(halfW: number, halfL: number) {
+  const shape = new THREE.Shape();
+  const w = halfW + 0.35;
+  const l = halfL + 0.35;
+  shape.absarc(0, 0, 1, 0, Math.PI * 2, false);
+  const hole = new THREE.Path();
+  hole.absarc(0, 0, 0.82, 0, Math.PI * 2, true);
+  shape.holes.push(hole);
+  const m = new THREE.Mesh(
+    new THREE.ShapeGeometry(shape, 32),
+    new THREE.MeshBasicMaterial({ color: "#ff2a2a", transparent: true, opacity: 0.75, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4 }),
+  );
+  m.rotation.x = -Math.PI / 2;
+  m.position.y = 0.05;
+  m.scale.set(w, l, 1);
+  m.name = "danger";
+  return m;
 }
 
 function buildJar() {
   const g = new THREE.Group();
   const spin = new THREE.Group();
   spin.name = "spin";
-  const caramel = mat("#c8772e", { emissive: "#7a3a00", emissiveIntensity: 0.45, roughness: 0.25, metalness: 0.1 });
-  const lid = mat("#ffd23f", { metalness: 0.8, roughness: 0.25, emissive: "#664400", emissiveIntensity: 0.3 });
+  const caramel = mat("#ffb02e", { emissive: "#ff8a00", emissiveIntensity: 0.9, roughness: 0.2, metalness: 0.1 });
+  const lid = mat("#ffe14a", { metalness: 0.6, roughness: 0.2, emissive: "#ffcc00", emissiveIntensity: 0.9 });
   const labelTex = canvasTex(256, 64, (ctx) => {
     ctx.fillStyle = "#fff4e0";
     ctx.fillRect(0, 0, 256, 64);
@@ -476,8 +526,14 @@ function buildJar() {
   lbl.position.y = -0.02;
   const top = mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.16, 18), lid, false);
   top.position.y = 0.43;
-  spin.add(jar, lbl, top);
-  g.add(spin, glowRing("#ffcc55"));
+  // sparkle halo
+  const halo = new THREE.Mesh(
+    new THREE.SphereGeometry(0.75, 16, 12),
+    new THREE.MeshBasicMaterial({ color: "#ffd23f", transparent: true, opacity: 0.22, depthWrite: false, blending: THREE.AdditiveBlending }),
+  );
+  spin.add(jar, lbl, top, halo);
+  spin.scale.setScalar(1.3);
+  g.add(spin, glowRing("#ffcc55"), lightBeam("#ffd23f"));
   return g;
 }
 
@@ -505,7 +561,8 @@ function buildNitro() {
   const b2 = mesh(bg, yellow, false);
   b2.position.z = -0.34;
   spin.add(can, cap, b1, b2);
-  g.add(spin, glowRing("#ff6a3a"));
+  spin.scale.setScalar(1.2);
+  g.add(spin, glowRing("#ff6a3a"), lightBeam("#ff6a3a"));
   return g;
 }
 
@@ -520,7 +577,8 @@ function buildShield() {
     new THREE.MeshStandardMaterial({ color: "#a8ecff", transparent: true, opacity: 0.25, emissive: "#24A0CE", emissiveIntensity: 0.4, depthWrite: false }),
   );
   spin.add(gem, bubble);
-  g.add(spin, glowRing("#5fd8ff"));
+  spin.scale.setScalar(1.2);
+  g.add(spin, glowRing("#5fd8ff"), lightBeam("#5fd8ff"));
   return g;
 }
 
@@ -537,7 +595,7 @@ function buildHeart() {
   const h = mesh(geo, mat("#ff3d6e", { emissive: "#cc0033", emissiveIntensity: 0.7, roughness: 0.3 }), false);
   h.scale.setScalar(1.3);
   spin.add(h);
-  g.add(spin, glowRing("#ff6d8f"));
+  g.add(spin, glowRing("#ff6d8f"), lightBeam("#ff6d8f"));
   return g;
 }
 
@@ -852,6 +910,7 @@ const BUILDERS: Record<string, Builder> = {
 for (let v = 0; v < 7; v++) BUILDERS[`house${v}`] = () => buildHouse(v);
 
 const templates = new Map<string, THREE.Object3D>();
+const SOLID_KINDS = ["cone", "rock", "sacks", "barrier"] as const;
 
 /** Pool of cloned models per kind, so we never allocate during a race. */
 export class ModelPool {
@@ -864,6 +923,10 @@ export class ModelPool {
     if (!t) {
       const b = BUILDERS[kind];
       t = b ? b() : new THREE.Group();
+      if ((SOLID_KINDS as readonly string[]).includes(kind)) {
+        const [hw, hl] = OBSTACLE_SIZE[kind as ObstacleKind];
+        t.add(dangerMark(hw, hl));
+      }
       templates.set(kind, t);
     }
     const o = t.clone(true);

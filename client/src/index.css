@@ -25,6 +25,24 @@
   }
 }
 
+/* Game, not a document: no text selection, long-press menus or tap flashes
+   (iPhone was showing "Select All" while players held the touch buttons). */
+html, body, #root, #root * {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+#root input, #root textarea {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}
+html, body {
+  overscroll-behavior: none;
+  touch-action: manipulation;
+}
+
 #root {
   width: 100%;
   height: 100%;

@@ -4,7 +4,7 @@
  * the useRally store.
  */
 export const MAX_HEARTS = 3;
-export const NITRO_DURATION = 3.2; // seconds
+export const NITRO_DURATION = 2.2; // seconds
 export const INVULNERABLE_TIME = 1.6; // seconds after a hit
 
 export interface RunState {

@@ -85,6 +85,8 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
     const obj = pool.acquire(kind);
     obj.visible = true;
     obj.rotation.set(0, 0, 0);
+    const mark = obj.getObjectByName("danger");
+    if (mark) mark.visible = true;
     obj.scale.setScalar(1);
     group.current?.add(obj);
     ents.current.push({ kind, pickup, z, lat, h, passed: false, done: false, fly: 0, vx: 0, vy: 0, spin: 0, obj, seed: Math.random() * 10 });
@@ -201,7 +203,8 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
   };
 
   const award = (pts: number) => {
-    const p = Math.round(pts * multiplierFor(run.combo));
+    // nitro doubles everything you earn
+    const p = Math.round(pts * multiplierFor(run.combo) * (run.nitroTime > 0 ? 2 : 1));
     run.score += p;
     return p;
   };
@@ -290,11 +293,11 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
       run.nitroUses++;
       run.shake = 0.5;
       audioManager.playNitro();
-      rally.getState().popup("NITRO!", COLORS.orange, true);
+      rally.getState().popup("NITRO! x2 POINTS", COLORS.orange, true);
     }
     if (run.nitroTime > 0) {
       run.nitroTime -= dt;
-      target = top + 70 / 3.6;
+      target = top + 40 / 3.6;
     }
     if (run.slowTime > 0) {
       run.slowTime -= dt;
@@ -343,7 +346,7 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
     /* --- move --- */
     const dz = run.speed * dt;
     run.z += dz;
-    run.score += dz * (run.speed * 3.6 / 100) * 0.5 * multiplierFor(run.combo);
+    run.score += dz * (run.speed * 3.6 / 100) * 0.5 * multiplierFor(run.combo) * (run.nitroTime > 0 ? 2 : 1);
     run.maxSpeedKmh = Math.max(run.maxSpeedKmh, run.speed * 3.6);
 
     if (run.combo > 0) {
@@ -510,6 +513,8 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
 
   function fling(e: Entity) {
     e.done = true;
+    const mark = e.obj.getObjectByName("danger");
+    if (mark) mark.visible = false;
     e.fly = 1.6;
     e.vx = (e.lat > run.lat ? 1 : -1) * (6 + Math.random() * 4);
     e.vy = 7 + Math.random() * 4;
@@ -550,6 +555,8 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
         }
         const ring = o.getObjectByName("ring");
         if (ring) ring.scale.setScalar(1 + Math.sin(t * 4 + e.seed) * 0.12);
+        const beam = o.getObjectByName("beam");
+        if (beam) beam.rotation.y = t;
       } else if (!e.pickup && e.fly <= 0) {
         o.rotation.y = Math.atan(roadX(z + 0.5) - roadX(z - 0.5));
       }

@@ -46,7 +46,7 @@ export function Camera() {
     camera.lookAt(look.current);
 
     const cam = camera as THREE.PerspectiveCamera;
-    const targetFov = 62 + sp * 10 + (run.nitroTime > 0 ? 10 : 0);
+    const targetFov = 62 + sp * 10 + (run.nitroTime > 0 ? 6 : 0);
     if (Math.abs(cam.fov - targetFov) > 0.05) {
       cam.fov += (targetFov - cam.fov) * Math.min(1, dt * 4);
       cam.updateProjectionMatrix();
