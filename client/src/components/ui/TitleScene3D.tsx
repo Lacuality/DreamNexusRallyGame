@@ -1,156 +1,169 @@
-import { Canvas } from "@react-three/fiber";
-import { useGLTF, PerspectiveCamera, Environment as DreiEnvironment, Float, Html } from "@react-three/drei";
-import { Suspense, useRef, useMemo, useState, useEffect } from "react";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { useGLTF, Float } from "@react-three/drei";
+import { Component, Suspense, useMemo, useRef, type ReactNode } from "react";
 import * as THREE from "three";
-import { useFrame } from "@react-three/fiber";
+import { ShowcaseCar } from "../game/Car";
+import { isTouchDevice } from "@/lib/input";
 
-function LoadingFallback() {
-  return (
-    <Html center>
-      <div style={{ color: "#24A0CE", fontFamily: "monospace", fontSize: "18px" }}>
-        Loading 3D Scene...
-      </div>
-    </Html>
-  );
+/** If the 3D bunny ever fails to load, just skip it instead of crashing. */
+class SafeBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  componentDidCatch(err: unknown) {
+    console.warn("Title model failed to load:", err);
+  }
+  render() {
+    return this.state.failed ? null : this.props.children;
+  }
+}
+
+/** Pull the camera back on tall/narrow (phone) screens so everything fits. */
+function CameraFit() {
+  const { camera, size } = useThree();
+  useFrame(() => {
+    const aspect = size.width / size.height;
+    const z = aspect < 1 ? 8 + 5.5 / aspect : 10;
+    camera.position.set(0, aspect < 1 ? 4 : 2.6, z);
+    camera.lookAt(aspect < 1 ? -0.8 : -0.6, aspect < 1 ? -1.2 : 0.2, 0);
+  });
+  return null;
 }
 
 function PixelBunny() {
+  const { size } = useThree();
+  const narrow = size.width / size.height < 1;
   const { scene } = useGLTF("/pixel-bunny-3d.glb");
-  const bunnyRef = useRef<THREE.Group>(null);
-
-  useFrame((state) => {
-    if (bunnyRef.current) {
-      bunnyRef.current.rotation.y = Math.sin(state.clock.elapsedTime * 0.5) * 0.1;
-      bunnyRef.current.position.y = Math.sin(state.clock.elapsedTime * 0.8) * 0.05;
-    }
-  });
-
-  return (
-    <Float speed={1.5} rotationIntensity={0.2} floatIntensity={0.3}>
-      <primitive ref={bunnyRef} object={scene.clone()} scale={1.5} position={[0, 0, 0]} />
-    </Float>
-  );
-}
-
-function RallyCar() {
-  const { scene } = useGLTF("/models/rally-car.glb");
-  const carRef = useRef<THREE.Group>(null);
-
-  useFrame((state) => {
-    if (carRef.current) {
-      carRef.current.position.y = Math.sin(state.clock.elapsedTime * 0.6 + 1) * 0.03;
-    }
-  });
-
-  return (
-    <Float speed={1.2} rotationIntensity={0.1} floatIntensity={0.2}>
-      <primitive ref={carRef} object={scene.clone()} scale={0.8} position={[2, -0.3, 0.5]} rotation={[0, -0.5, 0]} />
-    </Float>
-  );
-}
-
-function CoffeeParticles({ isMobile }: { isMobile: boolean }) {
-  const count = isMobile ? 15 : 30;
-  const meshRef = useRef<THREE.InstancedMesh>(null);
-  
-  const positions = useMemo(() => {
-    const pos = new Float32Array(count * 3);
-    for (let i = 0; i < count; i++) {
-      pos[i * 3] = (Math.random() - 0.5) * 8;
-      pos[i * 3 + 1] = (Math.random() - 0.5) * 6;
-      pos[i * 3 + 2] = (Math.random() - 0.5) * 4;
-    }
-    return pos;
-  }, [count]);
-
-  useFrame((state) => {
-    if (meshRef.current) {
-      for (let i = 0; i < count; i++) {
-        const i3 = i * 3;
-        const matrix = new THREE.Matrix4();
-        const y = positions[i3 + 1] + state.clock.elapsedTime * 0.1;
-        const wrappedY = ((y + 3) % 6) - 3;
-        
-        matrix.setPosition(
-          positions[i3] + Math.sin(state.clock.elapsedTime * 0.5 + i) * 0.2,
-          wrappedY,
-          positions[i3 + 2]
-        );
-        matrix.scale(new THREE.Vector3(0.05, 0.05, 0.05));
-        meshRef.current.setMatrixAt(i, matrix);
+  const model = useMemo(() => {
+    const s = scene.clone(true);
+    s.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (m.isMesh) {
+        if (!m.geometry.attributes.normal) m.geometry.computeVertexNormals();
+        m.castShadow = true;
       }
-      meshRef.current.instanceMatrix.needsUpdate = true;
-    }
-  });
-
+    });
+    return s;
+  }, [scene]);
   return (
-    <instancedMesh ref={meshRef} args={[undefined, undefined, count]}>
-      <sphereGeometry args={[1, 8, 8]} />
-      <meshStandardMaterial color="#8B4513" emissive="#654321" emissiveIntensity={0.3} />
+    <Float speed={2} rotationIntensity={0.25} floatIntensity={0.6}>
+      <primitive object={model} scale={2.3} position={narrow ? [-2.2, 1.15, 2.2] : [-3.3, 1.15, 0.8]} rotation={[0, 0.35, 0]} />
+    </Float>
+  );
+}
+
+function Turntable({ children }: { children: ReactNode }) {
+  const ref = useRef<THREE.Group>(null);
+  useFrame((_, dt) => {
+    if (ref.current) ref.current.rotation.y += dt * 0.35;
+  });
+  return <group ref={ref}>{children}</group>;
+}
+
+function Confetti() {
+  const count = 60;
+  const ref = useRef<THREE.InstancedMesh>(null);
+  const data = useMemo(
+    () =>
+      Array.from({ length: count }, () => ({
+        x: (Math.random() - 0.5) * 14,
+        y: Math.random() * 8,
+        z: (Math.random() - 0.5) * 8 - 2,
+        s: 0.4 + Math.random() * 0.8,
+        r: Math.random() * 6,
+      })),
+    [],
+  );
+  const colors = useMemo(() => {
+    const pal = ["#ffd23f", "#24A0CE", "#FDC6B5", "#ff5a5f", "#7bd389"];
+    const arr = new Float32Array(count * 3);
+    const c = new THREE.Color();
+    for (let i = 0; i < count; i++) {
+      c.set(pal[i % pal.length]);
+      arr.set([c.r, c.g, c.b], i * 3);
+    }
+    return arr;
+  }, []);
+  const m = useMemo(() => new THREE.Matrix4(), []);
+  const q = useMemo(() => new THREE.Quaternion(), []);
+  const e = useMemo(() => new THREE.Euler(), []);
+  const v = useMemo(() => new THREE.Vector3(), []);
+  const sc = useMemo(() => new THREE.Vector3(), []);
+  useFrame((state, dt) => {
+    if (!ref.current) return;
+    data.forEach((d, i) => {
+      d.y -= dt * d.s;
+      d.r += dt * 2;
+      if (d.y < -1) d.y = 8;
+      e.set(d.r, d.r * 0.7, 0);
+      q.setFromEuler(e);
+      v.set(d.x + Math.sin(state.clock.elapsedTime + i) * 0.3, d.y, d.z);
+      sc.set(0.12, 0.2, 0.02);
+      m.compose(v, q, sc);
+      ref.current!.setMatrixAt(i, m);
+    });
+    ref.current.instanceMatrix.needsUpdate = true;
+  });
+  return (
+    <instancedMesh ref={ref} args={[undefined, undefined, count]}>
+      <boxGeometry args={[1, 1, 1]}>
+        <instancedBufferAttribute attach="attributes-color" args={[colors, 3]} />
+      </boxGeometry>
+      <meshBasicMaterial vertexColors side={THREE.DoubleSide} />
     </instancedMesh>
   );
 }
 
-function AutoRotateCamera() {
-  const cameraRef = useRef<THREE.PerspectiveCamera>(null);
-
-  useFrame((state) => {
-    if (cameraRef.current) {
-      const radius = 6;
-      const x = Math.sin(state.clock.elapsedTime * 0.15) * radius;
-      const z = Math.cos(state.clock.elapsedTime * 0.15) * radius;
-      cameraRef.current.position.set(x, 2, z);
-      cameraRef.current.lookAt(0, 0.5, 0);
-    }
-  });
-
-  return <PerspectiveCamera ref={cameraRef} makeDefault position={[5, 2, 5]} fov={50} />;
-}
-
-function SceneLighting() {
-  return (
-    <>
-      <ambientLight intensity={0.4} />
-      <spotLight position={[5, 8, 5]} intensity={1.2} angle={0.4} penumbra={0.5} castShadow color="#24A0CE" />
-      <spotLight position={[-5, 5, -5]} intensity={0.8} angle={0.3} penumbra={0.6} color="#FDC6B5" />
-      <pointLight position={[0, 1, 2]} intensity={0.5} color="#24A0CE" />
-    </>
-  );
-}
-
 export function TitleScene3D() {
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
-  }, []);
-
+  const touch = isTouchDevice();
   return (
     <div style={{ position: "absolute", inset: 0, zIndex: 1 }}>
-      <Canvas 
-        shadows 
-        dpr={isMobile ? [1, 1.5] : [1, 2]}
-        performance={{ min: 0.5 }}
+      <Canvas
+        shadows
+        dpr={touch ? [1, 1.5] : [1, 2]}
+        camera={{ position: [0, 2.6, 10], fov: 45 }}
+        onCreated={({ camera }) => camera.lookAt(-0.6, 0.2, 0)}
       >
-        <Suspense fallback={<LoadingFallback />}>
-          <AutoRotateCamera />
-          <SceneLighting />
-          
-          <PixelBunny />
-          <RallyCar />
-          <CoffeeParticles isMobile={isMobile} />
+        <color attach="background" args={["#3d9be0"]} />
+        <fog attach="fog" args={["#bfe6f5", 14, 40]} />
+        <hemisphereLight intensity={0.8} color="#bfe6f5" groundColor="#4f9a3c" />
+        <directionalLight position={[6, 10, 6]} intensity={1.8} castShadow shadow-mapSize-width={1024} shadow-mapSize-height={1024} />
 
-          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.5, 0]} receiveShadow>
-            <planeGeometry args={[20, 20]} />
-            <meshStandardMaterial color="#0E1B24" roughness={0.8} />
+        {/* sky gradient backdrop */}
+        <mesh position={[0, 8, -20]}>
+          <planeGeometry args={[120, 40]} />
+          <meshBasicMaterial color="#8fd0f0" fog={false} />
+        </mesh>
+        {/* hills */}
+        {[-14, -6, 5, 13].map((x, i) => (
+          <mesh key={i} position={[x, -1, -12 - (i % 2) * 4]} scale={[7 + i, 5 + (i % 3) * 2, 6]}>
+            <sphereGeometry args={[1, 12, 8]} />
+            <meshStandardMaterial color={i % 2 ? "#3f7f5a" : "#4f9a3c"} flatShading />
           </mesh>
+        ))}
+        {/* ground + road piece */}
+        <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow position={[0, 0, 0]}>
+          <circleGeometry args={[30, 40]} />
+          <meshStandardMaterial color="#4f9a3c" />
+        </mesh>
+        <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow position={[0, 0.01, 0]}>
+          <circleGeometry args={[3.6, 40]} />
+          <meshStandardMaterial color="#3a3d42" />
+        </mesh>
 
-          <DreiEnvironment preset="sunset" />
-          <fog attach="fog" args={["#0E1B24", 5, 15]} />
-        </Suspense>
+        <CameraFit />
+        <Turntable>
+          <ShowcaseCar position={[0, 0.02, 0]} />
+        </Turntable>
+
+        <SafeBoundary>
+          <Suspense fallback={null}>
+            <PixelBunny />
+          </Suspense>
+        </SafeBoundary>
+
+        <Confetti />
       </Canvas>
     </div>
   );

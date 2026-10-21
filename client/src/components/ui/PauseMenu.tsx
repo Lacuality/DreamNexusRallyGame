@@ -1,107 +1,89 @@
+import { Play, Home, RotateCcw, Music, Volume2 } from "lucide-react";
 import { useRally } from "@/lib/stores/useRally";
-import { DREAM_NEXUS_COLORS } from "@/lib/constants";
-import { useEffect, useState } from "react";
-import { SettingsPanel } from "./SettingsPanel";
+import { useSettings } from "@/lib/stores/useSettings";
+import { audioManager } from "@/lib/audio";
+import { BigButton, UI, panelStyle, useAudioSettings } from "./gameUi";
+
+function Slider({ label, icon, value, onChange }: { label: string; icon: React.ReactNode; value: number; onChange: (v: number) => void }) {
+  return (
+    <label style={{ display: "flex", alignItems: "center", gap: 12, fontWeight: 800, fontSize: 18 }}>
+      <span style={{ display: "flex", alignItems: "center", gap: 8, width: 120 }}>
+        {icon}
+        {label}
+      </span>
+      <input
+        type="range"
+        min={0}
+        max={1}
+        step={0.05}
+        value={value}
+        onChange={(e) => onChange(parseFloat(e.target.value))}
+        style={{ flex: 1, height: 28, accentColor: UI.cyanBright }}
+      />
+    </label>
+  );
+}
 
 export function PauseMenu() {
-  const { resume, restart } = useRally();
-  const [showSettings, setShowSettings] = useState(false);
-  
-  const handleKeyPress = (e: KeyboardEvent) => {
-    if (e.key === "p" || e.key === "P") {
-      resume();
-    }
-  };
-  
-  useEffect(() => {
-    window.addEventListener("keypress", handleKeyPress);
-    return () => window.removeEventListener("keypress", handleKeyPress);
-  }, []);
-  
+  const resume = useRally((s) => s.resume);
+  const restart = useRally((s) => s.restart);
+  const start = useRally((s) => s.start);
+  const audio = useAudioSettings();
+  const { reducedMotion, toggleReducedMotion } = useSettings();
+
   return (
-    <>
-      <div
-        style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          width: "100vw",
-          height: "100vh",
-          backgroundColor: "rgba(14, 27, 36, 0.95)",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          zIndex: 1000,
-          fontFamily: "monospace",
-          color: DREAM_NEXUS_COLORS.white,
-        }}
-      >
-        <h1
-          style={{
-            fontSize: "48px",
-            color: DREAM_NEXUS_COLORS.cyan,
-            marginBottom: "40px",
-          }}
-        >
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(14, 27, 36, 0.82)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 1000,
+        fontFamily: UI.body,
+        color: UI.white,
+        padding: 16,
+      }}
+    >
+      <div style={{ ...panelStyle, padding: "28px 28px", width: "min(460px, 100%)", animation: "dnrFadeIn 0.25s ease-out" }}>
+        <h1 style={{ fontFamily: UI.display, fontSize: "clamp(40px, 8vw, 60px)", color: UI.cyanBright, margin: "0 0 20px", textAlign: "center" }}>
           PAUSED
         </h1>
-        
-        <div style={{ display: "flex", gap: "20px", marginBottom: "20px" }}>
-          <button
-            onClick={resume}
-            style={{
-              fontSize: "24px",
-              padding: "15px 40px",
-              backgroundColor: DREAM_NEXUS_COLORS.cyan,
-              color: DREAM_NEXUS_COLORS.navy,
-              border: "none",
-              borderRadius: "10px",
-              cursor: "pointer",
-              fontWeight: "bold",
-              fontFamily: "monospace",
-            }}
-          >
-            Resume (P)
-          </button>
-          
-          <button
-            onClick={restart}
-            style={{
-              fontSize: "24px",
-              padding: "15px 40px",
-              backgroundColor: DREAM_NEXUS_COLORS.warm,
-              color: DREAM_NEXUS_COLORS.navy,
-              border: "none",
-              borderRadius: "10px",
-              cursor: "pointer",
-              fontWeight: "bold",
-              fontFamily: "monospace",
-            }}
-          >
-            Quit to Menu
-          </button>
+
+        <div style={{ display: "grid", gap: 14 }}>
+          <BigButton onClick={resume} color={UI.cyanBright}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+              <Play size={28} strokeWidth={3} fill="currentColor" /> RESUME
+            </span>
+          </BigButton>
+          <BigButton onClick={start} color={UI.gold}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+              <RotateCcw size={26} strokeWidth={3} /> RESTART
+            </span>
+          </BigButton>
+          <BigButton onClick={restart} color={UI.warm}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+              <Home size={26} strokeWidth={3} /> MENU
+            </span>
+          </BigButton>
         </div>
-        
-        <button
-          onClick={() => setShowSettings(true)}
-          style={{
-            fontSize: "18px",
-            padding: "12px 30px",
-            backgroundColor: "#555",
-            color: DREAM_NEXUS_COLORS.white,
-            border: "none",
-            borderRadius: "8px",
-            cursor: "pointer",
-            fontWeight: "bold",
-            fontFamily: "monospace",
-          }}
-        >
-          Settings
-        </button>
+
+        <div style={{ display: "grid", gap: 14, marginTop: 24 }}>
+          <Slider label="Music" icon={<Music size={22} />} value={audio.music} onChange={(v) => audioManager.setMusicVolume(v)} />
+          <Slider label="Effects" icon={<Volume2 size={22} />} value={audio.sfx} onChange={(v) => audioManager.setSfxVolume(v)} />
+          <label style={{ display: "flex", alignItems: "center", gap: 12, fontWeight: 800, fontSize: 18, cursor: "pointer" }}>
+            <input type="checkbox" checked={audio.muted} onChange={() => audioManager.toggleMute()} style={{ width: 26, height: 26, accentColor: UI.cyanBright }} />
+            Mute all sound
+          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: 12, fontWeight: 800, fontSize: 18, cursor: "pointer" }}>
+            <input type="checkbox" checked={reducedMotion} onChange={toggleReducedMotion} style={{ width: 26, height: 26, accentColor: UI.cyanBright }} />
+            Less camera shake
+          </label>
+        </div>
+
+        <p style={{ textAlign: "center", opacity: 0.7, marginTop: 18, marginBottom: 0, fontWeight: 700 }}>Press P or Esc to resume</p>
       </div>
-      
-      {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}
-    </>
+    </div>
   );
 }

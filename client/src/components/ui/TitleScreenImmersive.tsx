@@ -1,11 +1,11 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
+import { Volume2, VolumeX, Trophy, Maximize, Minimize, X, Flag } from "lucide-react";
 import { useRally } from "@/lib/stores/useRally";
-import { DREAM_NEXUS_COLORS } from "@/lib/constants";
 import { TitleScene3D } from "./TitleScene3D";
-import { HolographicPanel } from "./HolographicPanel";
 import { Leaderboard } from "./Leaderboard";
-import { FullscreenButton } from "./FullscreenButton";
 import { audioManager } from "@/lib/audio";
+import { isTouchDevice } from "@/lib/input";
+import { BigButton, IconButton, UI, panelStyle, useAudioSettings } from "./gameUi";
 
 interface TitleScreenImmersiveProps {
   isFullscreen: boolean;
@@ -13,543 +13,235 @@ interface TitleScreenImmersiveProps {
   isFullscreenSupported: boolean;
 }
 
-export function TitleScreenImmersive({ isFullscreen, onToggleFullscreen, isFullscreenSupported }: TitleScreenImmersiveProps) {
-  const { start, highScore, loadHighScore, playerName, setPlayerName, loadPlayerName } = useRally();
-  const [nameInput, setNameInput] = useState("");
-  const [isMobile, setIsMobile] = useState(false);
-  const [showControls, setShowControls] = useState(false);
-  const musicStartedRef = useRef(false);
+function HowTo({ emoji, title, text }: { emoji: string; title: string; text: string }) {
+  return (
+    <div
+      style={{
+        ...panelStyle,
+        padding: "10px 12px",
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        minWidth: 0,
+      }}
+    >
+      <div style={{ fontSize: 34, lineHeight: 1 }} aria-hidden>
+        {emoji}
+      </div>
+      <div style={{ textAlign: "left", minWidth: 0 }}>
+        <div style={{ fontFamily: UI.display, fontSize: 15, color: UI.gold }}>{title}</div>
+        <div style={{ fontSize: 14, fontWeight: 700, opacity: 0.9, lineHeight: 1.25 }}>{text}</div>
+      </div>
+    </div>
+  );
+}
 
-  const handleStartMusic = () => {
-    if (!musicStartedRef.current) {
-      audioManager.playBackgroundMusic();
-      musicStartedRef.current = true;
-    }
-  };
+export function TitleScreenImmersive({ isFullscreen, onToggleFullscreen, isFullscreenSupported }: TitleScreenImmersiveProps) {
+  const start = useRally((s) => s.start);
+  const highScore = useRally((s) => s.highScore);
+  const loadHighScore = useRally((s) => s.loadHighScore);
+  const playerName = useRally((s) => s.playerName);
+  const setPlayerName = useRally((s) => s.setPlayerName);
+  const loadPlayerName = useRally((s) => s.loadPlayerName);
+  const [nameInput, setNameInput] = useState("");
+  const [showBoard, setShowBoard] = useState(false);
+  const audio = useAudioSettings();
+  const touch = isTouchDevice();
 
   useEffect(() => {
     loadHighScore();
     loadPlayerName();
+    audioManager.playBackgroundMusic();
   }, [loadHighScore, loadPlayerName]);
 
   useEffect(() => {
     if (playerName) setNameInput(playerName);
   }, [playerName]);
 
-  useEffect(() => {
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev || "";
-    };
-  }, []);
-
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      audioManager.stopBackgroundMusic();
-      musicStartedRef.current = false;
-    };
-  }, []);
-
   const handleStart = () => {
-    const trimmed = nameInput.trim();
-    if (trimmed) {
-      setPlayerName(trimmed);
-      start();
-    }
+    const trimmed = nameInput.trim().slice(0, 20);
+    if (trimmed) setPlayerName(trimmed);
+    audioManager.unlock();
+    start();
   };
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Enter") handleStart();
+      if (e.key === "Enter" && !showBoard) handleStart();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [nameInput]);
+  });
+
+  const controls = touch
+    ? [
+        { emoji: "👆", title: "STEER", text: "Big ◀ ▶ buttons, bottom left" },
+        { emoji: "⚡", title: "NITRO", text: "Fill the ring, tap NITRO to smash through!" },
+      ]
+    : [
+        { emoji: "⌨️", title: "STEER", text: "← → / A D · ↑ faster · ↓ brake" },
+        { emoji: "⚡", title: "NITRO", text: "SPACE when full — smash everything!" },
+      ];
 
   return (
     <div
-      onClick={handleStartMusic}
       style={{
         position: "fixed",
         inset: 0,
-        background: "#000",
-        color: DREAM_NEXUS_COLORS.white,
+        background: "#0E1B24",
+        color: UI.white,
         zIndex: 1000,
         overflow: "hidden",
+        fontFamily: UI.body,
       }}
     >
       <TitleScene3D />
 
-      <FullscreenButton isFullscreen={isFullscreen} onClick={onToggleFullscreen} isSupported={isFullscreenSupported} />
-
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          zIndex: 10,
-          pointerEvents: "none",
-        }}
-      >
-        {isMobile ? (
-          <>
-            {/* Mobile Layout */}
-            {/* Title - Top */}
-            <div style={{ 
-              position: "absolute", 
-              top: "10px", 
-              left: "50%", 
-              transform: "translateX(-50%)", 
-              textAlign: "center",
-              pointerEvents: "none",
-              width: "100%",
-              padding: "0 10px",
-            }}>
-              <img
-                src="/dream-nexus-logo.png"
-                alt="Dream Nexus"
-                style={{
-                  width: "80px",
-                  height: "auto",
-                  display: "block",
-                  margin: "0 auto 4px",
-                  filter: "drop-shadow(0 0 15px rgba(36, 160, 206, 0.5))",
-                  animation: "logoFloat 3s ease-in-out infinite",
-                }}
-              />
-              <h1
-                style={{
-                  fontFamily: "monospace",
-                  fontSize: "20px",
-                  letterSpacing: "0.05em",
-                  color: DREAM_NEXUS_COLORS.cyan,
-                  margin: "0",
-                  textShadow: "0 0 20px rgba(36, 160, 206, 0.6)",
-                  animation: "textGlow 2s ease-in-out infinite alternate",
-                }}
-              >
-                DREAM NEXUS RALLY
-              </h1>
-            </div>
-
-            {/* Leaderboard Toggle - Top Right */}
-            <button
-              onClick={() => setShowControls(!showControls)}
-              style={{
-                position: "absolute",
-                top: "10px",
-                right: "10px",
-                width: "44px",
-                height: "44px",
-                background: "rgba(14, 27, 36, 0.8)",
-                backdropFilter: "blur(10px)",
-                border: `2px solid ${DREAM_NEXUS_COLORS.cyan}`,
-                borderRadius: "10px",
-                color: DREAM_NEXUS_COLORS.cyan,
-                fontSize: "18px",
-                cursor: "pointer",
-                pointerEvents: "auto",
-                boxShadow: "0 0 15px rgba(36, 160, 206, 0.3)",
-              }}
-            >
-              🏆
-            </button>
-
-            {/* Collapsible Leaderboard */}
-            {showControls && (
-              <div style={{ 
-                position: "absolute", 
-                top: "60px", 
-                right: "10px",
-                maxWidth: "90vw",
-                width: "300px",
-                pointerEvents: "auto",
-              }}>
-                <HolographicPanel>
-                  <Leaderboard />
-                </HolographicPanel>
-              </div>
-            )}
-
-            {/* Name Input & Start - Bottom Center */}
-            <div style={{ 
-              position: "absolute", 
-              bottom: "10px", 
-              left: "50%", 
-              transform: "translateX(-50%)",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: "12px",
-              pointerEvents: "auto",
-              width: "calc(100% - 20px)",
-              maxWidth: "400px",
-            }}>
-              <HolographicPanel
-                style={{
-                  width: "100%",
-                }}
-              >
-                <label
-                  htmlFor="player-name-input"
-                  style={{
-                    display: "block",
-                    fontFamily: "monospace",
-                    color: DREAM_NEXUS_COLORS.cyan,
-                    fontSize: "14px",
-                    marginBottom: "8px",
-                    textAlign: "center",
-                    textShadow: "0 0 10px rgba(36, 160, 206, 0.5)",
-                  }}
-                >
-                  🏁 Enter Your Name
-                </label>
-                <input
-                  id="player-name-input"
-                  type="text"
-                  value={nameInput}
-                  onChange={(e) => setNameInput(e.target.value)}
-                  placeholder="Racer Name"
-                  maxLength={20}
-                  aria-label="Enter your racer name"
-                  aria-required="true"
-                  style={{
-                    width: "100%",
-                    fontFamily: "monospace",
-                    fontSize: "16px",
-                    padding: "14px 16px",
-                    background: "rgba(36, 160, 206, 0.1)",
-                    border: `2px solid ${DREAM_NEXUS_COLORS.cyan}`,
-                    borderRadius: "10px",
-                    color: DREAM_NEXUS_COLORS.white,
-                    textAlign: "center",
-                    outline: "none",
-                    boxShadow: "inset 0 2px 10px rgba(0,0,0,0.3)",
-                  }}
-                  onFocus={(e) => {
-                    e.currentTarget.style.background = "rgba(36, 160, 206, 0.2)";
-                    e.currentTarget.style.borderColor = "#5dd6ff";
-                    e.currentTarget.style.boxShadow = "0 0 20px rgba(36, 160, 206, 0.4), inset 0 2px 10px rgba(0,0,0,0.3)";
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.background = "rgba(36, 160, 206, 0.1)";
-                    e.currentTarget.style.borderColor = DREAM_NEXUS_COLORS.cyan;
-                    e.currentTarget.style.boxShadow = "inset 0 2px 10px rgba(0,0,0,0.3)";
-                  }}
-                />
-                
-                {highScore > 0 && (
-                  <div
-                    style={{
-                      fontSize: "12px",
-                      color: DREAM_NEXUS_COLORS.warm,
-                      marginTop: "8px",
-                      textAlign: "center",
-                    }}
-                  >
-                    Your Best: {highScore}m
-                  </div>
-                )}
-              </HolographicPanel>
-
-              <button
-                onClick={handleStart}
-                disabled={!nameInput.trim()}
-                style={{
-                  width: "100%",
-                  fontFamily: "monospace",
-                  fontWeight: 700,
-                  fontSize: "18px",
-                  padding: "16px 48px",
-                  background: nameInput.trim()
-                    ? `linear-gradient(135deg, ${DREAM_NEXUS_COLORS.cyan}, #5dd6ff)`
-                    : "rgba(100,100,100,0.4)",
-                  color: nameInput.trim() ? DREAM_NEXUS_COLORS.navy : "rgba(255,255,255,0.4)",
-                  border: nameInput.trim() ? `2px solid #5dd6ff` : "2px solid rgba(150,150,150,0.3)",
-                  borderRadius: "14px",
-                  cursor: nameInput.trim() ? "pointer" : "not-allowed",
-                  boxShadow: nameInput.trim()
-                    ? "0 0 30px rgba(36, 160, 206, 0.6), 0 10px 25px rgba(0,0,0,0.4)"
-                    : "none",
-                  transition: "all 0.3s ease",
-                  opacity: nameInput.trim() ? 1 : 0.5,
-                  textShadow: nameInput.trim() ? "0 2px 5px rgba(0,0,0,0.3)" : "none",
-                }}
-              >
-                🚀 START RACE
-              </button>
-            </div>
-          </>
-        ) : (
-          <>
-            {/* Desktop Layout */}
-            {/* Title - Top Center */}
-            <div style={{ 
-              position: "absolute", 
-              top: "20px", 
-              left: "50%", 
-              transform: "translateX(-50%)", 
-              textAlign: "center",
-              pointerEvents: "none",
-            }}>
-              <img
-                src="/dream-nexus-logo.png"
-                alt="Dream Nexus"
-                style={{
-                  width: "clamp(120px, 15vw, 180px)",
-                  height: "auto",
-                  display: "block",
-                  margin: "0 auto 8px",
-                  filter: "drop-shadow(0 0 20px rgba(36, 160, 206, 0.5))",
-                  animation: "logoFloat 3s ease-in-out infinite",
-                }}
-              />
-              <h1
-                style={{
-                  fontFamily: "monospace",
-                  fontSize: "clamp(24px, 3.5vw, 40px)",
-                  letterSpacing: "0.05em",
-                  color: DREAM_NEXUS_COLORS.cyan,
-                  margin: "0 0 6px",
-                  textShadow: "0 0 20px rgba(36, 160, 206, 0.6)",
-                  animation: "textGlow 2s ease-in-out infinite alternate",
-                }}
-              >
-                DREAM NEXUS RALLY
-              </h1>
-              <p
-                style={{
-                  fontSize: "clamp(12px, 1.5vw, 16px)",
-                  color: DREAM_NEXUS_COLORS.warm,
-                  margin: 0,
-                  textShadow: "0 2px 10px rgba(0,0,0,0.5)",
-                }}
-              >
-                Race with <strong>Pixel the Bunny</strong> through Colombia!
-              </p>
-            </div>
-
-            {/* Controls - Bottom Left */}
-            <div style={{ 
-              position: "absolute", 
-              bottom: "20px", 
-              left: "20px",
-              maxWidth: "300px",
-              pointerEvents: "auto",
-            }}>
-              <HolographicPanel>
-                <h3
-                  style={{
-                    margin: 0,
-                    marginBottom: "0.8em",
-                    fontFamily: "monospace",
-                    color: DREAM_NEXUS_COLORS.cyan,
-                    fontSize: "clamp(14px, 1.8vw, 18px)",
-                  }}
-                  aria-label="Game Controls"
-                >
-                  🎮 Controls
-                </h3>
-                <div 
-                  style={{ display: "grid", gap: "6px", fontSize: "clamp(12px, 1.5vw, 14px)" }}
-                  role="list"
-                  aria-label="Keyboard controls for the game"
-                >
-                  <ControlRow left="↑ / W" right="Accelerate" />
-                  <ControlRow left="↓ / S" right="Brake" />
-                  <ControlRow left="← / A" right="Steer Left" />
-                  <ControlRow left="→ / D" right="Steer Right" />
-                  <ControlRow left="P" right="Pause" />
-                </div>
-              </HolographicPanel>
-            </div>
-
-            {/* Leaderboard - Top Right */}
-            <div style={{ 
-              position: "absolute", 
-              top: "20px", 
-              right: "20px",
-              maxWidth: "320px",
-              pointerEvents: "auto",
-            }}>
-              <HolographicPanel>
-                <Leaderboard />
-              </HolographicPanel>
-            </div>
-
-            {/* Name Input & Start Button - Bottom Center */}
-            <div style={{ 
-              position: "absolute", 
-              bottom: "20px", 
-              left: "50%", 
-              transform: "translateX(-50%)",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: "16px",
-              pointerEvents: "auto",
-            }}>
-          <HolographicPanel
-            style={{
-              maxWidth: "400px",
-              width: "100%",
-            }}
-          >
-            <label
-              htmlFor="player-name-input"
-              style={{
-                display: "block",
-                fontFamily: "monospace",
-                color: DREAM_NEXUS_COLORS.cyan,
-                fontSize: "clamp(14px, 1.8vw, 16px)",
-                marginBottom: "10px",
-                textAlign: "center",
-                textShadow: "0 0 10px rgba(36, 160, 206, 0.5)",
-              }}
-            >
-              🏁 Enter Your Name
-            </label>
-            <input
-              id="player-name-input"
-              type="text"
-              value={nameInput}
-              onChange={(e) => setNameInput(e.target.value)}
-              placeholder="Racer Name"
-              maxLength={20}
-              aria-label="Enter your racer name"
-              aria-required="true"
-              style={{
-                width: "100%",
-                fontFamily: "monospace",
-                fontSize: "clamp(14px, 1.8vw, 16px)",
-                padding: "10px 14px",
-                background: "rgba(36, 160, 206, 0.1)",
-                border: `2px solid ${DREAM_NEXUS_COLORS.cyan}`,
-                borderRadius: "10px",
-                color: DREAM_NEXUS_COLORS.white,
-                textAlign: "center",
-                outline: "none",
-                boxShadow: "inset 0 2px 10px rgba(0,0,0,0.3)",
-              }}
-              onFocus={(e) => {
-                e.currentTarget.style.background = "rgba(36, 160, 206, 0.2)";
-                e.currentTarget.style.borderColor = "#5dd6ff";
-                e.currentTarget.style.boxShadow = "0 0 20px rgba(36, 160, 206, 0.4), inset 0 2px 10px rgba(0,0,0,0.3)";
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.background = "rgba(36, 160, 206, 0.1)";
-                e.currentTarget.style.borderColor = DREAM_NEXUS_COLORS.cyan;
-                e.currentTarget.style.boxShadow = "inset 0 2px 10px rgba(0,0,0,0.3)";
-              }}
-            />
-            
-            {highScore > 0 && (
-              <div
-                style={{
-                  fontSize: "clamp(12px, 1.5vw, 14px)",
-                  color: DREAM_NEXUS_COLORS.warm,
-                  marginTop: "10px",
-                  textAlign: "center",
-                }}
-              >
-                Your Best: {highScore}m
-              </div>
-            )}
-          </HolographicPanel>
-
-          <button
-            onClick={handleStart}
-            disabled={!nameInput.trim()}
-            style={{
-              fontFamily: "monospace",
-              fontWeight: 700,
-              fontSize: "clamp(16px, 2.2vw, 22px)",
-              padding: "clamp(12px, 1.8vw, 16px) clamp(36px, 5vw, 56px)",
-              background: nameInput.trim()
-                ? `linear-gradient(135deg, ${DREAM_NEXUS_COLORS.cyan}, #5dd6ff)`
-                : "rgba(100,100,100,0.4)",
-              color: nameInput.trim() ? DREAM_NEXUS_COLORS.navy : "rgba(255,255,255,0.4)",
-              border: nameInput.trim() ? `2px solid #5dd6ff` : "2px solid rgba(150,150,150,0.3)",
-              borderRadius: "14px",
-              cursor: nameInput.trim() ? "pointer" : "not-allowed",
-              boxShadow: nameInput.trim()
-                ? "0 0 30px rgba(36, 160, 206, 0.6), 0 10px 25px rgba(0,0,0,0.4)"
-                : "none",
-              transform: "translateZ(0)",
-              transition: "all 0.3s ease",
-              opacity: nameInput.trim() ? 1 : 0.5,
-              textShadow: nameInput.trim() ? "0 2px 5px rgba(0,0,0,0.3)" : "none",
-            }}
-            onMouseEnter={(e) => {
-              if (nameInput.trim()) {
-                e.currentTarget.style.transform = "translateY(-3px) scale(1.05)";
-                e.currentTarget.style.boxShadow = "0 0 40px rgba(36, 160, 206, 0.8), 0 15px 30px rgba(0,0,0,0.5)";
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (nameInput.trim()) {
-                e.currentTarget.style.transform = "translateY(0) scale(1)";
-                e.currentTarget.style.boxShadow = "0 0 30px rgba(36, 160, 206, 0.6), 0 10px 25px rgba(0,0,0,0.4)";
-              }
-            }}
-          >
-            🚀 START RACE
-          </button>
-
-              <div
-                style={{
-                  fontSize: "clamp(10px, 1.3vw, 12px)",
-                  color: DREAM_NEXUS_COLORS.warm,
-                  opacity: 0.8,
-                  textAlign: "center",
-                }}
-              >
-                Press Enter to Start • Sponsored by Dream Nexus
-              </div>
-            </div>
-          </>
+      {/* top bar */}
+      <div style={{ position: "absolute", top: "max(12px, env(safe-area-inset-top))", right: 12, display: "flex", gap: 10, zIndex: 20 }}>
+        <IconButton label="Leaderboard" onClick={() => setShowBoard(true)}>
+          <Trophy size={30} strokeWidth={2.5} />
+        </IconButton>
+        <IconButton label={audio.muted ? "Unmute" : "Mute"} onClick={() => audioManager.toggleMute()} active={audio.muted}>
+          {audio.muted ? <VolumeX size={30} strokeWidth={2.5} /> : <Volume2 size={30} strokeWidth={2.5} />}
+        </IconButton>
+        {isFullscreenSupported && !touch && (
+          <IconButton label={isFullscreen ? "Exit fullscreen" : "Fullscreen"} onClick={onToggleFullscreen}>
+            {isFullscreen ? <Minimize size={28} strokeWidth={2.5} /> : <Maximize size={28} strokeWidth={2.5} />}
+          </IconButton>
         )}
       </div>
 
-      <style>{`
-        @keyframes hologramScan {
-          0% { left: -100%; }
-          100% { left: 100%; }
-        }
-        @keyframes logoFloat {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-10px); }
-        }
-        @keyframes textGlow {
-          from { text-shadow: 0 0 20px rgba(36, 160, 206, 0.6); }
-          to { text-shadow: 0 0 30px rgba(36, 160, 206, 0.9), 0 0 40px rgba(36, 160, 206, 0.5); }
-        }
-      `}</style>
-    </div>
-  );
-}
+      {/* title */}
+      <div
+        style={{
+          position: "absolute",
+          top: "max(14px, env(safe-area-inset-top))",
+          left: 0,
+          right: 0,
+          textAlign: "center",
+          pointerEvents: "none",
+          zIndex: 10,
+          padding: "0 80px",
+        }}
+      >
+        <img
+          src="/dream-nexus-logo.png"
+          alt="Dream Nexus"
+          style={{
+            width: touch ? "clamp(120px, 40vw, 180px)" : "clamp(150px, 16vw, 230px)",
+            height: "auto",
+            display: "block",
+            margin: "0 auto",
+            filter: "drop-shadow(0 0 10px rgba(255,255,255,0.9))",
+            animation: "dnrFloat 3s ease-in-out infinite",
+          }}
+        />
+        <h1
+          style={{
+            fontFamily: UI.display,
+            fontSize: touch ? "clamp(30px, 9vw, 44px)" : "clamp(30px, 5.2vw, 64px)",
+            lineHeight: 1,
+            margin: "6px 0 4px",
+            color: UI.white,
+            textShadow: "0 5px 0 #24A0CE, 0 10px 24px rgba(0,0,0,0.5)",
+          }}
+        >
+          DREAM NEXUS{touch ? <br /> : " "}
+          <span style={{ color: UI.gold, textShadow: "0 5px 0 #c8772e, 0 10px 24px rgba(0,0,0,0.5)" }}>RALLY</span>
+        </h1>
+        <p style={{ margin: 0, fontWeight: 800, fontSize: "clamp(15px, 2vw, 20px)", color: UI.warm, textShadow: "0 2px 6px rgba(0,0,0,0.7)" }}>
+          Race Pixel the Bunny through the mountains of Colombia!
+        </p>
+      </div>
 
-function ControlRow({ left, right }: { left: string; right: string }) {
-  return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "minmax(6ch, auto) 1fr",
-        gap: "10px",
-        alignItems: "center",
-      }}
-    >
-      <span style={{ color: DREAM_NEXUS_COLORS.cyan, fontWeight: "bold" }}>{left}</span>
-      <span style={{ color: "rgba(255,255,255,0.85)" }}>{right}</span>
+      {/* bottom: name + start + how-to */}
+      <div
+        style={{
+          position: "absolute",
+          left: "50%",
+          bottom: "max(14px, env(safe-area-inset-bottom))",
+          transform: "translateX(-50%)",
+          width: touch ? "min(520px, calc(100% - 24px))" : "min(980px, calc(100% - 32px))",
+          display: "flex",
+          flexDirection: "column",
+          gap: 12,
+          zIndex: 10,
+        }}
+      >
+        <div style={{ display: "grid", gridTemplateColumns: touch ? "1fr" : "repeat(4, 1fr)", gap: 8, order: 2 }}>
+          {controls.map((c) => (
+            <HowTo key={c.title} {...c} />
+          ))}
+          {!touch && (
+            <>
+              <HowTo emoji="🍯" title="COLLECT" text="Arequipe jars = points, nitro & combos" />
+              <HowTo emoji="🦘" title="JUMP & DODGE" text="Yellow ramps fly · 3 hearts, dodge rocks!" />
+            </>
+          )}
+        </div>
+
+        <div style={{ ...panelStyle, padding: 12, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "stretch", order: 1, width: "min(620px, 100%)", alignSelf: "center", boxSizing: "border-box" }}>
+          <input
+            id="player-name-input"
+            type="text"
+            value={nameInput}
+            onChange={(e) => setNameInput(e.target.value)}
+            placeholder="Your racer name"
+            maxLength={20}
+            aria-label="Your racer name"
+            autoComplete="off"
+            style={{
+              flex: "1 1 200px",
+              minHeight: 64,
+              fontFamily: UI.body,
+              fontWeight: 800,
+              fontSize: 22,
+              padding: "0 18px",
+              background: "rgba(255,255,255,0.1)",
+              border: `3px solid ${UI.cyanBright}`,
+              borderRadius: 16,
+              color: UI.white,
+              outline: "none",
+              textAlign: "center",
+            }}
+          />
+          <BigButton onClick={handleStart} color={UI.gold} style={{ flex: "1 1 200px", animation: "dnrPulse 1.6s ease-in-out infinite" }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+              <Flag size={28} strokeWidth={3} /> START RACE
+            </span>
+          </BigButton>
+          {highScore > 0 && (
+            <div style={{ width: "100%", textAlign: "center", fontWeight: 800, color: UI.warm, fontSize: 17 }}>
+              🏆 Your best: {highScore.toLocaleString()}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* leaderboard modal */}
+      {showBoard && (
+        <div
+          onClick={() => setShowBoard(false)}
+          style={{
+            position: "absolute",
+            inset: 0,
+            background: "rgba(14,27,36,0.8)",
+            zIndex: 30,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
+          }}
+        >
+          <div onClick={(e) => e.stopPropagation()} style={{ position: "relative", width: "min(480px, 100%)" }}>
+            <IconButton label="Close" onClick={() => setShowBoard(false)} size={52} style={{ position: "absolute", top: -18, right: -10, zIndex: 2 }}>
+              <X size={28} strokeWidth={3} />
+            </IconButton>
+            <Leaderboard />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

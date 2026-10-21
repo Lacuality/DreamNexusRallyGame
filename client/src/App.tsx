@@ -5,6 +5,7 @@ import { TitleScreenImmersive } from "./components/ui/TitleScreenImmersive";
 import { GameScene } from "./components/game/GameScene";
 import { GameOverScreen } from "./components/ui/GameOverScreen";
 import { AchievementNotification } from "./components/ui/AchievementNotification";
+import { GameStyles } from "./components/ui/gameUi";
 import { audioManager } from "./lib/audio";
 import { useFullscreen } from "./hooks/useFullscreen";
 import "@fontsource/inter";
@@ -17,37 +18,33 @@ function App() {
   const loadPlayerStats = useAchievements((state) => state.loadPlayerStats);
 
   useEffect(() => {
-    console.log("Dream Nexus Rally initialized. Phase:", phase);
     loadAchievements();
-
+    // Browsers only allow sound after the player interacts with the page.
+    const unlock = () => audioManager.unlock();
+    window.addEventListener("pointerdown", unlock);
+    window.addEventListener("keydown", unlock);
+    window.addEventListener("touchstart", unlock);
     return () => {
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
+      window.removeEventListener("touchstart", unlock);
       audioManager.cleanup();
     };
   }, [loadAchievements]);
 
   useEffect(() => {
-    if (playerName) {
-      loadPlayerStats(playerName);
-    }
+    if (playerName) loadPlayerStats(playerName);
   }, [playerName, loadPlayerStats]);
-  
-  useEffect(() => {
-    if (phase === "playing") {
-      console.log("Game started - playing phase");
-    }
-  }, [phase]);
-  
+
   return (
-    <div ref={elementRef} style={{ width: '100vw', height: '100vh', position: 'relative', overflow: 'hidden' }}>
-      {phase === "menu" && <TitleScreenImmersive isFullscreen={isFullscreen} onToggleFullscreen={toggle} isFullscreenSupported={isSupported} />}
-      {phase === "playing" && <GameScene isFullscreen={isFullscreen} onToggleFullscreen={toggle} />}
-      {phase === "paused" && <GameScene isFullscreen={isFullscreen} onToggleFullscreen={toggle} />}
-      {phase === "gameover" && (
-        <>
-          <GameScene isFullscreen={isFullscreen} onToggleFullscreen={toggle} />
-          <GameOverScreen />
-        </>
+    <div ref={elementRef} style={{ width: "100vw", height: "100dvh", position: "relative", overflow: "hidden", background: "#0E1B24" }}>
+      <GameStyles />
+      {phase === "menu" ? (
+        <TitleScreenImmersive isFullscreen={isFullscreen} onToggleFullscreen={toggle} isFullscreenSupported={isSupported} />
+      ) : (
+        <GameScene isFullscreen={isFullscreen} onToggleFullscreen={isSupported ? toggle : undefined} />
       )}
+      {phase === "gameover" && <GameOverScreen />}
       <AchievementNotification />
     </div>
   );

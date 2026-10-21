@@ -1,177 +1,80 @@
-import { useRef, useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
-import { useKeyboardControls, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
-import { GAME_CONFIG } from "@/lib/constants";
-import { useRally } from "@/lib/stores/useRally";
-import { useMobileControls } from "@/lib/stores/useMobileControls";
-import { useSettings } from "@/lib/stores/useSettings";
-import { audioManager } from "@/lib/audio";
+import { buildCar } from "@/lib/game/models";
+import { run } from "@/lib/game/run";
+import { roadX, roadY, roadSlope, roadPitch } from "@/lib/track";
 
-export enum Controls {
-  forward = "forward",
-  back = "back",
-  left = "left",
-  right = "right",
-}
+/** The player's car. Purely visual: it reads the live `run` state. */
+export function Car() {
+  const rig = useMemo(() => buildCar(), []);
+  const blob = useMemo(() => rig.root.getObjectByName("blob") as THREE.Mesh, [rig]);
 
-interface CarProps {
-  carPositionRef: React.MutableRefObject<THREE.Vector3>;
-  carSpeedRef: React.MutableRefObject<number>;
-  onCrash: () => void;
-  boostCounter?: number;
-  nitroActive?: boolean;
-  puddleSlowdown?: boolean;
-}
-
-export function Car({ carPositionRef, carSpeedRef, onCrash, boostCounter = 0, nitroActive = false, puddleSlowdown = false }: CarProps) {
-  const carRef = useRef<THREE.Group>(null);
-  const bodyRef = useRef<THREE.Group>(null);
-  const carModelRef = useRef<THREE.Group>(null);
-
-  const { scene: carScene } = useGLTF("/models/rally-car.glb");
-
-  const carModel = useMemo(() => {
-    const clonedScene = carScene.clone();
-    clonedScene.traverse((child) => {
-      if (child instanceof THREE.Mesh) {
-        child.castShadow = true;
-        child.receiveShadow = true;
-        if (nitroActive && child.material) {
-          const material = child.material as THREE.MeshStandardMaterial;
-          if (material.color) {
-            material.emissive = new THREE.Color(0xff0000);
-            material.emissiveIntensity = 0.3;
-          }
-        }
-      }
-    });
-    return clonedScene;
-  }, [carScene, nitroActive]);
-  
-  const targetSpeedRef = useRef(0);
-  const actualSpeedRef = useRef(0);
-  const yawVelocityRef = useRef(0);
-  const carYawRef = useRef(0);
-  const lanePositionRef = useRef(0);
-  const distanceRef = useRef(0);
-  const lastBoostCounterRef = useRef(0);
-  const wheelRotationRef = useRef(0);
-  const suspensionTimeRef = useRef(0);
-  
-  const [, getKeys] = useKeyboardControls<Controls>();
-  const phase = useRally((state) => state.phase);
-  const mobileControls = useMobileControls();
-  const showPhotoMode = useSettings((state) => state.showPhotoMode);
-  
-  useEffect(() => {
-    const controls = getKeys();
-    console.log("Keyboard controls initialized:", {
-      forward: controls.forward,
-      back: controls.back,
-      left: controls.left,
-      right: controls.right
-    });
-  }, [getKeys]);
-
-  useEffect(() => {
-    if (phase === "playing") {
-      audioManager.startEngineSound();
-    }
-    return () => {
-      audioManager.stopEngineSound();
-    };
-  }, [phase]);
-  
   useFrame((state, delta) => {
-    if (!carRef.current || phase !== "playing" || showPhotoMode) return;
-    
-    const keys = getKeys();
-    const isForward = keys.forward || mobileControls.forward;
-    const isBack = keys.back || mobileControls.back;
-    const isLeft = keys.left || mobileControls.left;
-    const isRight = keys.right || mobileControls.right;
-    
-    const maxSpeedMs = nitroActive ? GAME_CONFIG.MAX_SPEED_MS * 1.2 : GAME_CONFIG.MAX_SPEED_MS;
-    const accelInput = isForward ? 1 : 0;
-    const brakeInput = isBack ? 1 : 0;
-    const steerInput = (isLeft ? 1 : 0) + (isRight ? -1 : 0);
-    
-    targetSpeedRef.current += (accelInput * GAME_CONFIG.ACCEL_RATE - brakeInput * GAME_CONFIG.BRAKE_RATE) * delta;
-    
-    if (nitroActive && targetSpeedRef.current < maxSpeedMs) {
-      targetSpeedRef.current = Math.min(maxSpeedMs, targetSpeedRef.current + GAME_CONFIG.ACCEL_RATE * delta * 0.5);
+    const t = state.clock.elapsedTime;
+    const z = run.z;
+    const x = roadX(z) + run.lat;
+    const y = roadY(z);
+    rig.root.position.set(x, y + run.y, z);
+
+    // face along the road, plus a bit of steering yaw
+    const heading = Math.atan(roadSlope(z));
+    rig.root.rotation.set(0, heading + run.latVel * 0.025, 0);
+    rig.body.rotation.x = -roadPitch(z) + (run.airborne ? -run.vy * 0.025 : 0);
+    rig.body.rotation.z = THREE.MathUtils.lerp(rig.body.rotation.z, run.steer * 0.06, Math.min(1, delta * 8));
+
+    // suspension bounce (more off-road)
+    const bounce = run.airborne ? 0 : Math.sin(t * 22) * (run.offroad ? 0.06 : 0.012) * Math.min(1, run.speed / 20);
+    rig.body.position.y = bounce;
+
+    // wheels
+    const spin = run.speed * delta / 0.42;
+    rig.wheels.forEach((w) => (w.rotation.x += spin));
+    rig.frontWheels.forEach((w) => (w.rotation.y = run.steer * 0.35));
+
+    // Pixel's ears stream back with speed and flop on bumps
+    const sp = Math.min(1, run.speed / 55);
+    const flop = Math.sin(t * 9) * 0.08 * (run.offroad ? 2.5 : 1);
+    rig.earL.rotation.x = -0.25 - sp * 0.9 + flop;
+    rig.earR.rotation.x = -0.25 - sp * 0.9 - flop;
+
+    // blink while invulnerable after a hit
+    rig.body.visible = run.invulnerable > 0 ? Math.floor(t * 14) % 2 === 0 : true;
+
+    // nitro flames flicker
+    rig.flames.visible = run.nitroTime > 0;
+    if (rig.flames.visible) rig.flames.scale.set(1, 1, 0.8 + Math.random() * 0.6);
+
+    // shield bubble pulse
+    rig.shield.visible = run.shield;
+    if (run.shield) {
+      const p = 1 + Math.sin(t * 5) * 0.04;
+      rig.shield.scale.set(0.85 * p, 0.62 * p, 1.05 * p);
     }
-    
-    if (puddleSlowdown) {
-      targetSpeedRef.current *= Math.pow(0.85, delta / (1/60));
-      actualSpeedRef.current *= Math.pow(0.90, delta / (1/60));
+
+    // shadow blob stays on the road during jumps
+    if (blob) {
+      blob.position.y = -run.y + 0.04;
+      const s = Math.max(0.4, 1 - run.y * 0.15);
+      blob.scale.set(s, s, 1);
     }
-    
-    targetSpeedRef.current = Math.max(0, Math.min(targetSpeedRef.current, maxSpeedMs));
-    
-    if (boostCounter > lastBoostCounterRef.current) {
-      const boostMs = GAME_CONFIG.PICKUP_BURST / 3.6;
-      targetSpeedRef.current = Math.min(maxSpeedMs, targetSpeedRef.current + boostMs);
-      lastBoostCounterRef.current = boostCounter;
-      console.log(`Speed boost applied! +${GAME_CONFIG.PICKUP_BURST} km/h`);
-    }
-    
-    actualSpeedRef.current += (targetSpeedRef.current - actualSpeedRef.current) * 0.12;
-    
-    const speedFactor = 0.7 + 0.3 * (actualSpeedRef.current / maxSpeedMs);
-    const targetYaw = steerInput * GAME_CONFIG.STEER_STRENGTH * speedFactor;
-    yawVelocityRef.current += (targetYaw - yawVelocityRef.current) * 0.15;
-    carYawRef.current += yawVelocityRef.current * delta;
-    
-    const yawDamping = Math.pow(0.92, delta / (1/60));
-    carYawRef.current *= yawDamping;
-    
-    lanePositionRef.current += Math.sin(carYawRef.current) * actualSpeedRef.current * delta * 0.8;
-    lanePositionRef.current = Math.max(
-      -GAME_CONFIG.LANE_WIDTH / 2 + 0.5,
-      Math.min(GAME_CONFIG.LANE_WIDTH / 2 - 0.5, lanePositionRef.current)
-    );
-    
-    const isOffRoad = Math.abs(lanePositionRef.current) > GAME_CONFIG.LANE_WIDTH / 2 - 1;
-    if (isOffRoad) {
-      const offRoadDrag = Math.pow(GAME_CONFIG.OFFROAD_DRAG, delta / (1/60));
-      actualSpeedRef.current *= offRoadDrag;
-      targetSpeedRef.current *= offRoadDrag;
-    }
-    
-    distanceRef.current += actualSpeedRef.current * delta;
-    
-    wheelRotationRef.current += actualSpeedRef.current * delta * 2;
-    
-    suspensionTimeRef.current += delta;
-    const baseMaxSpeed = GAME_CONFIG.MAX_SPEED_MS;
-    const suspensionBob = Math.sin(suspensionTimeRef.current * 8 + actualSpeedRef.current * 0.5) * 0.03 * (actualSpeedRef.current / baseMaxSpeed);
-    
-    const targetBodyRoll = steerInput * THREE.MathUtils.degToRad(4);
-    if (bodyRef.current) {
-      bodyRef.current.rotation.z += (targetBodyRoll - bodyRef.current.rotation.z) * delta * 6;
-      bodyRef.current.position.y = suspensionBob;
-    }
-    
-    carRef.current.position.x = lanePositionRef.current;
-    carRef.current.position.z = distanceRef.current;
-    carRef.current.rotation.y = -carYawRef.current * 0.3;
-    
-    const speedKmh = actualSpeedRef.current * 3.6;
-    carSpeedRef.current = speedKmh;
-    carPositionRef.current.copy(carRef.current.position);
-    
-    audioManager.updateEngineSound(speedKmh);
   });
-  
+
+  return <primitive object={rig.root} />;
+}
+
+/** Static showcase car for the title screen. */
+export function ShowcaseCar(props: JSX.IntrinsicElements["group"]) {
+  const rig = useMemo(() => buildCar(), []);
+  useFrame((state) => {
+    const t = state.clock.elapsedTime;
+    rig.earL.rotation.x = -0.3 + Math.sin(t * 2) * 0.12;
+    rig.earR.rotation.x = -0.3 + Math.sin(t * 2 + 1) * 0.12;
+    rig.wheels.forEach((w) => (w.rotation.x = t * 3));
+  });
   return (
-    <group ref={carRef} position={[0, 0.5, 0]}>
-      <group ref={bodyRef}>
-        <group ref={carModelRef} scale={2.0} rotation={[0, Math.PI / 2, 0]}>
-          <primitive object={carModel} />
-        </group>
-      </group>
+    <group {...props}>
+      <primitive object={rig.root} />
     </group>
   );
 }

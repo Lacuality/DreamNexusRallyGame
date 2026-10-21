@@ -1,23 +1,14 @@
 import { create } from "zustand";
+import { biomeAt, type BiomeType } from "@/lib/track";
 
-export type BiomeType = "coffee_hills" | "andes_highland" | "pueblo";
+export type { BiomeType };
 
 export function lerpColor(color1: string, color2: string, t: number): string {
   const c1 = parseInt(color1.replace("#", ""), 16);
   const c2 = parseInt(color2.replace("#", ""), 16);
-
-  const r1 = (c1 >> 16) & 255;
-  const g1 = (c1 >> 8) & 255;
-  const b1 = c1 & 255;
-
-  const r2 = (c2 >> 16) & 255;
-  const g2 = (c2 >> 8) & 255;
-  const b2 = c2 & 255;
-
-  const r = Math.round(r1 + (r2 - r1) * t);
-  const g = Math.round(g1 + (g2 - g1) * t);
-  const b = Math.round(b1 + (b2 - b1) * t);
-
+  const r = Math.round(((c1 >> 16) & 255) + ((((c2 >> 16) & 255) - ((c1 >> 16) & 255)) * t));
+  const g = Math.round(((c1 >> 8) & 255) + ((((c2 >> 8) & 255) - ((c1 >> 8) & 255)) * t));
+  const b = Math.round((c1 & 255) + (((c2 & 255) - (c1 & 255)) * t));
   return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, "0")}`;
 }
 
@@ -27,102 +18,93 @@ export function lerpNumber(a: number, b: number, t: number): number {
 
 export interface BiomeConfig {
   name: string;
-  skyColor: string;
+  subtitle: string;
+  skyTop: string;
+  skyHorizon: string;
   fogColor: string;
   fogNear: number;
   fogFar: number;
   sunIntensity: number;
+  sunColor: string;
   ambientIntensity: number;
   terrainColor: string;
-  curveMultiplier: number;
-  hillMultiplier: number;
-  transitionDistance: number;
+  shoulderColor: string;
+  mountainColor: string;
 }
 
 export const BIOME_CONFIGS: Record<BiomeType, BiomeConfig> = {
   coffee_hills: {
     name: "Coffee Hills",
-    skyColor: "#0e1b24",
-    fogColor: "#152630",
-    fogNear: 70,
-    fogFar: 190,
-    sunIntensity: 1.35,
+    subtitle: "Eje Cafetero",
+    skyTop: "#3d9be0",
+    skyHorizon: "#bfe6f5",
+    fogColor: "#bfe6f5",
+    fogNear: 60,
+    fogFar: 230,
+    sunIntensity: 1.6,
+    sunColor: "#fff3d6",
     ambientIntensity: 0.55,
-    terrainColor: "#2b5d3b", // lush green
-    curveMultiplier: 1.0,
-    hillMultiplier: 1.0,
-    transitionDistance: 600,
+    terrainColor: "#4f9a3c",
+    shoulderColor: "#9b7a4a",
+    mountainColor: "#3f7f5a",
   },
   andes_highland: {
     name: "Andes Highland",
-    skyColor: "#17212d",
-    fogColor: "#223041",
-    fogNear: 55,
-    fogFar: 160,
-    sunIntensity: 1.05,
-    ambientIntensity: 0.45,
-    terrainColor: "#3b4f63", // bluish slate
-    curveMultiplier: 1.2,
-    hillMultiplier: 1.4,
-    transitionDistance: 700,
+    subtitle: "Páramo de los Frailejones",
+    skyTop: "#5a7fb8",
+    skyHorizon: "#d8e2ee",
+    fogColor: "#d8e2ee",
+    fogNear: 45,
+    fogFar: 190,
+    sunIntensity: 1.3,
+    sunColor: "#eef4ff",
+    ambientIntensity: 0.6,
+    terrainColor: "#7c8f55",
+    shoulderColor: "#8a8274",
+    mountainColor: "#6e7f96",
   },
   pueblo: {
     name: "Pueblo",
-    skyColor: "#221a16",
-    fogColor: "#2c241f",
-    fogNear: 60,
-    fogFar: 170,
-    sunIntensity: 1.45,
+    subtitle: "Colorful mountain village",
+    skyTop: "#f08a4b",
+    skyHorizon: "#ffd9a8",
+    fogColor: "#ffd9a8",
+    fogNear: 55,
+    fogFar: 220,
+    sunIntensity: 1.5,
+    sunColor: "#ffd2a0",
     ambientIntensity: 0.6,
-    terrainColor: "#5a4a36", // warm earth
-    curveMultiplier: 0.9,
-    hillMultiplier: 0.85,
-    transitionDistance: 500,
+    terrainColor: "#8a9a3c",
+    shoulderColor: "#b0703f",
+    mountainColor: "#9a6a5a",
   },
 };
 
 interface BiomeState {
   currentBiome: BiomeType;
   previousBiome: BiomeType | null;
-  currentDistance: number;
   transitionProgress: number;
   isTransitioning: boolean;
 
   updateDistance: (distance: number) => void;
   updateTransition: (delta: number) => void;
+  reset: () => void;
   getCurrentConfig: () => BiomeConfig;
   getPreviousConfig: () => BiomeConfig | null;
 }
 
-const BIOME_SEQUENCE: BiomeType[] = [
-  "coffee_hills",
-  "andes_highland",
-  "pueblo",
-];
-const TRANSITION_DURATION = 0.7; // seconds
+const TRANSITION_DURATION = 2.5; // seconds
 
 export const useBiome = create<BiomeState>((set, get) => ({
   currentBiome: "coffee_hills",
   previousBiome: null,
-  currentDistance: 0,
   transitionProgress: 1.0,
   isTransitioning: false,
 
   updateDistance: (distance: number) => {
     const state = get();
-    set({ currentDistance: distance });
-
-    const currentConfig = BIOME_CONFIGS[state.currentBiome];
-    const nextDistance = Math.floor(
-      distance / currentConfig.transitionDistance,
-    );
-    const biomeIndex = nextDistance % BIOME_SEQUENCE.length;
-    const newBiome = BIOME_SEQUENCE[biomeIndex];
-
+    const newBiome = biomeAt(distance);
     if (newBiome !== state.currentBiome) {
-      console.log(
-        `Biome transition: ${state.currentBiome} → ${newBiome} at ${distance.toFixed(0)}m`,
-      );
       set({
         previousBiome: state.currentBiome,
         currentBiome: newBiome,
@@ -134,26 +116,42 @@ export const useBiome = create<BiomeState>((set, get) => ({
 
   updateTransition: (delta: number) => {
     const state = get();
-    if (state.isTransitioning) {
-      const newProgress = Math.min(
-        1.0,
-        state.transitionProgress + delta / TRANSITION_DURATION,
-      );
-      set({ transitionProgress: newProgress });
-
-      if (newProgress >= 1.0) {
-        set({ isTransitioning: false, previousBiome: null });
-      }
-    }
+    if (!state.isTransitioning) return;
+    const p = Math.min(1.0, state.transitionProgress + delta / TRANSITION_DURATION);
+    if (p >= 1.0) set({ transitionProgress: 1, isTransitioning: false, previousBiome: null });
+    else set({ transitionProgress: p });
   },
 
-  getCurrentConfig: () => {
-    const state = get();
-    return BIOME_CONFIGS[state.currentBiome];
-  },
+  reset: () =>
+    set({ currentBiome: "coffee_hills", previousBiome: null, transitionProgress: 1, isTransitioning: false }),
+
+  getCurrentConfig: () => BIOME_CONFIGS[get().currentBiome],
 
   getPreviousConfig: () => {
-    const state = get();
-    return state.previousBiome ? BIOME_CONFIGS[state.previousBiome] : null;
+    const prev = get().previousBiome;
+    return prev ? BIOME_CONFIGS[prev] : null;
   },
 }));
+
+/** Blended config for the current moment of a biome transition. */
+export function blendedBiome(): BiomeConfig {
+  const s = useBiome.getState();
+  const cur = BIOME_CONFIGS[s.currentBiome];
+  const prev = s.previousBiome ? BIOME_CONFIGS[s.previousBiome] : null;
+  if (!prev || !s.isTransitioning) return cur;
+  const t = s.transitionProgress;
+  return {
+    ...cur,
+    skyTop: lerpColor(prev.skyTop, cur.skyTop, t),
+    skyHorizon: lerpColor(prev.skyHorizon, cur.skyHorizon, t),
+    fogColor: lerpColor(prev.fogColor, cur.fogColor, t),
+    fogNear: lerpNumber(prev.fogNear, cur.fogNear, t),
+    fogFar: lerpNumber(prev.fogFar, cur.fogFar, t),
+    sunIntensity: lerpNumber(prev.sunIntensity, cur.sunIntensity, t),
+    sunColor: lerpColor(prev.sunColor, cur.sunColor, t),
+    ambientIntensity: lerpNumber(prev.ambientIntensity, cur.ambientIntensity, t),
+    terrainColor: lerpColor(prev.terrainColor, cur.terrainColor, t),
+    shoulderColor: lerpColor(prev.shoulderColor, cur.shoulderColor, t),
+    mountainColor: lerpColor(prev.mountainColor, cur.mountainColor, t),
+  };
+}

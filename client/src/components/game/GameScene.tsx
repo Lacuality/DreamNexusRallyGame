@@ -1,304 +1,124 @@
-import { Canvas, useFrame } from "@react-three/fiber";
-import { KeyboardControls } from "@react-three/drei";
-import { Suspense, useState, useRef, useEffect } from "react";
+import { Canvas } from "@react-three/fiber";
+import { Suspense, useEffect, useRef } from "react";
 import * as THREE from "three";
-import { Car, Controls } from "./Car";
-import { Road } from "./Road";
+import { World } from "./World";
+import { Car } from "./Car";
 import { Camera } from "./Camera";
-import { Environment } from "./Environment";
-import { Obstacles } from "./Obstacles";
-import { Collectibles } from "./Collectibles";
-import { SponsorBanners } from "./SponsorBanners";
-import { NitroParticles, DustTrail, ExhaustSmoke, CollisionSparks } from "./ParticleEffects";
-import { BiomePropsScene } from "./BiomeProps";
+import { RaceSystem, Scenery } from "./RaceSystem";
+import { NitroParticles, DustTrail, ExhaustSmoke } from "./ParticleEffects";
 import { AtmosphericParticles } from "./AtmosphericParticles";
 import { SpeedLines } from "./SpeedLines";
 import { useRally } from "@/lib/stores/useRally";
 import { useSettings } from "@/lib/stores/useSettings";
-import { useBiome } from "@/lib/stores/useBiome";
 import { GameHUD } from "../ui/GameHUD";
 import { PauseMenu } from "../ui/PauseMenu";
 import { MobileControls } from "../ui/MobileControls";
-import { TuningPanel } from "../ui/TuningPanel";
-import { GAME_CONFIG } from "@/lib/constants";
-import { audioManager } from "@/lib/audio";
-
-function FrameSync({
-  carPositionRef,
-  carSpeedRef,
-}: {
-  carPositionRef: React.MutableRefObject<THREE.Vector3>;
-  carSpeedRef: React.MutableRefObject<number>;
-}) {
-  const frameCountRef = useRef(0);
-  const phase = useRally((state) => state.phase);
-  const updateDistance = useRally((state) => state.updateDistance);
-  const updateSpeed = useRally((state) => state.updateSpeed);
-  const updateBiomeDistance = useBiome((state) => state.updateDistance);
-
-  useFrame(() => {
-    if (phase !== "playing") return;
-
-    frameCountRef.current++;
-    if (frameCountRef.current % 10 === 0) {
-      updateDistance(carPositionRef.current.z);
-      updateBiomeDistance(carPositionRef.current.z);
-      updateSpeed(carSpeedRef.current);
-    }
-  });
-
-  return null;
-}
+import { installKeyboard, isTouchDevice } from "@/lib/input";
+import { run } from "@/lib/game/run";
 
 interface GameSceneProps {
   isFullscreen?: boolean;
   onToggleFullscreen?: () => void;
 }
 
+function NitroFx({ carPositionRef }: { carPositionRef: React.MutableRefObject<THREE.Vector3> }) {
+  const nitroActive = useRally((s) => s.hud.nitroActive);
+  return <NitroParticles active={nitroActive} carPositionRef={carPositionRef} />;
+}
+
 export function GameScene({ isFullscreen = false, onToggleFullscreen }: GameSceneProps = {}) {
   const carPositionRef = useRef(new THREE.Vector3(0, 0, 0));
   const carSpeedRef = useRef(0);
-  const [boostCounter, setBoostCounter] = useState(0);
-  const [nitroActive, setNitroActive] = useState(false);
-  const [shieldActive, setShieldActive] = useState(false);
-  const [puddleSlowdownActive, setPuddleSlowdownActive] = useState(false);
-  const [collisionSparkPosition, setCollisionSparkPosition] = useState(new THREE.Vector3(0, 0, 0));
-  const [showCollisionSparks, setShowCollisionSparks] = useState(false);
-  const [cameraShakeIntensity, setCameraShakeIntensity] = useState(0);
-  const nitroTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const puddleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  const {
-    phase,
-    updateDistance,
-    updateSpeed,
-    gameOver,
-    pause,
-    resume,
-    addCollectible,
-  } = useRally();
-
-  const incrementNitroUse = () => {
-    useRally.setState((state) => ({
-      nitroUsesThisRun: state.nitroUsesThisRun + 1
-    }));
-  };
-  const showPhotoMode = useSettings((state) => state.showPhotoMode);
-  const updateBiomeDistance = useBiome((state) => state.updateDistance);
+  const phase = useRally((s) => s.phase);
+  const runId = useRally((s) => s.runId);
+  const showPhotoMode = useSettings((s) => s.showPhotoMode);
+  const touch = isTouchDevice();
 
   useEffect(() => {
-    if (phase === "menu" || phase === "gameover") {
-      if (nitroTimeoutRef.current) {
-        clearTimeout(nitroTimeoutRef.current);
-        nitroTimeoutRef.current = null;
-      }
-      if (puddleTimeoutRef.current) {
-        clearTimeout(puddleTimeoutRef.current);
-        puddleTimeoutRef.current = null;
-      }
-      setNitroActive(false);
-      setShieldActive(false);
-      setPuddleSlowdownActive(false);
-      setBoostCounter(0);
-      carPositionRef.current.set(0, 0, 0);
-      carSpeedRef.current = 0;
-    }
-  }, [phase]);
+    installKeyboard();
+  }, []);
 
+  // keyboard shortcuts: P / Esc pause, F2 photo mode
   useEffect(() => {
-    const handleKeyPress = (e: KeyboardEvent) => {
-      if (e.key === "p" || e.key === "P") {
-        if (phase === "playing") {
-          pause();
-        } else if (phase === "paused") {
-          resume();
-        }
+    const onKey = (e: KeyboardEvent) => {
+      const { phase, pause, resume } = useRally.getState();
+      if (e.code === "KeyP" || e.code === "Escape") {
+        if (phase === "playing" || phase === "countdown") pause();
+        else if (phase === "paused") resume();
       }
-    };
-
-    window.addEventListener("keypress", handleKeyPress);
-    return () => window.removeEventListener("keypress", handleKeyPress);
-  }, [phase, pause, resume]);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "F2") {
         e.preventDefault();
         useSettings.getState().togglePhotoMode();
-        const newPhotoMode = useSettings.getState().showPhotoMode;
-        console.log("Photo mode:", newPhotoMode ? "ON" : "OFF");
       }
     };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const handlePuddleHit = () => {
-    console.log("Hit puddle - splash and slowdown!");
-    audioManager.playSplash();
-    setPuddleSlowdownActive(true);
-    if (puddleTimeoutRef.current) {
-      clearTimeout(puddleTimeoutRef.current);
-    }
-    puddleTimeoutRef.current = setTimeout(() => {
-      setPuddleSlowdownActive(false);
-      puddleTimeoutRef.current = null;
-    }, 800);
-  };
+  // auto-pause when the tab is hidden or the phone locks
+  useEffect(() => {
+    const onHide = () => {
+      if (document.hidden) useRally.getState().pause();
+    };
+    document.addEventListener("visibilitychange", onHide);
+    return () => document.removeEventListener("visibilitychange", onHide);
+  }, []);
 
-  const handleCollision = (obstacle: any) => {
-    console.log(
-      "Collision with obstacle:",
-      obstacle.type,
-      "at speed:",
-      carSpeedRef.current,
-    );
-
-    if (obstacle.type === "puddle") {
-      handlePuddleHit();
-      return;
-    }
-
-    setCollisionSparkPosition(obstacle.position.clone());
-    setShowCollisionSparks(true);
-    setTimeout(() => setShowCollisionSparks(false), 600);
-
-    const shakeAmount = shieldActive ? 0.8 : 1.5;
-    setCameraShakeIntensity(shakeAmount);
-    setTimeout(() => setCameraShakeIntensity(0), 500);
-
-    if (shieldActive) {
-      console.log("Shield absorbed the hit!");
-      setShieldActive(false);
-      return;
-    }
-
-    if (carSpeedRef.current > GAME_CONFIG.CRASH_SPEED_THRESHOLD) {
-      console.log("High-speed crash! Game over.");
-      audioManager.playCrash();
-      gameOver();
-    } else {
-      console.log("Low-speed collision - speed penalty only");
-      audioManager.playCrash();
-    }
-  };
-
-  const handleCollect = (collectible: any) => {
-    if (collectible.type === "arequipe") {
-      console.log("Collected arequipe jar! +50 points, speed burst!");
-      addCollectible();
-      audioManager.playSuccess();
-      setBoostCounter((prev) => prev + 1);
-    } else if (collectible.type === "nitro") {
-      console.log("Collected nitro! +20% speed for 2 seconds!");
-      audioManager.playNitro();
-      setNitroActive(true);
-      incrementNitroUse();
-      if (nitroTimeoutRef.current) {
-        clearTimeout(nitroTimeoutRef.current);
-      }
-      nitroTimeoutRef.current = setTimeout(() => {
-        setNitroActive(false);
-        nitroTimeoutRef.current = null;
-      }, 2000);
-    } else if (collectible.type === "shield") {
-      console.log("Collected shield! Protection from 1 hit!");
-      audioManager.playShield();
-      setShieldActive(true);
-    }
-  };
-
-  const keyMap = [
-    { name: Controls.forward, keys: ["ArrowUp", "KeyW"] },
-    { name: Controls.back, keys: ["ArrowDown", "KeyS"] },
-    { name: Controls.left, keys: ["ArrowLeft", "KeyA"] },
-    { name: Controls.right, keys: ["ArrowRight", "KeyD"] },
-  ];
+  const inRace = phase === "playing" || phase === "countdown";
 
   return (
     <>
-      <KeyboardControls map={keyMap}>
-        <Canvas
-          camera={{ position: [0, 6, -12], fov: 65, near: 0.1, far: 250 }}
-          gl={{
-            antialias: true,
-            powerPreference: "high-performance",
-            toneMapping: THREE.ACESFilmicToneMapping,
-          }}
-          shadows={{ type: THREE.PCFSoftShadowMap }}
-        >
-          <Suspense fallback={null}>
-            <Environment />
-            <SponsorBanners />
-            <Road carPositionRef={carPositionRef} />
-            <BiomePropsScene carPositionRef={carPositionRef} />
-            <Car
-              carPositionRef={carPositionRef}
-              carSpeedRef={carSpeedRef}
-              onCrash={gameOver}
-              boostCounter={boostCounter}
-              nitroActive={nitroActive}
-              puddleSlowdown={puddleSlowdownActive}
-            />
-            <Obstacles
-              carPositionRef={carPositionRef}
-              carSpeedRef={carSpeedRef}
-              onCollision={handleCollision}
-            />
-            <Collectibles
-              carPositionRef={carPositionRef}
-              onCollect={handleCollect}
-            />
-            <NitroParticles
-              active={nitroActive}
-              carPositionRef={carPositionRef}
-            />
+      <Canvas
+        camera={{ position: [0, 4, -9], fov: 62, near: 0.1, far: 900 }}
+        dpr={touch ? [1, 1.5] : [1, 2]}
+        gl={{ antialias: !touch, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping }}
+        shadows={{ type: THREE.PCFSoftShadowMap }}
+        style={{ position: "fixed", inset: 0 }}
+      >
+        <Suspense fallback={null}>
+          <group key={runId}>
+            <World />
+            <Scenery />
+            <Car />
+            <RaceSystem carPositionRef={carPositionRef} carSpeedRef={carSpeedRef} />
+            <NitroFx carPositionRef={carPositionRef} />
             <DustTrail carPositionRef={carPositionRef} speedRef={carSpeedRef} />
             <ExhaustSmoke carPositionRef={carPositionRef} speedRef={carSpeedRef} />
-            <CollisionSparks position={collisionSparkPosition} active={showCollisionSparks} />
             <AtmosphericParticles carPositionRef={carPositionRef} />
             <SpeedLines carPositionRef={carPositionRef} speedRef={carSpeedRef} />
-            <Camera carPositionRef={carPositionRef} shakeIntensity={cameraShakeIntensity} />
-            <FrameSync
-              carPositionRef={carPositionRef}
-              carSpeedRef={carSpeedRef}
-            />
-          </Suspense>
-        </Canvas>
-      </KeyboardControls>
+            <Camera />
+          </group>
+        </Suspense>
+      </Canvas>
 
-      {!showPhotoMode && phase === "playing" && (
-        <GameHUD 
-          nitroActive={nitroActive} 
-          shieldActive={shieldActive}
-          isFullscreen={isFullscreen}
-          onToggleFullscreen={onToggleFullscreen}
-        />
+      {!showPhotoMode && (inRace || phase === "paused") && (
+        <GameHUD isFullscreen={isFullscreen} onToggleFullscreen={onToggleFullscreen} />
       )}
-      {!showPhotoMode && phase === "playing" && <TuningPanel />}
+      {!showPhotoMode && inRace && <MobileControls />}
       {!showPhotoMode && phase === "paused" && <PauseMenu />}
-      {!showPhotoMode && <MobileControls />}
 
       {showPhotoMode && (
         <div
           style={{
             position: "fixed",
-            bottom: "20px",
+            bottom: 20,
             left: "50%",
             transform: "translateX(-50%)",
-            backgroundColor: "rgba(14, 27, 36, 0.9)",
-            padding: "10px 20px",
-            borderRadius: "8px",
+            background: "rgba(14, 27, 36, 0.9)",
+            padding: "12px 22px",
+            borderRadius: 12,
             color: "#24A0CE",
-            fontFamily: "monospace",
-            fontSize: "16px",
+            fontWeight: 800,
+            fontSize: 18,
             zIndex: 1000,
           }}
         >
-          Photo Mode (Press F2 to exit)
+          Photo Mode — press F2 to exit
         </div>
       )}
     </>
   );
 }
+
+// Handy for debugging in the browser console
+if (typeof window !== "undefined") (window as any).__rally = run;

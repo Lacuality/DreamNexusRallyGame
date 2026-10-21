@@ -50,16 +50,16 @@ Preferred communication style: Simple, everyday language.
 
 **Database**: Configured for PostgreSQL via Neon serverless driver (@neondatabase/serverless). Drizzle ORM provides type-safe schema definitions and migrations. The drizzle.config.ts expects a DATABASE_URL environment variable and outputs migrations to ./migrations directory with schema defined in ./shared/schema.ts.
 
-**Audio Assets**: HTML5 Audio API handles sound playback. The AudioManager class expects audio files at:
-- /sounds/background.mp3 (looping background music)
-- /sounds/hit.mp3 (collision sound effect)
+**Audio**: `client/src/lib/audio.ts` (AudioManager). Music is `/sounds/background.mp3`, looping through menu and races. The engine and all sound effects are synthesized with the Web Audio API (no files). Audio unlocks on the first tap/key press. Mute + music/effects volume are saved in localStorage.
 
-**3D Assets**: The game references but does not include:
-- /dream-nexus-logo.png (title screen branding)
-- /textures/asphalt.png (road surface texture, repeating)
-- Character sprite/model for Pixel the Bunny
-- Car mesh (low-poly .glb or sprite)
-- GLSL shader support via vite-plugin-glsl
+**3D Assets**: All in-game models are built in code in `client/src/lib/game/models.ts` (car with Pixel the Bunny, obstacles, pickups, scenery). The only model file used is `/pixel-bunny-3d.glb` on the title screen (optimised with meshopt + webp, ~0.7 MB).
+
+**Game code map**:
+- `client/src/lib/track.ts` – road shape (curves, hills) and biome per distance; everything reads it.
+- `client/src/lib/game/run.ts` – live per-frame race state (hearts, combo, nitro, score).
+- `client/src/components/game/RaceSystem.tsx` – driving physics, spawn patterns, collisions, scoring, scenery placement.
+- `client/src/components/game/World.tsx` – sky, fog, lights, road and terrain.
+- `client/src/components/ui/*` – HUD, touch controls, pause, game over, title screen.
 
 **Fonts**: Inter font family loaded via @fontsource/inter package, applied globally through Tailwind configuration.
 

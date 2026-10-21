@@ -1,228 +1,328 @@
+import { useEffect, useRef } from "react";
+import { Pause, Volume2, VolumeX, Maximize, Minimize, Heart, Shield, Zap } from "lucide-react";
 import { useRally } from "@/lib/stores/useRally";
-import { DREAM_NEXUS_COLORS } from "@/lib/constants";
-import { useEffect, useState } from "react";
+import { MAX_HEARTS, run } from "@/lib/game/run";
+import { audioManager } from "@/lib/audio";
+import { isTouchDevice } from "@/lib/input";
+import { IconButton, UI, panelStyle, useAudioSettings } from "./gameUi";
 
 interface GameHUDProps {
-  nitroActive?: boolean;
-  shieldActive?: boolean;
   isFullscreen?: boolean;
   onToggleFullscreen?: () => void;
 }
 
-export function GameHUD({ nitroActive = false, shieldActive = false, isFullscreen = false, onToggleFullscreen }: GameHUDProps = {}) {
-  const { distance, speed, highScore, collectiblesCount, currentScore, pause } = useRally();
-  const [nitroProgress, setNitroProgress] = useState(100);
+export function GameHUD({ isFullscreen = false, onToggleFullscreen }: GameHUDProps) {
+  const hud = useRally((s) => s.hud);
+  const phase = useRally((s) => s.phase);
+  const countdown = useRally((s) => s.countdown);
+  const popups = useRally((s) => s.popups);
+  const banner = useRally((s) => s.banner);
+  const highScore = useRally((s) => s.highScore);
+  const pause = useRally((s) => s.pause);
+  const audio = useAudioSettings();
+  const touch = isTouchDevice();
+  const flashRef = useRef<HTMLDivElement>(null);
 
+  // red hit flash + nitro tint driven straight from the live run state
   useEffect(() => {
-    if (nitroActive) {
-      setNitroProgress(100);
-      const interval = setInterval(() => {
-        setNitroProgress(prev => Math.max(0, prev - 5));
-      }, 100);
-      return () => clearInterval(interval);
-    }
-  }, [nitroActive]);
-  
+    let raf = 0;
+    const tick = () => {
+      if (flashRef.current) {
+        flashRef.current.style.opacity = String(run.flash * 0.75);
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  const iconSize = touch ? 30 : 28;
+  const btn = touch ? 58 : 60;
+  const nitroReady = hud.nitro >= 1 && !hud.nitroActive;
+
   return (
     <div
       style={{
         position: "fixed",
-        top: 0,
-        left: 0,
-        width: "100vw",
-        height: "100vh",
+        inset: 0,
         pointerEvents: "none",
-        fontFamily: "monospace",
+        fontFamily: UI.body,
+        color: UI.white,
         zIndex: 100,
+        userSelect: "none",
       }}
     >
+      {/* hit flash */}
       <div
+        ref={flashRef}
         style={{
           position: "absolute",
-          top: "20px",
-          left: "20px",
-          backgroundColor: "rgba(14, 27, 36, 0.8)",
-          padding: "15px 20px",
-          borderRadius: "10px",
-          color: DREAM_NEXUS_COLORS.white,
-          fontSize: "18px",
-          border: `2px solid ${DREAM_NEXUS_COLORS.cyan}`,
+          inset: 0,
+          opacity: 0,
+          background: "radial-gradient(ellipse at center, rgba(255,0,0,0) 40%, rgba(255,30,30,0.9) 100%)",
         }}
-      >
-        <div style={{ marginBottom: "8px", color: DREAM_NEXUS_COLORS.cyan }}>
-          <strong>Distance:</strong> {Math.floor(distance)}m
-        </div>
-        <div style={{ marginBottom: "8px", color: DREAM_NEXUS_COLORS.warm }}>
-          <strong>Speed:</strong> {Math.floor(speed)} km/h
-        </div>
-        <div style={{ marginBottom: "8px", color: DREAM_NEXUS_COLORS.warm }}>
-          <strong>Arequipe Jars:</strong> {collectiblesCount}
-        </div>
-        <div style={{ marginBottom: "8px", color: DREAM_NEXUS_COLORS.cyan }}>
-          <strong>Score:</strong> {currentScore}
-        </div>
-        <div style={{ color: DREAM_NEXUS_COLORS.white }}>
-          <strong>High Score:</strong> {highScore}
-        </div>
-      </div>
-      
+      />
+      {hud.nitroActive && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            background: "radial-gradient(ellipse at center, rgba(0,0,0,0) 55%, rgba(255,140,40,0.35) 100%)",
+          }}
+        />
+      )}
+
+      {/* ---- top left: score ---- */}
       <div
         style={{
+          ...panelStyle,
           position: "absolute",
-          top: "20px",
-          right: "20px",
-          pointerEvents: "auto",
-          display: "flex",
-          gap: "10px",
+          top: "max(12px, env(safe-area-inset-top))",
+          left: 12,
+          padding: touch ? "8px 14px" : "10px 18px",
+          minWidth: touch ? 130 : 180,
         }}
       >
-        {isFullscreen && onToggleFullscreen && (
-          <button
-            onClick={onToggleFullscreen}
+        <div style={{ fontSize: touch ? 12 : 14, fontWeight: 800, color: UI.warm, letterSpacing: "0.12em" }}>SCORE</div>
+        <div style={{ fontFamily: UI.display, fontSize: touch ? 28 : 40, lineHeight: 1.05, color: UI.gold, textShadow: "0 3px 0 rgba(0,0,0,0.4)" }}>
+          {hud.score.toLocaleString()}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
+          <span
             style={{
-              backgroundColor: DREAM_NEXUS_COLORS.warm,
-              color: DREAM_NEXUS_COLORS.navy,
-              border: "none",
-              borderRadius: "8px",
-              padding: "10px 20px",
-              fontSize: "16px",
-              fontWeight: "bold",
-              cursor: "pointer",
-              fontFamily: "monospace",
+              fontFamily: UI.display,
+              fontSize: touch ? 16 : 20,
+              padding: "1px 10px",
+              borderRadius: 10,
+              background: hud.multiplier > 1 ? UI.orange : "rgba(255,255,255,0.15)",
+              color: hud.multiplier > 1 ? UI.navy : UI.white,
+              animation: hud.multiplier > 1 ? "dnrPulse 0.6s ease-in-out infinite" : "none",
             }}
           >
-            Exit Fullscreen
-          </button>
+            x{hud.multiplier}
+          </span>
+          {hud.combo > 0 && (
+            <span style={{ fontWeight: 800, fontSize: touch ? 13 : 15, color: UI.warm }}>{hud.combo} combo</span>
+          )}
+        </div>
+        {!touch && (
+          <div style={{ fontSize: 13, opacity: 0.75, marginTop: 4, fontWeight: 700 }}>Best {Math.max(highScore, hud.score).toLocaleString()}</div>
         )}
-        <button
-          onClick={pause}
+      </div>
+
+      {/* ---- top centre: hearts + shield ---- */}
+      <div
+        style={{
+          position: "absolute",
+          top: "max(14px, env(safe-area-inset-top))",
+          left: "50%",
+          transform: "translateX(-50%)",
+          display: "flex",
+          gap: touch ? 4 : 8,
+          alignItems: "center",
+        }}
+      >
+        {Array.from({ length: MAX_HEARTS }).map((_, i) => (
+          <Heart
+            key={`${i}-${hud.hearts > i}`}
+            size={touch ? 32 : 42}
+            strokeWidth={2.5}
+            color={hud.hearts > i ? "#ff3d6e" : "rgba(255,255,255,0.5)"}
+            fill={hud.hearts > i ? "#ff3d6e" : "rgba(0,0,0,0.35)"}
+            style={{ filter: "drop-shadow(0 3px 0 rgba(0,0,0,0.4))", animation: "dnrHeart 0.4s ease-out" }}
+          />
+        ))}
+        {hud.shield && (
+          <Shield
+            size={touch ? 32 : 42}
+            strokeWidth={2.5}
+            color={UI.cyanBright}
+            fill="rgba(95,216,255,0.35)"
+            style={{ filter: "drop-shadow(0 0 8px #5fd8ff)", animation: "dnrPulse 1s ease-in-out infinite" }}
+          />
+        )}
+      </div>
+
+      {/* ---- top right: buttons ---- */}
+      <div
+        style={{
+          position: "absolute",
+          top: "max(12px, env(safe-area-inset-top))",
+          right: 12,
+          display: "flex",
+          gap: 10,
+        }}
+      >
+        <IconButton label={audio.muted ? "Unmute" : "Mute"} onClick={() => audioManager.toggleMute()} size={btn} active={audio.muted}>
+          {audio.muted ? <VolumeX size={iconSize} strokeWidth={2.5} /> : <Volume2 size={iconSize} strokeWidth={2.5} />}
+        </IconButton>
+        {onToggleFullscreen && !touch && (
+          <IconButton label={isFullscreen ? "Exit fullscreen" : "Fullscreen"} onClick={onToggleFullscreen} size={btn}>
+            {isFullscreen ? <Minimize size={iconSize} strokeWidth={2.5} /> : <Maximize size={iconSize} strokeWidth={2.5} />}
+          </IconButton>
+        )}
+        <IconButton label="Pause (P)" onClick={pause} size={btn}>
+          <Pause size={iconSize} strokeWidth={3} fill="currentColor" />
+        </IconButton>
+      </div>
+
+      {/* ---- speedometer + distance ---- */}
+      <div
+        style={{
+          ...panelStyle,
+          position: "absolute",
+          ...(touch
+            ? { top: "calc(max(12px, env(safe-area-inset-top)) + 70px)", right: 12, padding: "6px 12px" }
+            : { bottom: 20, left: 20, padding: "10px 20px" }),
+          textAlign: touch ? "right" : "left",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "baseline", gap: 6, justifyContent: touch ? "flex-end" : "flex-start" }}>
+          <span
+            style={{
+              fontFamily: UI.display,
+              fontSize: touch ? 26 : 46,
+              lineHeight: 1,
+              color: hud.nitroActive ? UI.orange : UI.white,
+            }}
+          >
+            {hud.speed}
+          </span>
+          <span style={{ fontWeight: 800, fontSize: touch ? 12 : 16, color: UI.warm }}>km/h</span>
+        </div>
+        <div style={{ fontWeight: 800, fontSize: touch ? 13 : 17, color: UI.cyanBright }}>{hud.distance.toLocaleString()} m</div>
+      </div>
+
+      {/* ---- nitro meter (desktop; touch has its own button) ---- */}
+      {!touch && (
+        <div
           style={{
-            backgroundColor: DREAM_NEXUS_COLORS.cyan,
-            color: DREAM_NEXUS_COLORS.navy,
-            border: "none",
-            borderRadius: "8px",
-            padding: "10px 20px",
-            fontSize: "16px",
-            fontWeight: "bold",
-            cursor: "pointer",
-            fontFamily: "monospace",
+            position: "absolute",
+            bottom: 22,
+            left: "50%",
+            transform: "translateX(-50%)",
+            width: "min(420px, 50vw)",
+            textAlign: "center",
           }}
         >
-          Pause (P)
-        </button>
-      </div>
-      
-      <div
-        style={{
-          position: "absolute",
-          bottom: "20px",
-          left: "20px",
-          display: "flex",
-          gap: "12px",
-        }}
-      >
-        {nitroActive && (
           <div
             style={{
-              backgroundColor: "rgba(255, 107, 0, 0.9)",
-              padding: "12px 18px",
-              borderRadius: "10px",
-              border: "3px solid #ff6b00",
-              color: "white",
-              fontWeight: "bold",
-              fontSize: "16px",
-              display: "flex",
-              flexDirection: "column",
-              gap: "6px",
-              minWidth: "180px",
-              animation: "pulse 0.5s ease-in-out infinite",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <div style={{
-                width: "24px",
-                height: "24px",
-                background: "linear-gradient(180deg, #ffff00 0%, #ff6b00 100%)",
-                borderRadius: "50%",
-                boxShadow: "0 0 10px #ff6b00"
-              }} />
-              NITRO BOOST
-            </div>
-            <div style={{
-              width: "100%",
-              height: "6px",
-              backgroundColor: "rgba(0, 0, 0, 0.3)",
-              borderRadius: "3px",
-              overflow: "hidden"
-            }}>
-              <div style={{
-                width: `${nitroProgress}%`,
-                height: "100%",
-                background: "linear-gradient(90deg, #ffff00 0%, #ff6b00 100%)",
-                transition: "width 0.1s linear"
-              }} />
-            </div>
-          </div>
-        )}
-        
-        {shieldActive && (
-          <div
-            style={{
-              backgroundColor: "rgba(36, 160, 206, 0.9)",
-              padding: "12px 18px",
-              borderRadius: "10px",
-              border: "3px solid #24A0CE",
-              color: "white",
-              fontWeight: "bold",
-              fontSize: "16px",
+              fontFamily: UI.display,
+              fontSize: 18,
+              marginBottom: 6,
+              color: nitroReady ? UI.orange : "rgba(255,255,255,0.8)",
+              textShadow: "0 2px 0 rgba(0,0,0,0.5)",
+              animation: nitroReady ? "dnrPulse 0.7s ease-in-out infinite" : "none",
               display: "flex",
               alignItems: "center",
-              gap: "8px",
+              justifyContent: "center",
+              gap: 6,
             }}
           >
-            <div style={{ 
-              width: "24px", 
-              height: "24px", 
-              background: "linear-gradient(135deg, #24A0CE 0%, #0E1B24 100%)",
-              borderRadius: "50%",
-              boxShadow: "0 0 10px #24A0CE"
-            }} />
-            SHIELD ACTIVE
+            <Zap size={22} strokeWidth={3} fill="currentColor" />
+            {hud.nitroActive ? "BOOOOST!" : nitroReady ? "NITRO READY — PRESS SPACE" : "NITRO"}
           </div>
-        )}
+          <div
+            style={{
+              height: 22,
+              borderRadius: 12,
+              background: "rgba(0,0,0,0.45)",
+              border: `3px solid ${nitroReady ? UI.orange : "rgba(255,255,255,0.4)"}`,
+              overflow: "hidden",
+              animation: nitroReady ? "dnrGlow 0.8s ease-in-out infinite" : "none",
+            }}
+          >
+            <div
+              style={{
+                width: `${Math.round((hud.nitroActive ? 1 : hud.nitro) * 100)}%`,
+                height: "100%",
+                background: "linear-gradient(90deg, #ffd23f, #ff6a3a)",
+                transition: "width 0.15s linear",
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {hud.offroad && phase === "playing" && (
+        <div
+          style={{
+            position: "absolute",
+            top: "26%",
+            left: "50%",
+            transform: "translateX(-50%)",
+            fontFamily: UI.display,
+            fontSize: touch ? 18 : 24,
+            color: UI.warm,
+            textShadow: "0 3px 0 rgba(0,0,0,0.5)",
+            opacity: 0.9,
+          }}
+        >
+          OFF ROAD — SLOWING DOWN
+        </div>
+      )}
+
+      {/* ---- floating popups ---- */}
+      <div style={{ position: "absolute", top: "34%", left: 0, right: 0 }}>
+        {popups.map((p, i) => (
+          <div
+            key={p.id}
+            style={{
+              position: "absolute",
+              left: "50%",
+              top: (i % 3) * 40,
+              whiteSpace: "nowrap",
+              fontFamily: UI.display,
+              fontSize: p.big ? (touch ? 28 : 40) : touch ? 20 : 26,
+              color: p.color,
+              textShadow: "0 3px 0 rgba(0,0,0,0.55), 0 0 20px rgba(0,0,0,0.3)",
+              animation: "dnrPopup 1.1s ease-out forwards",
+            }}
+          >
+            {p.text}
+          </div>
+        ))}
       </div>
-      
-      <div
-        style={{
-          position: "absolute",
-          bottom: "20px",
-          right: "20px",
-          display: "flex",
-          alignItems: "center",
-          gap: "10px",
-          backgroundColor: "rgba(14, 27, 36, 0.8)",
-          padding: "10px 15px",
-          borderRadius: "8px",
-        }}
-      >
-        <img
-          src="/pixel-bunny.png"
-          alt="Pixel"
-          style={{ width: "40px", height: "40px", objectFit: "contain" }}
-        />
-        <img
-          src="/dream-nexus-logo.png"
-          alt="Dream Nexus"
-          style={{ width: "120px", objectFit: "contain" }}
-        />
-      </div>
-      
-      <style>{`
-        @keyframes pulse {
-          0%, 100% { transform: scale(1); }
-          50% { transform: scale(1.05); }
-        }
-      `}</style>
+
+      {/* ---- biome banner ---- */}
+      {banner && (
+        <div
+          key={banner.id}
+          style={{
+            position: "absolute",
+            top: "16%",
+            left: "50%",
+            textAlign: "center",
+            animation: "dnrBanner 2.6s ease-out forwards",
+            whiteSpace: "nowrap",
+          }}
+        >
+          <div style={{ fontSize: touch ? 13 : 16, fontWeight: 800, letterSpacing: "0.25em", color: UI.warm }}>NOW ENTERING</div>
+          <div style={{ fontFamily: UI.display, fontSize: touch ? 32 : 52, color: UI.white, textShadow: "0 4px 0 rgba(0,0,0,0.45)" }}>
+            {banner.title}
+          </div>
+          {banner.subtitle && <div style={{ fontWeight: 800, fontSize: touch ? 14 : 18, color: UI.cyanBright }}>{banner.subtitle}</div>}
+        </div>
+      )}
+
+      {/* ---- countdown ---- */}
+      {phase === "countdown" && (
+        <div
+          key={countdown}
+          style={{
+            position: "absolute",
+            top: "45%",
+            left: "50%",
+            fontFamily: UI.display,
+            fontSize: "clamp(90px, 22vw, 180px)",
+            color: countdown === 0 ? UI.gold : UI.white,
+            textShadow: "0 8px 0 rgba(0,0,0,0.4), 0 0 40px rgba(36,160,206,0.8)",
+            animation: "dnrCount 0.8s ease-out forwards",
+          }}
+        >
+          {countdown === 0 ? "GO!" : countdown}
+        </div>
+      )}
     </div>
   );
 }

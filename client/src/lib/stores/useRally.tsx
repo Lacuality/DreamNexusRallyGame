@@ -2,172 +2,293 @@ import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
 import { audioManager } from "@/lib/audio";
 import { useAchievements } from "./useAchievements";
+import { run, resetRun, multiplierFor, MAX_HEARTS } from "@/lib/game/run";
+import type { BiomeType } from "@/lib/track";
 
-export type RallyPhase = "menu" | "playing" | "paused" | "gameover";
+export type RallyPhase = "menu" | "countdown" | "playing" | "paused" | "gameover";
+
+export interface Popup {
+  id: number;
+  text: string;
+  color: string;
+  big?: boolean;
+}
+
+export interface HudSnapshot {
+  distance: number;
+  speed: number;
+  score: number;
+  jars: number;
+  hearts: number;
+  combo: number;
+  multiplier: number;
+  nitro: number;
+  nitroActive: boolean;
+  shield: boolean;
+  offroad: boolean;
+}
+
+export interface RunSummary {
+  score: number;
+  distance: number;
+  jars: number;
+  nearMisses: number;
+  smashes: number;
+  jumps: number;
+  bestCombo: number;
+  maxSpeed: number;
+  airTime: number;
+}
+
+const emptyHud: HudSnapshot = {
+  distance: 0,
+  speed: 0,
+  score: 0,
+  jars: 0,
+  hearts: MAX_HEARTS,
+  combo: 0,
+  multiplier: 1,
+  nitro: 0.5,
+  nitroActive: false,
+  shield: false,
+  offroad: false,
+};
 
 interface RallyState {
   phase: RallyPhase;
-  distance: number;
-  speed: number;
+  runId: number;
+  countdown: number;
+  hud: HudSnapshot;
+  popups: Popup[];
+  banner: { id: number; title: string; subtitle?: string } | null;
+  summary: RunSummary | null;
   highScore: number;
-  currentScore: number;
-  collectiblesCount: number;
-  startTime: number;
+  isNewBest: boolean;
   playerName: string;
   scoreSubmitted: boolean;
-  maxSpeedThisRun: number;
-  nitroUsesThisRun: number;
-  
+
+  // kept for older components
+  distance: number;
+  speed: number;
+  currentScore: number;
+  collectiblesCount: number;
+
   start: () => void;
+  beginRace: () => void;
+  setCountdown: (n: number) => void;
   pause: () => void;
   resume: () => void;
   gameOver: () => void;
   restart: () => void;
-  updateDistance: (distance: number) => void;
-  updateSpeed: (speed: number) => void;
-  addCollectible: () => void;
+  syncHud: () => void;
+  popup: (text: string, color?: string, big?: boolean) => void;
+  showBanner: (title: string, subtitle?: string) => void;
   loadHighScore: () => void;
-  saveHighScore: () => void;
   setPlayerName: (name: string) => void;
   loadPlayerName: () => void;
+}
+
+let popupId = 0;
+
+function safeGet(key: string) {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+function safeSet(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    /* ignore */
+  }
 }
 
 export const useRally = create<RallyState>()(
   subscribeWithSelector((set, get) => ({
     phase: "menu",
-    distance: 0,
-    speed: 0,
+    runId: 0,
+    countdown: 3,
+    hud: emptyHud,
+    popups: [],
+    banner: null,
+    summary: null,
     highScore: 0,
-    currentScore: 0,
-    collectiblesCount: 0,
-    startTime: 0,
+    isNewBest: false,
     playerName: "",
     scoreSubmitted: false,
-    maxSpeedThisRun: 0,
-    nitroUsesThisRun: 0,
-    
+    distance: 0,
+    speed: 0,
+    currentScore: 0,
+    collectiblesCount: 0,
+
     start: () => {
-      const now = Date.now();
-      audioManager.stopBackgroundMusic();
-      set({
-        phase: "playing",
+      resetRun();
+      audioManager.playBackgroundMusic();
+      audioManager.duckMusic(1);
+      set((s) => ({
+        phase: "countdown",
+        runId: s.runId + 1,
+        countdown: 3,
+        hud: emptyHud,
+        popups: [],
+        banner: null,
+        summary: null,
+        isNewBest: false,
+        scoreSubmitted: false,
         distance: 0,
         speed: 0,
         currentScore: 0,
         collectiblesCount: 0,
-        startTime: now,
-        maxSpeedThisRun: 0,
-        nitroUsesThisRun: 0
-      });
+      }));
     },
-    
+
+    beginRace: () => {
+      if (get().phase === "countdown") set({ phase: "playing" });
+    },
+
+    setCountdown: (n) => set({ countdown: n }),
+
     pause: () => {
-      set((state) => state.phase === "playing" ? { phase: "paused" } : {});
+      const p = get().phase;
+      if (p === "playing" || p === "countdown") {
+        audioManager.duckMusic(0.4);
+        audioManager.stopEngineSound();
+        set({ phase: "paused" });
+      }
     },
-    
+
     resume: () => {
-      set((state) => state.phase === "paused" ? { phase: "playing" } : {});
+      if (get().phase === "paused") {
+        audioManager.duckMusic(1);
+        // resume into a short countdown so nobody crashes instantly
+        set({ phase: "countdown", countdown: 3 });
+      }
     },
-    
+
     gameOver: () => {
       const state = get();
-      if (state.phase === "playing") {
-        const finalScore = Math.floor(state.distance) + (state.collectiblesCount * 50);
-        const newHighScore = Math.max(finalScore, state.highScore);
+      if (state.phase !== "playing") return;
 
-        if (newHighScore > state.highScore) {
-          localStorage.setItem("dreamNexusRallyHighScore", String(newHighScore));
-        }
+      const finalScore = Math.floor(run.score);
+      const isNewBest = finalScore > state.highScore;
+      const highScore = Math.max(finalScore, state.highScore);
+      if (isNewBest) safeSet("dreamNexusRallyHighScore", String(highScore));
 
-        audioManager.stopEngineSound();
+      audioManager.stopEngineSound();
+      audioManager.playGameOver();
+      audioManager.duckMusic(0.5);
 
-        const playtimeSeconds = Math.floor((Date.now() - state.startTime) / 1000);
+      const summary: RunSummary = {
+        score: finalScore,
+        distance: Math.floor(run.z),
+        jars: run.jars,
+        nearMisses: run.nearMisses,
+        smashes: run.smashes,
+        jumps: run.jumps,
+        bestCombo: run.bestCombo,
+        maxSpeed: Math.floor(run.maxSpeedKmh),
+        airTime: Math.round(run.totalAir * 10) / 10,
+      };
 
-        set({ phase: "gameover", currentScore: finalScore, highScore: newHighScore, scoreSubmitted: false });
+      set({
+        phase: "gameover",
+        summary,
+        currentScore: finalScore,
+        highScore,
+        isNewBest,
+        scoreSubmitted: false,
+      });
 
-        if (state.playerName && finalScore > 0) {
-          fetch("/api/leaderboard", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              playerName: state.playerName,
-              score: finalScore,
-              distance: Math.floor(state.distance),
-            }),
+      if (state.playerName && finalScore > 0) {
+        fetch("/api/leaderboard", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            playerName: state.playerName,
+            score: finalScore,
+            distance: Math.floor(run.z),
+          }),
+        })
+          .then((r) => {
+            if (r.ok) set({ scoreSubmitted: true });
           })
-            .then(response => {
-              if (response.ok) {
-                return response.json();
-              }
-              throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            })
-            .then(data => {
-              console.log("Score submitted:", data);
-              set({ scoreSubmitted: true });
-            })
-            .catch(err => {
-              console.error("Failed to submit score:", err);
-            });
+          .catch(() => {});
 
-          useAchievements.getState().updatePlayerStats(state.playerName, {
-            player_name: state.playerName,
-            total_distance: Math.floor(state.distance),
-            max_speed: state.maxSpeedThisRun,
-            total_collectibles: state.collectiblesCount,
-            total_games: 1,
-            total_crashes: 1,
-            playtime_seconds: playtimeSeconds
-          });
-        }
+        useAchievements.getState().updatePlayerStats(state.playerName, {
+          player_name: state.playerName,
+          total_distance: Math.floor(run.z),
+          max_speed: Math.floor(run.maxSpeedKmh),
+          total_collectibles: run.jars,
+          total_games: 1,
+          total_crashes: 1,
+          playtime_seconds: Math.floor(run.time),
+        });
       }
     },
-    
+
     restart: () => {
+      audioManager.stopEngineSound();
+      audioManager.duckMusic(1);
       audioManager.playBackgroundMusic();
-      set({ phase: "menu", distance: 0, speed: 0, currentScore: 0, collectiblesCount: 0, scoreSubmitted: false, maxSpeedThisRun: 0, nitroUsesThisRun: 0 });
+      set({ phase: "menu", popups: [], banner: null });
     },
-    
-    updateDistance: (distance: number) => {
-      set({ distance });
+
+    syncHud: () => {
+      const hud: HudSnapshot = {
+        distance: Math.floor(run.z),
+        speed: Math.floor(run.speed * 3.6),
+        score: Math.floor(run.score),
+        jars: run.jars,
+        hearts: run.hearts,
+        combo: run.combo,
+        multiplier: multiplierFor(run.combo),
+        nitro: run.nitro,
+        nitroActive: run.nitroTime > 0,
+        shield: run.shield,
+        offroad: run.offroad,
+      };
+      set({
+        hud,
+        distance: hud.distance,
+        speed: hud.speed,
+        currentScore: hud.score,
+        collectiblesCount: hud.jars,
+      });
     },
-    
-    updateSpeed: (speed: number) => {
-      set((state) => ({
-        speed,
-        maxSpeedThisRun: Math.max(state.maxSpeedThisRun, Math.floor(speed))
-      }));
+
+    popup: (text, color = "#FFFFFF", big = false) => {
+      const id = ++popupId;
+      set((s) => ({ popups: [...s.popups.slice(-5), { id, text, color, big }] }));
+      setTimeout(() => {
+        set((s) => ({ popups: s.popups.filter((p) => p.id !== id) }));
+      }, 1100);
     },
-    
-    addCollectible: () => {
-      set((state) => ({
-        collectiblesCount: state.collectiblesCount + 1,
-        currentScore: state.currentScore + 50
-      }));
+
+    showBanner: (title, subtitle) => {
+      const id = ++popupId;
+      set({ banner: { id, title, subtitle } });
+      setTimeout(() => {
+        if (get().banner?.id === id) set({ banner: null });
+      }, 2600);
     },
-    
+
     loadHighScore: () => {
-      const saved = localStorage.getItem("dreamNexusRallyHighScore");
-      const highScore = saved ? parseInt(saved, 10) : 0;
-      set({ highScore });
+      const saved = safeGet("dreamNexusRallyHighScore");
+      set({ highScore: saved ? parseInt(saved, 10) || 0 : 0 });
     },
-    
-    saveHighScore: () => {
-      const { currentScore, highScore } = get();
-      const newHighScore = Math.max(currentScore, highScore);
-      localStorage.setItem("dreamNexusRallyHighScore", String(newHighScore));
-      set({ highScore: newHighScore });
-    },
-    
+
     setPlayerName: (name: string) => {
       set({ playerName: name });
-      localStorage.setItem("dreamNexusRallyPlayerName", name);
+      safeSet("dreamNexusRallyPlayerName", name);
     },
-    
+
     loadPlayerName: () => {
-      const saved = localStorage.getItem("dreamNexusRallyPlayerName");
-      if (saved) {
-        set({ playerName: saved });
-      }
-    }
-  }))
+      const saved = safeGet("dreamNexusRallyPlayerName");
+      if (saved) set({ playerName: saved });
+    },
+  })),
 );
+
+export type { BiomeType };
