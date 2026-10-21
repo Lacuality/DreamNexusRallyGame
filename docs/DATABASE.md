@@ -7,11 +7,8 @@ Without a database it still works and keeps scores on the player's device.
 ## One-time setup
 
 1. **Create a project** at https://supabase.com (free tier is fine).
-2. **Create the tables**: in Supabase open **SQL Editor**, then paste and run each file in
-   `supabase/migrations/` **in date order**:
-   1. `20251114112546_create_leaderboard_table.sql`
-   2. `20251114144826_create_achievements_system.sql`
-   3. `20261021160000_secure_leaderboard_and_run_stats.sql`
+2. **Create the tables**: in Supabase open **SQL Editor → New query**, paste the whole of
+   `supabase/setup.sql`, and click **Run**. (It is safe to run again.)
 3. **Copy two values** from **Project Settings → API**:
    - Project URL → `VITE_SUPABASE_URL`
    - `anon` `public` key → `VITE_SUPABASE_ANON_KEY`
