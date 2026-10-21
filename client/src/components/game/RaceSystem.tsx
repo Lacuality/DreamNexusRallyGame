@@ -217,6 +217,7 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
       return;
     }
     run.hearts--;
+    if (run.firstHitZ < 0) run.firstHitZ = run.z;
     run.speed *= 0.4;
     run.invulnerable = INVULNERABLE_TIME;
     run.combo = 0;
@@ -286,6 +287,7 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
     if (wantNitro && run.nitro >= 1 && run.nitroTime <= 0) {
       run.nitroTime = NITRO_DURATION;
       run.nitro = 0;
+      run.nitroUses++;
       run.shake = 0.5;
       audioManager.playNitro();
       rally.getState().popup("NITRO!", COLORS.orange, true);

@@ -1,27 +1,30 @@
-import { HAS_SERVER } from "@/lib/env";
 import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
+import {
+  getAchievements,
+  getUnlockedIds,
+  unlockAchievement,
+  getPlayerStats,
+  recordRun,
+  isOnline,
+  type Achievement as DbAchievement,
+  type PlayerStats,
+} from "@/lib/db";
 
-export interface Achievement {
-  id: string;
-  name: string;
-  description: string;
-  icon: string;
-  requirement_type: string;
-  requirement_value: number;
-  points: number;
+export type { PlayerStats };
+export interface Achievement extends DbAchievement {
   unlocked?: boolean;
   progress?: number;
 }
 
-export interface PlayerStats {
-  player_name: string;
-  total_distance: number;
-  max_speed: number;
-  total_collectibles: number;
-  total_games: number;
-  total_crashes: number;
-  playtime_seconds: number;
+/** What happened in the run that just ended (for "in one run" achievements). */
+export interface RunFacts {
+  distance: number;
+  maxSpeed: number;
+  jars: number;
+  nitroUses: number;
+  cleanDistance: number; // metres driven before the first crash
+  playtime: number;
 }
 
 interface AchievementsState {
@@ -29,12 +32,39 @@ interface AchievementsState {
   playerStats: PlayerStats | null;
   unlockedAchievements: Set<string>;
   recentUnlock: Achievement | null;
+  queue: Achievement[];
 
   loadAchievements: () => Promise<void>;
   loadPlayerStats: (playerName: string) => Promise<void>;
-  checkAndUnlockAchievements: (playerName: string) => Promise<void>;
-  updatePlayerStats: (playerName: string, stats: Partial<PlayerStats>) => Promise<void>;
+  finishRun: (playerName: string, run: RunFacts) => Promise<void>;
   clearRecentUnlock: () => void;
+}
+
+function progressFor(a: Achievement, stats: PlayerStats | null, run: RunFacts | null): number {
+  switch (a.requirement_type) {
+    // lifetime
+    case "max_speed":
+      return Math.max(stats?.max_speed ?? 0, run?.maxSpeed ?? 0);
+    case "total_distance":
+      return stats?.total_distance ?? 0;
+    case "total_collectibles":
+      return stats?.total_collectibles ?? 0;
+    case "games_played":
+      return stats?.total_games ?? 0;
+    case "playtime":
+      return stats?.playtime_seconds ?? 0;
+    // one run
+    case "distance":
+      return run?.distance ?? 0;
+    case "collectibles":
+      return run?.jars ?? 0;
+    case "distance_no_crash":
+      return run?.cleanDistance ?? 0;
+    case "nitro_uses":
+      return run?.nitroUses ?? 0;
+    default:
+      return 0;
+  }
 }
 
 export const useAchievements = create<AchievementsState>()(
@@ -43,127 +73,63 @@ export const useAchievements = create<AchievementsState>()(
     playerStats: null,
     unlockedAchievements: new Set(),
     recentUnlock: null,
+    queue: [],
 
     loadAchievements: async () => {
-      if (!HAS_SERVER) return;
+      if (!isOnline) return;
       try {
-        const response = await fetch("/api/achievements");
-        if (!response.ok) throw new Error("Failed to load achievements");
-        const data = await response.json();
-        set({ achievements: data });
+        set({ achievements: await getAchievements() });
       } catch (error) {
-        console.error("Error loading achievements:", error);
+        console.warn("Achievements unavailable:", error);
       }
     },
 
     loadPlayerStats: async (playerName: string) => {
-      if (!HAS_SERVER) return;
-      if (!playerName) return;
-
+      if (!playerName || !isOnline) return;
       try {
-        const response = await fetch(`/api/player-stats/${encodeURIComponent(playerName)}`);
-        if (!response.ok) throw new Error("Failed to load player stats");
-        const data = await response.json();
-        set({ playerStats: data });
-
-        const achievementsResponse = await fetch(`/api/player-achievements/${encodeURIComponent(playerName)}`);
-        if (achievementsResponse.ok) {
-          const unlockedData = await achievementsResponse.json();
-          set({ unlockedAchievements: new Set(unlockedData.map((a: any) => a.achievement_id)) });
-        }
+        const [stats, unlocked] = await Promise.all([getPlayerStats(playerName), getUnlockedIds(playerName)]);
+        set({ playerStats: stats, unlockedAchievements: new Set(unlocked) });
       } catch (error) {
-        console.error("Error loading player stats:", error);
+        console.warn("Player stats unavailable:", error);
       }
     },
 
-    checkAndUnlockAchievements: async (playerName: string) => {
-      if (!HAS_SERVER) return;
-      if (!playerName) return;
+    finishRun: async (playerName: string, run: RunFacts) => {
+      if (!playerName || !isOnline) return;
+      try {
+        const stats = await recordRun(playerName, {
+          distance: run.distance,
+          maxSpeed: run.maxSpeed,
+          jars: run.jars,
+          playtime: run.playtime,
+        });
+        if (stats) set({ playerStats: stats });
 
-      const { achievements, unlockedAchievements, playerStats } = get();
-      if (!playerStats) return;
-
-      for (const achievement of achievements) {
-        if (unlockedAchievements.has(achievement.id)) continue;
-
-        let shouldUnlock = false;
-
-        switch (achievement.requirement_type) {
-          case 'max_speed':
-            shouldUnlock = playerStats.max_speed >= achievement.requirement_value;
-            break;
-          case 'total_distance':
-            shouldUnlock = playerStats.total_distance >= achievement.requirement_value;
-            break;
-          case 'total_collectibles':
-            shouldUnlock = playerStats.total_collectibles >= achievement.requirement_value;
-            break;
-          case 'games_played':
-            shouldUnlock = playerStats.total_games >= achievement.requirement_value;
-            break;
-          case 'playtime':
-            shouldUnlock = playerStats.playtime_seconds >= achievement.requirement_value;
-            break;
-        }
-
-        if (shouldUnlock) {
-          try {
-            await fetch("/api/player-achievements", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                player_name: playerName,
-                achievement_id: achievement.id,
-                progress: achievement.requirement_value
-              })
-            });
-
-            const newUnlocked = new Set(unlockedAchievements);
-            newUnlocked.add(achievement.id);
-            set({
-              unlockedAchievements: newUnlocked,
-              recentUnlock: achievement
-            });
-
-            console.log(`Achievement unlocked: ${achievement.name}`);
-
-            setTimeout(() => {
-              set({ recentUnlock: null });
-            }, 5000);
-          } catch (error) {
-            console.error("Error unlocking achievement:", error);
+        const { achievements, unlockedAchievements } = get();
+        const newly: Achievement[] = [];
+        for (const a of achievements) {
+          if (unlockedAchievements.has(a.id)) continue;
+          const p = progressFor(a, stats, run);
+          if (p >= a.requirement_value) {
+            await unlockAchievement(playerName, a.id, a.requirement_value);
+            newly.push(a);
           }
         }
-      }
-    },
-
-    updatePlayerStats: async (playerName: string, stats: Partial<PlayerStats>) => {
-      if (!HAS_SERVER) return;
-      if (!playerName) return;
-
-      try {
-        const response = await fetch("/api/player-stats", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            player_name: playerName,
-            ...stats
-          })
-        });
-
-        if (!response.ok) throw new Error("Failed to update player stats");
-
-        const updatedStats = await response.json();
-        set({ playerStats: updatedStats });
-
-        get().checkAndUnlockAchievements(playerName);
+        if (newly.length) {
+          const all = new Set(get().unlockedAchievements);
+          newly.forEach((a) => all.add(a.id));
+          set({ unlockedAchievements: all, queue: [...get().queue, ...newly] });
+          if (!get().recentUnlock) get().clearRecentUnlock();
+        }
       } catch (error) {
-        console.error("Error updating player stats:", error);
+        console.warn("Could not save run stats:", error);
       }
     },
 
+    /** Shows the next unlocked achievement (one at a time). */
     clearRecentUnlock: () => {
-      set({ recentUnlock: null });
-    }
-  }))
+      const [next, ...rest] = get().queue;
+      set({ recentUnlock: next ?? null, queue: rest });
+    },
+  })),
 );

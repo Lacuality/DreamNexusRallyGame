@@ -29,6 +29,10 @@ jobs:
         env:
           GITHUB_PAGES: "1"
           VITE_STATIC: "1"
+          # Online leaderboard (Supabase). Add these in Settings → Secrets and variables → Actions.
+          # Without them the game still works and saves scores on the device only.
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL || secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY || secrets.VITE_SUPABASE_ANON_KEY }}
       - name: SPA fallback + disable Jekyll
         run: |
           cp dist/public/index.html dist/public/404.html

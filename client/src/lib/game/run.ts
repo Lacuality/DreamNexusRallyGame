@@ -38,6 +38,8 @@ export interface RunState {
   smashes: number;
   jumps: number;
   maxSpeedKmh: number;
+  nitroUses: number;
+  firstHitZ: number; // -1 until the first crash
   totalAir: number;
   nextMilestone: number;
 
@@ -74,6 +76,8 @@ export function freshRun(): RunState {
     smashes: 0,
     jumps: 0,
     maxSpeedKmh: 0,
+    nitroUses: 0,
+    firstHitZ: -1,
     totalAir: 0,
     nextMilestone: 500,
     shake: 0,

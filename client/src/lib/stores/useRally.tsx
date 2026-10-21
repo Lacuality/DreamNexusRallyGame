@@ -1,4 +1,4 @@
-import { HAS_SERVER, addLocalScore } from "@/lib/env";
+import { submitScore } from "@/lib/db";
 import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
 import { audioManager } from "@/lib/audio";
@@ -202,34 +202,20 @@ export const useRally = create<RallyState>()(
         scoreSubmitted: false,
       });
 
-      if (finalScore > 0 && !HAS_SERVER) {
-        addLocalScore(state.playerName, finalScore, Math.floor(run.z));
-        set({ scoreSubmitted: true });
+      if (finalScore > 0) {
+        submitScore(state.playerName, finalScore, Math.floor(run.z))
+          .then((ok) => ok && set({ scoreSubmitted: true }))
+          .catch((err) => console.warn("Could not save score:", err));
       }
 
-      if (HAS_SERVER && state.playerName && finalScore > 0) {
-        fetch("/api/leaderboard", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            playerName: state.playerName,
-            score: finalScore,
-            distance: Math.floor(run.z),
-          }),
-        })
-          .then((r) => {
-            if (r.ok) set({ scoreSubmitted: true });
-          })
-          .catch(() => {});
-
-        useAchievements.getState().updatePlayerStats(state.playerName, {
-          player_name: state.playerName,
-          total_distance: Math.floor(run.z),
-          max_speed: Math.floor(run.maxSpeedKmh),
-          total_collectibles: run.jars,
-          total_games: 1,
-          total_crashes: 1,
-          playtime_seconds: Math.floor(run.time),
+      if (state.playerName) {
+        useAchievements.getState().finishRun(state.playerName, {
+          distance: Math.floor(run.z),
+          maxSpeed: Math.floor(run.maxSpeedKmh),
+          jars: run.jars,
+          nitroUses: run.nitroUses,
+          cleanDistance: Math.floor(run.firstHitZ >= 0 ? run.firstHitZ : run.z),
+          playtime: Math.floor(run.time),
         });
       }
     },

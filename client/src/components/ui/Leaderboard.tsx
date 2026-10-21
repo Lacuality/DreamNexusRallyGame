@@ -1,9 +1,11 @@
-import { HAS_SERVER, readLocalBoard } from "@/lib/env";
+import { readLocalBoard } from "@/lib/env";
+import { getTopScores, isOnline } from "@/lib/db";
 import { useEffect, useState } from "react";
 import { DREAM_NEXUS_COLORS } from "@/lib/constants";
 import { useRally } from "@/lib/stores/useRally";
 
 interface LeaderboardEntry {
+  // same shape as LeaderRow in lib/db
   id: number;
   playerName: string;
   score: number;
@@ -20,19 +22,13 @@ export function Leaderboard() {
   const fetchLeaderboard = async () => {
     try {
       setLoading(true);
-      if (!HAS_SERVER) {
-        setLeaderboard(readLocalBoard());
-        setError(null);
-        return;
-      }
-      const response = await fetch("/api/leaderboard");
-      if (!response.ok) throw new Error("Failed to fetch leaderboard");
-      const data = await response.json();
-      setLeaderboard(data);
+      setLeaderboard(await getTopScores(10));
       setError(null);
     } catch (err) {
-      console.error("Error fetching leaderboard:", err);
-      setError("Could not load leaderboard");
+      console.warn("Leaderboard unavailable:", err);
+      // fall back to this device's runs so the panel is never empty
+      setLeaderboard(readLocalBoard());
+      setError(null);
     } finally {
       setLoading(false);
     }
@@ -95,7 +91,7 @@ export function Leaderboard() {
           textAlign: "center",
         }}
       >
-        🏆 {HAS_SERVER ? "Top 10 Leaderboard" : "Your Top 10 Runs"}
+        🏆 {isOnline ? "Top 10 Racers" : "Your Top 10 Runs"}
       </h3>
 
       {leaderboard.length === 0 ? (
