@@ -39,3 +39,31 @@ export function addLocalScore(playerName: string, score: number, distance: numbe
     /* ignore */
   }
 }
+
+/* Best single-run numbers on this device (for achievement progress bars). */
+export interface RunBests {
+  distance: number;
+  jars: number;
+  nitroUses: number;
+  cleanDistance: number;
+  maxSpeed: number;
+}
+const BEST_KEY = "dreamNexusRallyBests";
+
+export function readBests(): RunBests {
+  try {
+    return { distance: 0, jars: 0, nitroUses: 0, cleanDistance: 0, maxSpeed: 0, ...JSON.parse(localStorage.getItem(BEST_KEY) || "{}") };
+  } catch {
+    return { distance: 0, jars: 0, nitroUses: 0, cleanDistance: 0, maxSpeed: 0 };
+  }
+}
+
+export function saveBests(r: RunBests) {
+  try {
+    const b = readBests();
+    (Object.keys(b) as (keyof RunBests)[]).forEach((k) => (b[k] = Math.max(b[k], r[k] || 0)));
+    localStorage.setItem(BEST_KEY, JSON.stringify(b));
+  } catch {
+    /* ignore */
+  }
+}

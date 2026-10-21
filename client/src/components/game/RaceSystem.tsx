@@ -63,6 +63,9 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
   useEffect(() => {
     useBiome.getState().reset();
     return useBiome.subscribe((s, prev) => {
+      if (s.currentBiome !== prev.currentBiome) {
+        audioManager.setMusicTheme(s.currentBiome === "comuna_13" ? "synthwave" : "default");
+      }
       if (s.currentBiome !== prev.currentBiome && rally.getState().phase === "playing") {
         const c = BIOME_CONFIGS[s.currentBiome];
         rally.getState().showBanner(c.name, c.subtitle);
@@ -618,6 +621,15 @@ export function Scenery() {
         } else if (biome === "andes_highland") {
           place(r1 < 0.6 ? "frailejon" : "boulder", z + side * 2, near + side * 0.5, 0.8 + r3 * 0.7, r2 * 6);
           place(r2 > 0.4 ? "pine" : "boulder", z + 4, far, 1 + r3 * 0.8, r1 * 6);
+        } else if (biome === "comuna_13") {
+          // night barrio: graffiti walls and neon by the road, houses up the hills
+          const away = heading + (side > 0 ? 0 : Math.PI);
+          if (r1 < 0.5) place(`graffiti${Math.floor(r3 * 8)}`, z, side * (ROAD_HALF + 3), 1, heading);
+          else if (r1 < 0.75) place("neonPalm", z, side * (ROAD_HALF + 3 + r2 * 2), 0.9 + r3 * 0.3, r2 * 6);
+          else place("lamp", z, side * (ROAD_HALF + 2.2), 1, heading + (side > 0 ? 0 : Math.PI));
+          place(`barrio${Math.floor(r2 * 5)}`, z + 4, side * (ROAD_HALF + 9 + r3 * 6), 1, away);
+          if (i % 7 === 3) place("escalator", z + 8, side * (ROAD_HALF + 5), 1, away);
+          if (i % 6 === 2) place(`neonSign${Math.floor(r3 * 3)}`, z, side * (ROAD_HALF + 3.6), 1, heading + side * 0.3);
         } else if (biome === "ciudad_perdida") {
           // dense jungle: ferns at the road, terraces, huts and giant ceibas behind
           place("fern", z + side * 2, near - side * 0.8, 0.9 + r3 * 0.6, r2 * 6);

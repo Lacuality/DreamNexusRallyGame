@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { RotateCcw, Home, Trophy } from "lucide-react";
 import { useRally } from "@/lib/stores/useRally";
 import { Leaderboard } from "./Leaderboard";
+import { useAchievements } from "@/lib/stores/useAchievements";
+import { AchievementsPanel } from "./AchievementsPanel";
 import { BigButton, UI, panelStyle } from "./gameUi";
 
 function useCountUp(target: number, ms = 900) {
@@ -28,7 +30,9 @@ export function GameOverScreen() {
   const start = useRally((s) => s.start);
   const restart = useRally((s) => s.restart);
   const [showBoard, setShowBoard] = useState(false);
+  const [showAch, setShowAch] = useState(false);
   const score = useCountUp(summary?.score ?? 0);
+  const unlocks = useAchievements((s) => s.lastRunUnlocks);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -102,6 +106,37 @@ export function GameOverScreen() {
           </div>
         </div>
 
+        {unlocks.length > 0 && (
+          <div style={{ ...panelStyle, padding: "12px 14px", marginTop: 12, animation: "dnrFadeIn 0.4s ease-out" }}>
+            <div style={{ fontFamily: UI.display, fontSize: 16, color: UI.cyanBright, marginBottom: 8 }}>
+              🏅 ACHIEVEMENT{unlocks.length > 1 ? "S" : ""} UNLOCKED
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center" }}>
+              {unlocks.map((a) => (
+                <div
+                  key={a.id}
+                  title={a.description}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    background: "rgba(255,210,63,0.15)",
+                    border: "2px solid rgba(255,210,63,0.6)",
+                    borderRadius: 14,
+                    padding: "6px 12px",
+                  }}
+                >
+                  <span style={{ fontSize: 24 }}>{a.icon}</span>
+                  <span style={{ textAlign: "left" }}>
+                    <span style={{ display: "block", fontWeight: 900, color: UI.gold }}>{a.name}</span>
+                    <span style={{ display: "block", fontSize: 13, opacity: 0.85 }}>{a.description}</span>
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div style={{ display: "flex", gap: 12, marginTop: 18, flexWrap: "wrap", justifyContent: "center" }}>
           <BigButton onClick={start} color={UI.gold} style={{ flex: "1 1 220px" }}>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
@@ -123,6 +158,18 @@ export function GameOverScreen() {
         >
           {showBoard ? "Hide leaderboard ▲" : "Show leaderboard ▼"}
         </button>
+        <button
+          type="button"
+          onClick={() => setShowAch((v) => !v)}
+          style={{ marginTop: 0, background: "none", border: "none", color: UI.gold, fontWeight: 800, fontSize: 18, cursor: "pointer", padding: 10 }}
+        >
+          {showAch ? "Hide achievements ▲" : "🏅 All achievements ▼"}
+        </button>
+        {showAch && (
+          <div style={{ marginTop: 8, textAlign: "left" }}>
+            <AchievementsPanel />
+          </div>
+        )}
         {showBoard && (
           <div style={{ display: "flex", justifyContent: "center", marginTop: 8 }}>
             <Leaderboard />

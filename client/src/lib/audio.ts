@@ -31,6 +31,9 @@ export class AudioManager {
   private noiseBuffer: AudioBuffer | null = null;
 
   private music: HTMLAudioElement | null = null;
+  private mp3Gain: GainNode | null = null;
+  private theme: "default" | "synthwave" = "default";
+  private synth: { out: GainNode; timer: number; step: number; next: number } | null = null;
   private musicRouted = false;
   private wantMusic = false;
   private musicDuck = 1;
@@ -90,13 +93,15 @@ export class AudioManager {
       if (this.music) {
         try {
           const src = this.ctx.createMediaElementSource(this.music);
-          src.connect(this.musicGain);
+          this.mp3Gain = this.ctx.createGain();
+          src.connect(this.mp3Gain).connect(this.musicGain);
           this.musicRouted = true;
         } catch {
           this.musicRouted = false;
         }
       }
       this.applyVolumes();
+      if (this.theme === "synthwave") this.applyTheme();
     }
     if (this.ctx.state === "suspended") this.ctx.resume().catch(() => {});
     if (this.wantMusic) this.tryPlayMusic();
@@ -180,6 +185,184 @@ export class AudioManager {
   duckMusic(amount: number) {
     this.musicDuck = amount;
     this.applyVolumes();
+  }
+
+  /* ---------------- synthwave (Comuna 13 at night) ----------------
+   * An original, generated Miami-night style loop: four-on-the-floor kick,
+   * gated snare, 8th-note saw bass, warm pads and a delayed arpeggio over
+   * Am – F – C – G. Crossfades with the normal music track. */
+
+  setMusicTheme(theme: "default" | "synthwave") {
+    if (theme === this.theme) return;
+    this.theme = theme;
+    this.applyTheme();
+  }
+
+  private applyTheme() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const synthOn = this.theme === "synthwave";
+    if (this.mp3Gain) this.mp3Gain.gain.setTargetAtTime(synthOn ? 0 : 1, t, 0.9);
+    else if (this.music) this.music.muted = synthOn;
+    if (synthOn) this.startSynth();
+    else this.stopSynth();
+  }
+
+  private startSynth() {
+    if (!this.ctx || !this.musicGain) return;
+    if (this.synth) {
+      this.synth.out.gain.setTargetAtTime(1, this.ctx.currentTime, 0.9);
+      return;
+    }
+    const ctx = this.ctx;
+    const out = ctx.createGain();
+    out.gain.value = 0;
+    out.gain.setTargetAtTime(1, ctx.currentTime, 0.9);
+    out.connect(this.musicGain);
+    const synth = { out, timer: 0, step: 0, next: ctx.currentTime + 0.1 };
+    const sixteenth = 60 / 108 / 4;
+    synth.timer = window.setInterval(() => {
+      if (!this.ctx) return;
+      while (synth.next < this.ctx.currentTime + 0.15) {
+        this.synthStep(synth.step, synth.next, out);
+        synth.next += sixteenth;
+        synth.step++;
+      }
+    }, 25);
+    this.synth = synth;
+  }
+
+  private stopSynth() {
+    if (!this.synth || !this.ctx) return;
+    const s = this.synth;
+    this.synth = null;
+    s.out.gain.setTargetAtTime(0, this.ctx.currentTime, 0.6);
+    window.setTimeout(() => {
+      clearInterval(s.timer);
+      s.out.disconnect();
+    }, 3500);
+  }
+
+  private synthStep(step: number, t: number, out: GainNode) {
+    const ctx = this.ctx!;
+    const s16 = step % 16;
+    const bar = Math.floor(step / 16) % 4;
+    // Am, F, C, G (root in Hz, then chord tones)
+    const chords = [
+      [110, [220, 261.63, 329.63]],
+      [87.31, [174.61, 220, 261.63]],
+      [130.81, [261.63, 329.63, 392]],
+      [98, [196, 246.94, 293.66]],
+    ] as const;
+    const [root, tones] = chords[bar];
+
+    const env = (node: AudioNode, peak: number, attack: number, dur: number) => {
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(peak, t + attack);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      node.connect(g).connect(out);
+      return g;
+    };
+
+    // kick on every beat
+    if (s16 % 4 === 0) {
+      const o = ctx.createOscillator();
+      o.frequency.setValueAtTime(150, t);
+      o.frequency.exponentialRampToValueAtTime(42, t + 0.22);
+      env(o, 0.85, 0.005, 0.32);
+      o.start(t);
+      o.stop(t + 0.35);
+    }
+    // gated snare on 2 and 4
+    if (s16 === 4 || s16 === 12) {
+      if (this.noiseBuffer) {
+        const n = ctx.createBufferSource();
+        n.buffer = this.noiseBuffer;
+        const f = ctx.createBiquadFilter();
+        f.type = "bandpass";
+        f.frequency.value = 1800;
+        f.Q.value = 0.7;
+        n.connect(f);
+        env(f, 0.4, 0.003, 0.22);
+        n.start(t, Math.random());
+        n.stop(t + 0.25);
+      }
+      const o = ctx.createOscillator();
+      o.type = "triangle";
+      o.frequency.setValueAtTime(220, t);
+      o.frequency.exponentialRampToValueAtTime(120, t + 0.1);
+      env(o, 0.25, 0.002, 0.12);
+      o.start(t);
+      o.stop(t + 0.15);
+    }
+    // hi-hats
+    if (this.noiseBuffer && s16 % 2 === 0) {
+      const n = ctx.createBufferSource();
+      n.buffer = this.noiseBuffer;
+      const f = ctx.createBiquadFilter();
+      f.type = "highpass";
+      f.frequency.value = 7500;
+      n.connect(f);
+      env(f, s16 % 4 === 2 ? 0.14 : 0.06, 0.002, s16 % 4 === 2 ? 0.12 : 0.04);
+      n.start(t, Math.random());
+      n.stop(t + 0.15);
+    }
+    // 8th-note saw bass, octave bounce
+    if (s16 % 2 === 0) {
+      const o = ctx.createOscillator();
+      o.type = "sawtooth";
+      o.frequency.value = s16 % 4 === 2 ? root * 2 : root;
+      const f = ctx.createBiquadFilter();
+      f.type = "lowpass";
+      f.frequency.setValueAtTime(900, t);
+      f.frequency.exponentialRampToValueAtTime(220, t + 0.2);
+      o.connect(f);
+      env(f, 0.22, 0.005, 0.24);
+      o.start(t);
+      o.stop(t + 0.26);
+    }
+    // warm detuned pad at the start of each bar
+    if (s16 === 0) {
+      const barLen = (60 / 108) * 4;
+      tones.forEach((fq) => {
+        [-6, 6].forEach((det) => {
+          const o = ctx.createOscillator();
+          o.type = "sawtooth";
+          o.frequency.value = fq;
+          o.detune.value = det;
+          const f = ctx.createBiquadFilter();
+          f.type = "lowpass";
+          f.frequency.value = 1100;
+          o.connect(f);
+          env(f, 0.035, 0.5, barLen);
+          o.start(t);
+          o.stop(t + barLen + 0.05);
+        });
+      });
+    }
+    // arpeggio (with a simple echo) on 16ths
+    {
+      const pattern = [0, 1, 2, 1];
+      const fq = tones[pattern[s16 % 4]] * 2;
+      [0, 0.42].forEach((delay, k) => {
+        const o = ctx.createOscillator();
+        o.type = "square";
+        o.frequency.value = fq;
+        const f = ctx.createBiquadFilter();
+        f.type = "lowpass";
+        f.frequency.value = 2600;
+        o.connect(f);
+        const g = ctx.createGain();
+        const tt = t + delay;
+        g.gain.setValueAtTime(0.0001, tt);
+        g.gain.linearRampToValueAtTime(k ? 0.012 : 0.03, tt + 0.005);
+        g.gain.exponentialRampToValueAtTime(0.0001, tt + 0.11);
+        f.connect(g).connect(out);
+        o.start(tt);
+        o.stop(tt + 0.13);
+      });
+    }
   }
 
   /* ---------------- engine ---------------- */

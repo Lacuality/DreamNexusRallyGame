@@ -1,6 +1,7 @@
 import { asset } from "@/lib/env";
 import { useEffect, useState } from "react";
-import { Volume2, VolumeX, Trophy, Maximize, Minimize, X, Flag } from "lucide-react";
+import { Volume2, VolumeX, Trophy, Maximize, Minimize, X, Flag, Medal } from "lucide-react";
+import { AchievementsPanel } from "./AchievementsPanel";
 import { useRally } from "@/lib/stores/useRally";
 import { TitleScene3D } from "./TitleScene3D";
 import { Leaderboard } from "./Leaderboard";
@@ -46,6 +47,7 @@ export function TitleScreenImmersive({ isFullscreen, onToggleFullscreen, isFulls
   const loadPlayerName = useRally((s) => s.loadPlayerName);
   const [nameInput, setNameInput] = useState("");
   const [showBoard, setShowBoard] = useState(false);
+  const [showAch, setShowAch] = useState(false);
   const audio = useAudioSettings();
   const touch = isTouchDevice();
 
@@ -68,7 +70,7 @@ export function TitleScreenImmersive({ isFullscreen, onToggleFullscreen, isFulls
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Enter" && !showBoard) handleStart();
+      if (e.key === "Enter" && !showBoard && !showAch) handleStart();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
@@ -100,6 +102,13 @@ export function TitleScreenImmersive({ isFullscreen, onToggleFullscreen, isFulls
 
       {/* top bar */}
       <div style={{ position: "absolute", top: "max(12px, env(safe-area-inset-top))", right: 12, display: "flex", gap: 10, zIndex: 20 }}>
+        <IconButton label="Achievements" onClick={() => {
+          const trimmed = nameInput.trim().slice(0, 20);
+          if (trimmed && trimmed !== playerName) setPlayerName(trimmed);
+          setShowAch(true);
+        }}>
+          <Medal size={30} strokeWidth={2.5} />
+        </IconButton>
         <IconButton label="Leaderboard" onClick={() => setShowBoard(true)}>
           <Trophy size={30} strokeWidth={2.5} />
         </IconButton>
@@ -219,6 +228,21 @@ export function TitleScreenImmersive({ isFullscreen, onToggleFullscreen, isFulls
           )}
         </div>
       </div>
+
+      {/* achievements modal */}
+      {showAch && (
+        <div
+          onClick={() => setShowAch(false)}
+          style={{ position: "absolute", inset: 0, background: "rgba(14,27,36,0.8)", zIndex: 30, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+        >
+          <div onClick={(e) => e.stopPropagation()} style={{ position: "relative", width: "min(520px, 100%)" }}>
+            <IconButton label="Close" onClick={() => setShowAch(false)} size={52} style={{ position: "absolute", top: -18, right: -10, zIndex: 2 }}>
+              <X size={28} strokeWidth={3} />
+            </IconButton>
+            <AchievementsPanel />
+          </div>
+        </div>
+      )}
 
       {/* leaderboard modal */}
       {showBoard && (

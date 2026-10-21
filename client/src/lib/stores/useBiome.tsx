@@ -93,6 +93,21 @@ export const BIOME_CONFIGS: Record<BiomeType, BiomeConfig> = {
     shoulderColor: "#6b5a3e",
     mountainColor: "#2e6a45",
   },
+  comuna_13: {
+    name: "Comuna 13",
+    subtitle: "Medellín de noche · graffiti & neon",
+    skyTop: "#140a2e",
+    skyHorizon: "#ff4f9a",
+    fogColor: "#3b1c55",
+    fogNear: 45,
+    fogFar: 190,
+    sunIntensity: 0.6,
+    sunColor: "#ff9ad0",
+    ambientIntensity: 0.5,
+    terrainColor: "#3a2f52",
+    shoulderColor: "#4a3d5e",
+    mountainColor: "#2a1840",
+  },
 };
 
 interface BiomeState {

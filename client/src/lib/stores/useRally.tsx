@@ -1,4 +1,5 @@
 import { submitScore } from "@/lib/db";
+import { saveBests } from "@/lib/env";
 import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
 import { audioManager } from "@/lib/audio";
@@ -126,6 +127,8 @@ export const useRally = create<RallyState>()(
 
     start: () => {
       resetRun();
+      audioManager.setMusicTheme("default");
+      useAchievements.getState().clearLastRun();
       audioManager.playBackgroundMusic();
       audioManager.duckMusic(1);
       set((s) => ({
@@ -208,6 +211,14 @@ export const useRally = create<RallyState>()(
           .catch((err) => console.warn("Could not save score:", err));
       }
 
+      saveBests({
+        distance: Math.floor(run.z),
+        jars: run.jars,
+        nitroUses: run.nitroUses,
+        cleanDistance: Math.floor(run.firstHitZ >= 0 ? run.firstHitZ : run.z),
+        maxSpeed: Math.floor(run.maxSpeedKmh),
+      });
+
       if (state.playerName) {
         useAchievements.getState().finishRun(state.playerName, {
           distance: Math.floor(run.z),
@@ -221,6 +232,7 @@ export const useRally = create<RallyState>()(
     },
 
     restart: () => {
+      audioManager.setMusicTheme("default");
       audioManager.stopEngineSound();
       audioManager.duckMusic(1);
       audioManager.playBackgroundMusic();

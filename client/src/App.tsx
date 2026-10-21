@@ -4,7 +4,6 @@ import { useAchievements } from "./lib/stores/useAchievements";
 import { TitleScreenImmersive } from "./components/ui/TitleScreenImmersive";
 import { GameScene } from "./components/game/GameScene";
 import { GameOverScreen } from "./components/ui/GameOverScreen";
-import { AchievementNotification } from "./components/ui/AchievementNotification";
 import { GameStyles } from "./components/ui/gameUi";
 import { audioManager } from "./lib/audio";
 import { useFullscreen } from "./hooks/useFullscreen";
@@ -45,7 +44,6 @@ function App() {
         <GameScene isFullscreen={isFullscreen} onToggleFullscreen={isSupported ? toggle : undefined} />
       )}
       {phase === "gameover" && <GameOverScreen />}
-      <AchievementNotification />
     </div>
   );
 }

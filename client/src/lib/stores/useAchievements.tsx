@@ -31,13 +31,34 @@ interface AchievementsState {
   achievements: Achievement[];
   playerStats: PlayerStats | null;
   unlockedAchievements: Set<string>;
-  recentUnlock: Achievement | null;
-  queue: Achievement[];
+  loadedFor: string;
+  /** Unlocked in the race that just ended; shown on the race-over screen. */
+  lastRunUnlocks: Achievement[];
 
   loadAchievements: () => Promise<void>;
   loadPlayerStats: (playerName: string) => Promise<void>;
   finishRun: (playerName: string, run: RunFacts) => Promise<void>;
-  clearRecentUnlock: () => void;
+  clearLastRun: () => void;
+}
+
+// remembers what this device already celebrated, so nothing is announced twice
+const SEEN_KEY = "dreamNexusRallySeenAchievements";
+function seenSet(player: string): Set<string> {
+  try {
+    const all = JSON.parse(localStorage.getItem(SEEN_KEY) || "{}");
+    return new Set(all[player] || []);
+  } catch {
+    return new Set();
+  }
+}
+function markSeen(player: string, ids: string[]) {
+  try {
+    const all = JSON.parse(localStorage.getItem(SEEN_KEY) || "{}");
+    all[player] = Array.from(new Set([...(all[player] || []), ...ids]));
+    localStorage.setItem(SEEN_KEY, JSON.stringify(all));
+  } catch {
+    /* ignore */
+  }
 }
 
 function progressFor(a: Achievement, stats: PlayerStats | null, run: RunFacts | null): number {
@@ -72,8 +93,8 @@ export const useAchievements = create<AchievementsState>()(
     achievements: [],
     playerStats: null,
     unlockedAchievements: new Set(),
-    recentUnlock: null,
-    queue: [],
+    loadedFor: "",
+    lastRunUnlocks: [],
 
     loadAchievements: async () => {
       if (!isOnline) return;
@@ -88,15 +109,19 @@ export const useAchievements = create<AchievementsState>()(
       if (!playerName || !isOnline) return;
       try {
         const [stats, unlocked] = await Promise.all([getPlayerStats(playerName), getUnlockedIds(playerName)]);
-        set({ playerStats: stats, unlockedAchievements: new Set(unlocked) });
+        set({ playerStats: stats, unlockedAchievements: new Set(unlocked), loadedFor: playerName });
       } catch (error) {
         console.warn("Player stats unavailable:", error);
       }
     },
 
     finishRun: async (playerName: string, run: RunFacts) => {
+      set({ lastRunUnlocks: [] });
       if (!playerName || !isOnline) return;
       try {
+        if (!get().achievements.length) await get().loadAchievements();
+        if (get().loadedFor !== playerName) await get().loadPlayerStats(playerName);
+
         const stats = await recordRun(playerName, {
           distance: run.distance,
           maxSpeed: run.maxSpeed,
@@ -105,31 +130,24 @@ export const useAchievements = create<AchievementsState>()(
         });
         if (stats) set({ playerStats: stats });
 
-        const { achievements, unlockedAchievements } = get();
-        const newly: Achievement[] = [];
+        const { achievements } = get();
+        const unlocked = new Set(get().unlockedAchievements);
+        const seen = seenSet(playerName);
+        const fresh: Achievement[] = [];
         for (const a of achievements) {
-          if (unlockedAchievements.has(a.id)) continue;
-          const p = progressFor(a, stats, run);
-          if (p >= a.requirement_value) {
-            await unlockAchievement(playerName, a.id, a.requirement_value);
-            newly.push(a);
-          }
+          if (unlocked.has(a.id)) continue;
+          if (progressFor(a, stats, run) < a.requirement_value) continue;
+          const isNew = await unlockAchievement(playerName, a.id, a.requirement_value);
+          unlocked.add(a.id);
+          if (isNew && !seen.has(a.id)) fresh.push(a);
         }
-        if (newly.length) {
-          const all = new Set(get().unlockedAchievements);
-          newly.forEach((a) => all.add(a.id));
-          set({ unlockedAchievements: all, queue: [...get().queue, ...newly] });
-          if (!get().recentUnlock) get().clearRecentUnlock();
-        }
+        markSeen(playerName, Array.from(unlocked));
+        set({ unlockedAchievements: unlocked, lastRunUnlocks: fresh });
       } catch (error) {
         console.warn("Could not save run stats:", error);
       }
     },
 
-    /** Shows the next unlocked achievement (one at a time). */
-    clearRecentUnlock: () => {
-      const [next, ...rest] = get().queue;
-      set({ recentUnlock: next ?? null, queue: rest });
-    },
+    clearLastRun: () => set({ lastRunUnlocks: [] }),
   })),
 );

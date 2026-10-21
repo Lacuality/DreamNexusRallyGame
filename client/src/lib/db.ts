@@ -131,14 +131,16 @@ export async function getUnlockedIds(playerName: string): Promise<string[]> {
   return [];
 }
 
-export async function unlockAchievement(playerName: string, achievementId: string, progress: number) {
+/** Returns true only when this is a brand-new unlock. */
+export async function unlockAchievement(playerName: string, achievementId: string, progress: number): Promise<boolean> {
   if (supabase) {
     const { error } = await supabase
       .from("player_achievements")
       .insert({ player_name: playerName, achievement_id: achievementId, progress });
-    // a duplicate means it was already unlocked: fine
-    if (error && error.code !== "23505") throw error;
-    return;
+    // a duplicate means it was already unlocked before: not new
+    if (error && error.code === "23505") return false;
+    if (error) throw error;
+    return true;
   }
   if (HAS_SERVER) {
     await fetch("/api/player-achievements", {
@@ -146,7 +148,9 @@ export async function unlockAchievement(playerName: string, achievementId: strin
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ player_name: playerName, achievement_id: achievementId, progress }),
     });
+    return true;
   }
+  return false;
 }
 
 export async function getPlayerStats(playerName: string): Promise<PlayerStats | null> {

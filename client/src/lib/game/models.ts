@@ -619,7 +619,12 @@ export type SceneryKind =
   | "fern"
   | "terrace"
   | "hut"
-  | "stairs";
+  | "stairs"
+  | "barrio"
+  | "graffiti"
+  | "escalator"
+  | "neonPalm"
+  | "neonSign";
 
 function buildCoffeeBush() {
   const g = new THREE.Group();
@@ -992,6 +997,169 @@ function buildStairs() {
   return g;
 }
 
+/* ---------- Comuna 13 at night (Medellín · Siloé · Soacha) ---------- */
+const BRICK = ["#b5563a", "#a24a33", "#c46a45", "#e8d9c0", "#5fa8ff", "#ff9f43", "#7bd389"];
+let windowMat: THREE.Material | null = null;
+
+function buildBarrio(variant: number) {
+  // houses stacked up the hillside, lights on in the windows
+  const g = new THREE.Group();
+  windowMat ??= mat("#ffd27a", { emissive: "#ffc04a", emissiveIntensity: 1.6 });
+  const roofMat = mat("#5a5a5a", { roughness: 1 });
+  const winGeo = new THREE.BoxGeometry(0.06, 0.6, 0.6);
+  for (let i = 0; i < 7; i++) {
+    const r = hashV(variant * 31 + i);
+    const w = 3 + r * 2;
+    const h = 2.6 + hashV(variant * 17 + i) * 2.6;
+    const m = mat(BRICK[(variant + i) % BRICK.length], { roughness: 1 });
+    const house = mesh(new THREE.BoxGeometry(w, h, 3.4), m);
+    // each house sits higher and further from the road than the last
+    const x = i * 2.6;
+    const y = i * 1.5 + h / 2;
+    const z = (hashV(variant * 7 + i) - 0.5) * 6;
+    house.position.set(x, y, z);
+    g.add(house);
+    const roof = mesh(new THREE.BoxGeometry(w + 0.2, 0.15, 3.6), roofMat);
+    roof.position.set(x, y + h / 2 + 0.07, z);
+    g.add(roof);
+    for (let k = 0; k < 2; k++) {
+      if (hashV(variant * 13 + i * 3 + k) < 0.35) continue;
+      const win = mesh(winGeo, windowMat, false);
+      win.position.set(x - w / 2 - 0.02, y + 0.2, z - 0.8 + k * 1.6);
+      g.add(win);
+    }
+  }
+  return g;
+}
+
+function hashV(n: number) {
+  const s = Math.sin(n * 127.1 + 311.7) * 43758.5453;
+  return s - Math.floor(s);
+}
+
+function graffitiTexture(seed: number) {
+  const words = ["COMUNA 13", "PIXEL", "SILOÉ", "SOACHA", "DNR", "PAZ", "BUNNY", "RALLY"];
+  return canvasTex(512, 160, (ctx) => {
+    ctx.fillStyle = "#3d3a45";
+    ctx.fillRect(0, 0, 512, 160);
+    const cols = ["#ff4f9a", "#5fd8ff", "#ffd23f", "#7bd389", "#ff9f43", "#b388ff"];
+    for (let i = 0; i < 14; i++) {
+      ctx.fillStyle = cols[Math.floor(hashV(seed * 9 + i) * cols.length)];
+      ctx.globalAlpha = 0.85;
+      ctx.beginPath();
+      ctx.ellipse(hashV(seed + i * 3) * 512, hashV(seed + i * 5) * 160, 20 + hashV(i + seed) * 60, 12 + hashV(i * 2 + seed) * 40, hashV(i) * 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    const word = words[seed % words.length];
+    ctx.font = "bold 72px 'Arial Black', sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.lineWidth = 10;
+    ctx.strokeStyle = "#111";
+    ctx.strokeText(word, 256, 84);
+    ctx.fillStyle = cols[seed % cols.length];
+    ctx.fillText(word, 256, 84);
+    // paint drips
+    ctx.fillStyle = cols[(seed + 2) % cols.length];
+    for (let i = 0; i < 8; i++) ctx.fillRect(60 + i * 55, 110, 5, 20 + hashV(seed * 3 + i) * 30);
+  });
+}
+
+function buildGraffiti(variant: number) {
+  const g = new THREE.Group();
+  const tex = graffitiTexture(variant);
+  const face = mat("#ffffff", { map: tex, emissive: "#ffffff", emissiveMap: tex, emissiveIntensity: 0.35, roughness: 1 });
+  const side = mat("#4a4652");
+  const wall = mesh(new THREE.BoxGeometry(0.35, 2.6, 8), [face, face, side, side, side, side] as any);
+  wall.position.y = 1.3;
+  g.add(wall);
+  return g;
+}
+
+function buildEscalator() {
+  // Comuna 13's famous covered outdoor escalators, climbing the hill (+x)
+  const g = new THREE.Group();
+  const metal = mat("#9aa3ad", { metalness: 0.6, roughness: 0.4 });
+  const roof = mat("#ff7a1a", { emissive: "#ff5a00", emissiveIntensity: 0.4 });
+  const len = 9;
+  const angle = Math.atan2(4.5, len);
+  const run = new THREE.Group();
+  run.rotation.z = angle;
+  const belt = mesh(new THREE.BoxGeometry(Math.hypot(len, 4.5), 0.4, 1.6), metal);
+  belt.position.x = Math.hypot(len, 4.5) / 2;
+  const cover = mesh(new THREE.BoxGeometry(Math.hypot(len, 4.5), 0.12, 2.4), roof);
+  cover.position.set(Math.hypot(len, 4.5) / 2, 2.4, 0);
+  run.add(belt, cover);
+  for (let i = 0; i < 5; i++) {
+    const post = mesh(new THREE.BoxGeometry(0.1, 2.4, 0.1), metal);
+    post.position.set(1 + i * 2.2, 1.2, 1.1);
+    const post2 = post.clone();
+    post2.position.z = -1.1;
+    run.add(post, post2);
+  }
+  g.add(run);
+  return g;
+}
+
+function buildNeonPalm() {
+  const g = new THREE.Group();
+  const pink = mat("#ff4f9a", { emissive: "#ff2a85", emissiveIntensity: 1.6 });
+  const cyan = mat("#5fd8ff", { emissive: "#24c8ff", emissiveIntensity: 1.6, side: THREE.DoubleSide });
+  const trunk = mesh(new THREE.CylinderGeometry(0.16, 0.22, 7, 7), mat("#1a1424"));
+  trunk.position.y = 3.5;
+  g.add(trunk);
+  for (let i = 0; i < 6; i++) {
+    const ring = mesh(new THREE.TorusGeometry(0.2, 0.04, 4, 12), pink, false);
+    ring.rotation.x = Math.PI / 2;
+    ring.position.y = 1 + i * 1.1;
+    g.add(ring);
+  }
+  const leafGeo = new THREE.BoxGeometry(0.08, 0.06, 2.6);
+  for (let i = 0; i < 7; i++) {
+    const l = mesh(leafGeo, cyan, false);
+    const a = (i / 7) * Math.PI * 2;
+    l.position.set(Math.cos(a) * 1.1, 6.9, Math.sin(a) * 1.1);
+    l.rotation.y = -a + Math.PI / 2;
+    l.rotation.x = 0.45;
+    g.add(l);
+  }
+  return g;
+}
+
+function buildNeonSign(variant: number) {
+  const words = ["COMUNA 13", "SILOÉ", "SOACHA"];
+  const colors = ["#ff4f9a", "#5fd8ff", "#ffd23f"];
+  const word = words[variant % words.length];
+  const col = colors[variant % colors.length];
+  const tex = canvasTex(512, 160, (ctx) => {
+    ctx.fillStyle = "#07040d";
+    ctx.fillRect(0, 0, 512, 160);
+    ctx.shadowColor = col;
+    ctx.shadowBlur = 24;
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 8;
+    ctx.strokeRect(14, 14, 484, 132);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 76px 'Arial Black', sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(word, 256, 84);
+  });
+  const g = new THREE.Group();
+  const face = mat("#ffffff", { map: tex, emissive: "#ffffff", emissiveMap: tex, emissiveIntensity: 1.4 });
+  const dark = mat("#111");
+  const board = mesh(new THREE.BoxGeometry(0.15, 1.6, 5), [face, face, dark, dark, dark, dark] as any);
+  board.position.y = 3.2;
+  g.add(board);
+  [-2, 2].forEach((z) => {
+    const p = mesh(new THREE.CylinderGeometry(0.07, 0.07, 3.2, 6), dark);
+    p.position.set(0, 1.6, z);
+    g.add(p);
+  });
+  return g;
+}
+
 /* =========================================================
  * Pools
  * ======================================================= */
@@ -1022,9 +1190,14 @@ const BUILDERS: Record<string, Builder> = {
   terrace: buildTerrace,
   hut: buildHut,
   stairs: buildStairs,
+  escalator: buildEscalator,
+  neonPalm: buildNeonPalm,
   bunting: buildBunting,
 };
 for (let v = 0; v < 7; v++) BUILDERS[`house${v}`] = () => buildHouse(v);
+for (let v = 0; v < 5; v++) BUILDERS[`barrio${v}`] = () => buildBarrio(v);
+for (let v = 0; v < 8; v++) BUILDERS[`graffiti${v}`] = () => buildGraffiti(v);
+for (let v = 0; v < 3; v++) BUILDERS[`neonSign${v}`] = () => buildNeonSign(v);
 
 const templates = new Map<string, THREE.Object3D>();
 const SOLID_KINDS = ["cone", "rock", "sacks", "barrier"] as const;

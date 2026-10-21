@@ -38,9 +38,9 @@ export function roadPitch(z: number) {
 }
 
 /* ---------------- Biomes ---------------- */
-export type BiomeType = "coffee_hills" | "andes_highland" | "pueblo" | "ciudad_perdida";
+export type BiomeType = "coffee_hills" | "andes_highland" | "pueblo" | "ciudad_perdida" | "comuna_13";
 export const BIOME_LENGTH = 800;
-export const BIOME_SEQUENCE: BiomeType[] = ["coffee_hills", "andes_highland", "pueblo", "ciudad_perdida"];
+export const BIOME_SEQUENCE: BiomeType[] = ["coffee_hills", "andes_highland", "pueblo", "ciudad_perdida", "comuna_13"];
 
 export function biomeAt(z: number): BiomeType {
   const i = Math.floor(Math.max(0, z) / BIOME_LENGTH) % BIOME_SEQUENCE.length;
