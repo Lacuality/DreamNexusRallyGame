@@ -618,6 +618,13 @@ export function Scenery() {
         } else if (biome === "andes_highland") {
           place(r1 < 0.6 ? "frailejon" : "boulder", z + side * 2, near + side * 0.5, 0.8 + r3 * 0.7, r2 * 6);
           place(r2 > 0.4 ? "pine" : "boulder", z + 4, far, 1 + r3 * 0.8, r1 * 6);
+        } else if (biome === "ciudad_perdida") {
+          // dense jungle: ferns at the road, terraces, huts and giant ceibas behind
+          place("fern", z + side * 2, near - side * 0.8, 0.9 + r3 * 0.6, r2 * 6);
+          if (r1 < 0.3) place("hut", z + 3, side * (ROAD_HALF + 10 + r2 * 4), 1, face);
+          else if (r1 < 0.55) place("terrace", z + 3, side * (ROAD_HALF + 11 + r2 * 3), 1, r3 * 6);
+          else if (r1 < 0.65) place("stairs", z, side * (ROAD_HALF + 4.5), 1, heading + (side > 0 ? 0 : Math.PI)); // climbs away from the road
+          place("ceiba", z + 6, far * 1.1, 0.8 + r3 * 0.5, r1 * 6);
         } else {
           if (r1 < 0.7) place(`house${Math.floor(r3 * 7)}`, z, side * (ROAD_HALF + 7 + r2 * 2), 1, face);
           else place("lamp", z, side * (ROAD_HALF + 2.2), 1, heading + (side > 0 ? 0 : Math.PI));

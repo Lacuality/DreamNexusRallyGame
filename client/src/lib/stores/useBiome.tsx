@@ -78,6 +78,21 @@ export const BIOME_CONFIGS: Record<BiomeType, BiomeConfig> = {
     shoulderColor: "#b0703f",
     mountainColor: "#9a6a5a",
   },
+  ciudad_perdida: {
+    name: "Ciudad Perdida",
+    subtitle: "Teyuna · Sierra Nevada de Santa Marta",
+    skyTop: "#6fa8a0",
+    skyHorizon: "#cfe3d6",
+    fogColor: "#c4dccd",
+    fogNear: 30,
+    fogFar: 150,
+    sunIntensity: 1.15,
+    sunColor: "#fff6dc",
+    ambientIntensity: 0.7,
+    terrainColor: "#2f7a36",
+    shoulderColor: "#6b5a3e",
+    mountainColor: "#2e6a45",
+  },
 };
 
 interface BiomeState {

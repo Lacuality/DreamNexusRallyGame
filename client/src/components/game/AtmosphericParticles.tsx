@@ -56,6 +56,8 @@ export function AtmosphericParticles({ carPositionRef }: { carPositionRef: React
         return new THREE.Color(0xE8F4F8);
       case "pueblo":
         return new THREE.Color(0xFFE5CC);
+      case "ciudad_perdida":
+        return new THREE.Color(0xDFF5E6); // jungle mist
       default:
         return new THREE.Color(0xFFFFFF);
     }

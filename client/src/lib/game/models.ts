@@ -614,7 +614,12 @@ export type SceneryKind =
   | "lamp"
   | "banner"
   | "bunting"
-  | "arch";
+  | "arch"
+  | "ceiba"
+  | "fern"
+  | "terrace"
+  | "hut"
+  | "stairs";
 
 function buildCoffeeBush() {
   const g = new THREE.Group();
@@ -880,6 +885,113 @@ function buildArch(label: string) {
   return g;
 }
 
+/* ---------- Ciudad Perdida (Teyuna) ---------- */
+function buildCeiba() {
+  // giant jungle tree with buttress roots, wide canopy and hanging vines
+  const g = new THREE.Group();
+  const bark = mat("#7b6a55", { roughness: 1, flatShading: true });
+  const trunk = mesh(new THREE.CylinderGeometry(0.55, 0.9, 10, 8), bark);
+  trunk.position.y = 5;
+  g.add(trunk);
+  for (let i = 0; i < 5; i++) {
+    const root = mesh(new THREE.BoxGeometry(0.25, 1.8, 1.6), bark);
+    const a = (i / 5) * Math.PI * 2;
+    root.position.set(Math.cos(a) * 0.9, 0.8, Math.sin(a) * 0.9);
+    root.rotation.y = -a;
+    g.add(root);
+  }
+  const leafA = mat("#2f7a36", { flatShading: true, roughness: 1 });
+  const leafB = mat("#4f9a3c", { flatShading: true, roughness: 1 });
+  const geo = new THREE.IcosahedronGeometry(2.4, 0);
+  [
+    [0, 10.5, 0, 1.3, leafA],
+    [2.4, 9.8, 0.8, 1, leafB],
+    [-2.2, 10, -0.6, 1.05, leafB],
+    [0.6, 11.6, -1.6, 0.9, leafA],
+    [-0.8, 9.6, 2, 0.85, leafA],
+  ].forEach(([x, y, z, s, m]) => {
+    const c = mesh(geo, m as THREE.Material);
+    c.position.set(x as number, y as number, z as number);
+    c.scale.set(s as number, (s as number) * 0.6, s as number);
+    g.add(c);
+  });
+  const vine = mat("#3d6b2a");
+  for (let i = 0; i < 6; i++) {
+    const v = mesh(new THREE.CylinderGeometry(0.04, 0.04, 3 + (i % 3), 4), vine, false);
+    const a = i * 1.1;
+    v.position.set(Math.cos(a) * 2.2, 8 - (i % 3) * 0.5, Math.sin(a) * 2.2);
+    g.add(v);
+  }
+  return g;
+}
+
+function buildFern() {
+  const g = new THREE.Group();
+  const leaf = mat("#3f9a3a", { side: THREE.DoubleSide, flatShading: true });
+  const geo = new THREE.ConeGeometry(0.28, 1.8, 3);
+  for (let i = 0; i < 9; i++) {
+    const l = mesh(geo, leaf);
+    const a = (i / 9) * Math.PI * 2;
+    l.position.set(Math.cos(a) * 0.6, 0.6, Math.sin(a) * 0.6);
+    l.rotation.set(Math.sin(a) * 1.2, 0, -Math.cos(a) * 1.2);
+    l.scale.set(1, 1, 0.25);
+    g.add(l);
+  }
+  return g;
+}
+
+function buildTerrace() {
+  // the round mossy stone terraces Ciudad Perdida is famous for
+  const g = new THREE.Group();
+  const stone = mat("#8f8c80", { flatShading: true, roughness: 1 });
+  const moss = mat("#5f9a45", { flatShading: true, roughness: 1 });
+  [
+    [5.2, 0.9, 0.45],
+    [3.8, 0.9, 1.35],
+  ].forEach(([r, h, y]) => {
+    const ring = mesh(new THREE.CylinderGeometry(r, r + 0.3, h, 20), stone);
+    ring.position.y = y;
+    g.add(ring);
+    const top = mesh(new THREE.CylinderGeometry(r - 0.1, r - 0.1, 0.12, 20), moss);
+    top.position.y = y + h / 2 + 0.05;
+    g.add(top);
+  });
+  return g;
+}
+
+function buildHut() {
+  // Tairona hut: stone base ring, round wall, tall conical thatch roof
+  const g = new THREE.Group();
+  const stone = mat("#8f8c80", { flatShading: true, roughness: 1 });
+  const wall = mat("#b49a72", { roughness: 1 });
+  const thatch = mat("#c9a85a", { flatShading: true, roughness: 1 });
+  const base = mesh(new THREE.CylinderGeometry(3.3, 3.5, 0.8, 18), stone);
+  base.position.y = 0.4;
+  const w = mesh(new THREE.CylinderGeometry(2.4, 2.4, 2.2, 16), wall);
+  w.position.y = 1.9;
+  const roof = mesh(new THREE.ConeGeometry(3.2, 4.2, 16), thatch);
+  roof.position.y = 5.1;
+  const tip = mesh(new THREE.CylinderGeometry(0.05, 0.08, 1.2, 5), mat("#5a4a3a"));
+  tip.position.y = 7.6;
+  const door = mesh(new THREE.BoxGeometry(0.9, 1.5, 0.2), mat("#3b2e22"), false);
+  door.position.set(2.38, 1.55, 0);
+  door.rotation.y = Math.PI / 2;
+  g.add(base, w, roof, tip, door);
+  return g;
+}
+
+function buildStairs() {
+  // a stone stairway climbing into the jungle
+  const g = new THREE.Group();
+  const stone = mat("#9a968a", { flatShading: true, roughness: 1 });
+  for (let i = 0; i < 7; i++) {
+    const step = mesh(new THREE.BoxGeometry(1.6 + i * 0.35, 0.35, 2.2), stone);
+    step.position.set(i * 0.7, 0.18 + i * 0.35, 0);
+    g.add(step);
+  }
+  return g;
+}
+
 /* =========================================================
  * Pools
  * ======================================================= */
@@ -905,6 +1017,11 @@ const BUILDERS: Record<string, Builder> = {
   pine: buildPine,
   lamp: buildLamp,
   banner: buildBanner,
+  ceiba: buildCeiba,
+  fern: buildFern,
+  terrace: buildTerrace,
+  hut: buildHut,
+  stairs: buildStairs,
   bunting: buildBunting,
 };
 for (let v = 0; v < 7; v++) BUILDERS[`house${v}`] = () => buildHouse(v);

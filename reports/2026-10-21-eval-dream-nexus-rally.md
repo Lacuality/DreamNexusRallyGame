@@ -47,7 +47,7 @@ the score multiplier and fill nitro → fire nitro to smash through everything �
   combo multiplier up to x5, near-miss bonus, ramps with BIG AIR bonus and jars in the air,
   nitro you fire yourself (Space / NITRO button) to smash obstacles for points, hand-made
   spawn patterns (jar lines, weaves, gap threading, cone slalom, ramp-over-wall, puddles,
-  power-ups) that always leave a way through and get denser as you go, three regions with
+  power-ups) that always leave a way through and get denser as you go, four regions (Coffee Hills, Andes, Pueblo, Ciudad Perdida) with
   "Now entering…" banners, milestones every 500 m, floating score popups, screen shake and
   hit flash, phone vibration on crash, auto-pause when you switch apps.
 - **Road**: one shared track shape drives road, car, obstacles and scenery, so curves and

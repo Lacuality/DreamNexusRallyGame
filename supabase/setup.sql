@@ -218,3 +218,8 @@ GRANT EXECUTE ON FUNCTION record_run(text, integer, integer, integer, integer) T
 
 -- ---------- achievements ----------
 DROP POLICY IF EXISTS "Anyone can update their achievements" ON player_achievements;
+
+-- ===== 4. Ciudad Perdida achievement =====
+INSERT INTO achievements (name, description, icon, requirement_type, requirement_value, points)
+SELECT 'Lost City Explorer', 'Reach Ciudad Perdida in one run (2400 m)', '🗿', 'distance', 2400, 25
+WHERE NOT EXISTS (SELECT 1 FROM achievements WHERE name = 'Lost City Explorer');
