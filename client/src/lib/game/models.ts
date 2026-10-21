@@ -26,254 +26,13 @@ function canvasTex(w: number, h: number, draw: (ctx: CanvasRenderingContext2D) =
   return t;
 }
 
-/* =========================================================
- * Rally car with Pixel the Bunny
- * ======================================================= */
-export interface CarRig {
-  root: THREE.Group;
-  body: THREE.Group;
-  wheels: THREE.Object3D[];
-  frontWheels: THREE.Object3D[];
-  earL: THREE.Object3D;
-  earR: THREE.Object3D;
-  flames: THREE.Object3D;
-  shield: THREE.Mesh;
-  paint: THREE.MeshStandardMaterial[];
-}
-
-export function buildCar(): CarRig {
-  const root = new THREE.Group();
-  const body = new THREE.Group();
-  root.add(body);
-
-  const paintMain = mat("#24A0CE", { roughness: 0.35, metalness: 0.3 });
-  const paintAccent = mat("#FDC6B5", { roughness: 0.4, metalness: 0.2 });
-  const dark = mat("#0E1B24", { roughness: 0.6 });
-  const glass = mat("#9fd8f0", { roughness: 0.1, metalness: 0.6, transparent: true, opacity: 0.75 });
-  const chrome = mat("#dddddd", { roughness: 0.2, metalness: 0.9 });
-  const light = mat("#fff6c8", { emissive: "#fff2a0", emissiveIntensity: 1.2 });
-  const tail = mat("#ff3344", { emissive: "#ff1122", emissiveIntensity: 0.8 });
-
-  const numberTex = canvasTex(128, 128, (ctx) => {
-    ctx.fillStyle = "#ffffff";
-    ctx.beginPath();
-    ctx.arc(64, 64, 58, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "#0E1B24";
-    ctx.font = "bold 76px sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText("7", 64, 70);
-  });
-  const numberMat = mat("#ffffff", { map: numberTex });
-
-  // chassis (car points toward +z)
-  const chassis = mesh(new THREE.BoxGeometry(1.8, 0.5, 3.9), paintMain);
-  chassis.position.y = 0.55;
-  body.add(chassis);
-  // bonnet slope
-  const bonnet = mesh(new THREE.BoxGeometry(1.7, 0.2, 1.2), paintMain);
-  bonnet.position.set(0, 0.85, 1.2);
-  bonnet.rotation.x = 0.12;
-  body.add(bonnet);
-  // stripe
-  const stripe = mesh(new THREE.BoxGeometry(0.5, 0.52, 3.92), paintAccent, false);
-  stripe.position.y = 0.555;
-  body.add(stripe);
-  // cabin
-  const cabin = mesh(new THREE.BoxGeometry(1.55, 0.6, 1.8), paintMain);
-  cabin.position.set(0, 1.1, -0.25);
-  body.add(cabin);
-  const windscreen = mesh(new THREE.BoxGeometry(1.45, 0.5, 0.06), glass, false);
-  windscreen.position.set(0, 1.12, 0.66);
-  windscreen.rotation.x = -0.35;
-  body.add(windscreen);
-  const sideGlassL = mesh(new THREE.BoxGeometry(0.04, 0.38, 1.4), glass, false);
-  sideGlassL.position.set(0.785, 1.14, -0.25);
-  body.add(sideGlassL);
-  const sideGlassR = sideGlassL.clone();
-  sideGlassR.position.x = -0.785;
-  body.add(sideGlassR);
-  // roof with sunroof hole look
-  const roof = mesh(new THREE.BoxGeometry(1.6, 0.08, 1.9), paintAccent);
-  roof.position.set(0, 1.44, -0.25);
-  body.add(roof);
-  // spoiler
-  const spoiler = mesh(new THREE.BoxGeometry(1.9, 0.08, 0.45), dark);
-  spoiler.position.set(0, 1.25, -1.85);
-  body.add(spoiler);
-  [-0.7, 0.7].forEach((x) => {
-    const post = mesh(new THREE.BoxGeometry(0.08, 0.4, 0.15), dark);
-    post.position.set(x, 1.02, -1.8);
-    body.add(post);
-  });
-  // bumpers, lights, number plates
-  const fb = mesh(new THREE.BoxGeometry(1.85, 0.25, 0.25), dark);
-  fb.position.set(0, 0.38, 1.95);
-  body.add(fb);
-  const rb = fb.clone();
-  rb.position.z = -1.95;
-  body.add(rb);
-  [-0.6, 0.6].forEach((x) => {
-    const hl = mesh(new THREE.BoxGeometry(0.35, 0.18, 0.06), light, false);
-    hl.position.set(x, 0.66, 1.96);
-    body.add(hl);
-    const tl = mesh(new THREE.BoxGeometry(0.35, 0.14, 0.06), tail, false);
-    tl.position.set(x, 0.66, -1.96);
-    body.add(tl);
-    // rally spot lamps
-    const spot = mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.1, 12), light, false);
-    spot.rotation.x = Math.PI / 2;
-    spot.position.set(x * 0.6, 0.5, 2.1);
-    body.add(spot);
-  });
-  [-1, 1].forEach((side) => {
-    const num = mesh(new THREE.PlaneGeometry(0.75, 0.75), numberMat, false);
-    num.position.set(side * 0.905, 0.62, -0.1);
-    num.rotation.y = side * Math.PI / 2;
-    body.add(num);
-  });
-  // exhaust
-  const ex = mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.3, 8), chrome, false);
-  ex.rotation.x = Math.PI / 2;
-  ex.position.set(0.55, 0.32, -2.05);
-  body.add(ex);
-
-  // wheels
-  const tyre = mat("#1b1b1f", { roughness: 0.9 });
-  const rim = mat("#FDC6B5", { metalness: 0.6, roughness: 0.3 });
-  const wheelGeo = new THREE.CylinderGeometry(0.42, 0.42, 0.34, 16);
-  const rimGeo = new THREE.CylinderGeometry(0.24, 0.24, 0.36, 8);
-  const wheels: THREE.Object3D[] = [];
-  const frontWheels: THREE.Object3D[] = [];
-  [
-    [0.92, 1.25],
-    [-0.92, 1.25],
-    [0.92, -1.25],
-    [-0.92, -1.25],
-  ].forEach(([x, z], i) => {
-    const pivot = new THREE.Group();
-    pivot.position.set(x, 0.42, z);
-    const spin = new THREE.Group();
-    const w = mesh(wheelGeo, tyre);
-    w.rotation.z = Math.PI / 2;
-    const r = mesh(rimGeo, rim, false);
-    r.rotation.z = Math.PI / 2;
-    spin.add(w, r);
-    pivot.add(spin);
-    root.add(pivot);
-    wheels.push(spin);
-    if (i < 2) frontWheels.push(pivot);
-  });
-
-  // ---- Pixel the Bunny popping out of the sunroof ----
-  const fur = mat("#fbfbfb", { roughness: 0.9 });
-  const pink = mat("#ffb3c4", { roughness: 0.8 });
-  const eye = mat("#111111", { roughness: 0.3 });
-  const goggles = mat("#24A0CE", { roughness: 0.2, metalness: 0.5, emissive: "#0c4a66", emissiveIntensity: 0.4 });
-  const bunny = new THREE.Group();
-  bunny.position.set(0, 1.5, -0.35);
-  const head = mesh(new THREE.SphereGeometry(0.36, 18, 14), fur);
-  head.scale.set(1, 0.92, 1);
-  head.position.y = 0.3;
-  bunny.add(head);
-  const cheekL = mesh(new THREE.SphereGeometry(0.14, 10, 8), fur);
-  cheekL.position.set(0.16, 0.2, 0.26);
-  bunny.add(cheekL);
-  const cheekR = cheekL.clone();
-  cheekR.position.x = -0.16;
-  bunny.add(cheekR);
-  const nose = mesh(new THREE.SphereGeometry(0.06, 8, 6), pink, false);
-  nose.position.set(0, 0.27, 0.36);
-  bunny.add(nose);
-  const band = mesh(new THREE.TorusGeometry(0.34, 0.04, 6, 24), dark, false);
-  band.position.y = 0.4;
-  band.rotation.x = Math.PI / 2 - 0.15;
-  bunny.add(band);
-  [-0.14, 0.14].forEach((x) => {
-    const g = mesh(new THREE.CylinderGeometry(0.11, 0.11, 0.08, 14), goggles, false);
-    g.rotation.x = Math.PI / 2;
-    g.position.set(x, 0.42, 0.3);
-    bunny.add(g);
-    const e = mesh(new THREE.SphereGeometry(0.05, 8, 6), eye, false);
-    e.position.set(x, 0.33, 0.33);
-    bunny.add(e);
-  });
-  const makeEar = (side: number) => {
-    const pivot = new THREE.Group();
-    pivot.position.set(side * 0.14, 0.56, -0.02);
-    const ear = mesh(new THREE.CapsuleGeometry(0.08, 0.55, 4, 10), fur);
-    ear.position.y = 0.34;
-    ear.scale.set(1, 1, 0.55);
-    const inner = mesh(new THREE.CapsuleGeometry(0.045, 0.45, 4, 8), pink, false);
-    inner.position.set(0, 0.34, 0.035);
-    inner.scale.set(1, 1, 0.4);
-    pivot.add(ear, inner);
-    pivot.rotation.z = -side * 0.15;
-    bunny.add(pivot);
-    return pivot;
-  };
-  const earL = makeEar(1);
-  const earR = makeEar(-1);
-  // scarf flapping colour
-  const scarf = mesh(new THREE.TorusGeometry(0.27, 0.07, 6, 18), mat("#ff5a5f"), false);
-  scarf.rotation.x = Math.PI / 2;
-  scarf.position.y = 0.02;
-  bunny.add(scarf);
-  body.add(bunny);
-
-  // nitro flames
-  const flames = new THREE.Group();
-  const flameMat = new THREE.MeshBasicMaterial({ color: "#ffb03a", transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false });
-  const flameCore = new THREE.MeshBasicMaterial({ color: "#5fd8ff", transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false });
-  [-0.45, 0.45].forEach((x) => {
-    const f = new THREE.Mesh(new THREE.ConeGeometry(0.22, 1.4, 10), flameMat);
-    f.rotation.x = -Math.PI / 2;
-    f.position.set(x, 0.42, -2.7);
-    const c = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.8, 8), flameCore);
-    c.rotation.x = -Math.PI / 2;
-    c.position.set(x, 0.42, -2.4);
-    flames.add(f, c);
-  });
-  flames.visible = false;
-  body.add(flames);
-
-  // shield bubble
-  const shield = new THREE.Mesh(
-    new THREE.SphereGeometry(2.6, 24, 16),
-    new THREE.MeshStandardMaterial({
-      color: "#5fd8ff",
-      emissive: "#24A0CE",
-      emissiveIntensity: 0.6,
-      transparent: true,
-      opacity: 0.22,
-      depthWrite: false,
-      side: THREE.DoubleSide,
-    }),
-  );
-  shield.scale.set(0.85, 0.62, 1.05);
-  shield.position.y = 0.8;
-  shield.visible = false;
-  root.add(shield);
-
-  // blob shadow helps read height during jumps
-  const blob = new THREE.Mesh(
-    new THREE.PlaneGeometry(2.4, 4.4),
-    new THREE.MeshBasicMaterial({ color: "#000", transparent: true, opacity: 0.25, depthWrite: false }),
-  );
-  blob.rotation.x = -Math.PI / 2;
-  blob.position.y = 0.03;
-  blob.name = "blob";
-  root.add(blob);
-
-  return { root, body, wheels, frontWheels, earL, earR, flames, shield, paint: [paintMain, paintAccent] };
-}
+/* Cars and drivers live in vehicles.ts */
 
 /* =========================================================
  * Obstacles
  * ======================================================= */
-export type ObstacleKind = "cone" | "rock" | "sacks" | "barrier" | "puddle" | "ramp";
-export type PickupKind = "jar" | "nitro" | "shield" | "heart";
+export type ObstacleKind = "cone" | "rock" | "sacks" | "barrier" | "puddle" | "ramp" | "cow" | "boost";
+export type PickupKind = "jar" | "nitro" | "shield" | "heart" | "tunjo";
 
 /** half sizes for collision: [halfWidth (lateral), halfLength (z)] */
 export const OBSTACLE_SIZE: Record<ObstacleKind, [number, number]> = {
@@ -283,6 +42,8 @@ export const OBSTACLE_SIZE: Record<ObstacleKind, [number, number]> = {
   barrier: [1.45, 0.3],
   puddle: [1.3, 1.3],
   ramp: [1.35, 1.8],
+  cow: [1.1, 0.6],
+  boost: [1.4, 1.6],
 };
 
 function buildCone() {
@@ -821,8 +582,8 @@ function buildBanner() {
       ctx.textBaseline = "middle";
       ctx.fillText("DREAM NEXUS", 256, 64);
       ctx.fillStyle = "#FDC6B5";
-      ctx.font = "bold 38px sans-serif";
-      ctx.fillText("★ RALLY ★", 256, 118);
+      ctx.font = "bold 34px sans-serif";
+      ctx.fillText("dreamnexus.digital", 256, 118);
     });
   }
   const g = new THREE.Group();
@@ -1160,6 +921,339 @@ function buildNeonSign(variant: number) {
   return g;
 }
 
+/* ---------- Colombian extras: cows, golden tunjo, race pieces ---------- */
+function buildCow() {
+  // a cow crossing the road — very Colombian countryside
+  const g = new THREE.Group();
+  const white = mat("#f4f1ea", { roughness: 1 });
+  const black = mat("#1a1a1a", { roughness: 1 });
+  const body = mesh(new THREE.BoxGeometry(0.9, 0.8, 1.8), white);
+  body.position.y = 1.0;
+  g.add(body);
+  [[0.3, 1.25, 0.3, 0.5], [-0.25, 1.0, -0.4, 0.6], [0.46, 0.95, -0.2, 0.4]].forEach(([x, y, z, s]) => {
+    const spot = mesh(new THREE.BoxGeometry(0.02 + (x > 0.4 ? 0.02 : 0.92), s * 0.8, s), black, false);
+    spot.position.set(x > 0.4 ? x : 0, y, z);
+    g.add(spot);
+  });
+  const head = mesh(new THREE.BoxGeometry(0.55, 0.5, 0.6), white);
+  head.position.set(0, 1.25, 1.1);
+  g.add(head);
+  const snout = mesh(new THREE.BoxGeometry(0.5, 0.25, 0.2), mat("#f2a5b0"));
+  snout.position.set(0, 1.1, 1.45);
+  g.add(snout);
+  [-0.2, 0.2].forEach((x) => {
+    const horn = mesh(new THREE.ConeGeometry(0.05, 0.22, 6), mat("#e8dcc0"));
+    horn.position.set(x, 1.6, 1.0);
+    g.add(horn);
+    const eye = mesh(new THREE.SphereGeometry(0.05, 6, 4), black, false);
+    eye.position.set(x, 1.35, 1.41);
+    g.add(eye);
+  });
+  [[0.3, 0.6], [-0.3, 0.6], [0.3, -0.6], [-0.3, -0.6]].forEach(([x, z]) => {
+    const leg = mesh(new THREE.BoxGeometry(0.18, 0.6, 0.18), white);
+    leg.position.set(x, 0.3, z);
+    g.add(leg);
+  });
+  const bell = mesh(new THREE.SphereGeometry(0.08, 8, 6), mat("#ffd23f", { metalness: 0.8, roughness: 0.3 }), false);
+  bell.position.set(0, 0.92, 1.3);
+  g.add(bell);
+  // cows walk sideways across the road: rotate so it faces across (+x)
+  g.rotation.y = Math.PI / 2;
+  const wrap = new THREE.Group();
+  wrap.add(g);
+  return wrap;
+}
+
+function buildTunjo() {
+  // golden Muisca "tunjo" offering figure — rare treasure
+  const g = new THREE.Group();
+  const spin = new THREE.Group();
+  spin.name = "spin";
+  const gold = mat("#ffcf33", { metalness: 0.95, roughness: 0.2, emissive: "#b37400", emissiveIntensity: 0.7 });
+  const body = mesh(new THREE.BoxGeometry(0.45, 0.8, 0.08), gold, false);
+  const head = mesh(new THREE.BoxGeometry(0.34, 0.3, 0.08), gold, false);
+  head.position.y = 0.55;
+  const crown = mesh(new THREE.BoxGeometry(0.5, 0.06, 0.08), gold, false);
+  crown.position.y = 0.73;
+  spin.add(body, head, crown);
+  [-0.3, 0.3].forEach((x) => {
+    const arm = mesh(new THREE.BoxGeometry(0.08, 0.5, 0.06), gold, false);
+    arm.position.set(x, 0.05, 0);
+    spin.add(arm);
+  });
+  const halo = new THREE.Mesh(
+    new THREE.SphereGeometry(0.8, 16, 12),
+    new THREE.MeshBasicMaterial({ color: "#fff0a0", transparent: true, opacity: 0.25, depthWrite: false, blending: THREE.AdditiveBlending }),
+  );
+  spin.add(halo);
+  spin.scale.setScalar(1.4);
+  g.add(spin, glowRing("#ffe680"), lightBeam("#fff3b0"));
+  return g;
+}
+
+function buildBoost() {
+  // glowing chevron boost pad on the road (circuits)
+  const g = new THREE.Group();
+  const tex = canvasTex(128, 256, (ctx) => {
+    ctx.fillStyle = "#0a3550";
+    ctx.fillRect(0, 0, 128, 256);
+    ctx.fillStyle = "#5fd8ff";
+    for (let i = 0; i < 3; i++) {
+      const y = 200 - i * 70;
+      ctx.beginPath();
+      ctx.moveTo(10, y);
+      ctx.lineTo(64, y - 50);
+      ctx.lineTo(118, y);
+      ctx.lineTo(118, y + 22);
+      ctx.lineTo(64, y - 28);
+      ctx.lineTo(10, y + 22);
+      ctx.fill();
+    }
+  });
+  const pad = new THREE.Mesh(
+    new THREE.PlaneGeometry(2.6, 3.2),
+    new THREE.MeshStandardMaterial({ map: tex, emissive: "#ffffff", emissiveMap: tex, emissiveIntensity: 1.2, polygonOffset: true, polygonOffsetFactor: -4 }),
+  );
+  pad.rotation.x = -Math.PI / 2;
+  pad.position.y = 0.04;
+  g.add(pad);
+  return g;
+}
+
+let checkerTex: THREE.Texture | null = null;
+export function makeFinishLine() {
+  checkerTex ??= canvasTex(256, 32, (ctx) => {
+    for (let i = 0; i < 16; i++)
+      for (let j = 0; j < 2; j++) {
+        ctx.fillStyle = (i + j) % 2 ? "#111" : "#fff";
+        ctx.fillRect(i * 16, j * 16, 16, 16);
+      }
+  });
+  const line = new THREE.Mesh(
+    new THREE.PlaneGeometry(9.8, 1.4),
+    new THREE.MeshStandardMaterial({ map: checkerTex, polygonOffset: true, polygonOffsetFactor: -4 }),
+  );
+  line.rotation.x = -Math.PI / 2;
+  line.position.y = 0.04;
+  return line;
+}
+
+function buildGrandstand() {
+  // stepped stands full of colourful fans, along the road (+x local is away)
+  const g = new THREE.Group();
+  const concrete = mat("#9aa0a8", { roughness: 1 });
+  const roof = mat("#24A0CE");
+  const fanColors = ["#FCD116", "#003893", "#CE1126", "#ffffff", "#ff9f43", "#7bd389"];
+  for (let i = 0; i < 5; i++) {
+    const step = mesh(new THREE.BoxGeometry(1.2, 0.6 + i * 0.6, 14), concrete);
+    step.position.set(i * 1.2, (0.6 + i * 0.6) / 2, 0);
+    g.add(step);
+    for (let k = 0; k < 12; k++) {
+      const fan = mesh(new THREE.BoxGeometry(0.4, 0.55, 0.4), mat(fanColors[(i * 5 + k) % fanColors.length]), false);
+      fan.position.set(i * 1.2 - 0.2, 0.6 + i * 0.6 + 0.28, -6.5 + k * 1.15 + (i % 2) * 0.3);
+      g.add(fan);
+    }
+  }
+  const r = mesh(new THREE.BoxGeometry(7, 0.15, 14.5), roof);
+  r.position.set(2.4, 5.2, 0);
+  r.rotation.z = -0.12;
+  g.add(r);
+  [0, 4.8].forEach((x) => [-7, 7].forEach((z) => {
+    const p = mesh(new THREE.BoxGeometry(0.15, 5.2, 0.15), concrete);
+    p.position.set(x, 2.6, z);
+    g.add(p);
+  }));
+  return g;
+}
+
+function buildTireWall() {
+  const g = new THREE.Group();
+  const tyre = mat("#1b1b1f", { roughness: 1 });
+  const red = mat("#e23b3b");
+  const white = mat("#f4f4f4");
+  const geo = new THREE.TorusGeometry(0.35, 0.16, 6, 12);
+  for (let i = 0; i < 8; i++)
+    for (let j = 0; j < 2; j++) {
+      const t = mesh(geo, j === 1 ? (i % 2 ? red : white) : tyre);
+      t.rotation.x = Math.PI / 2;
+      t.position.set(0, 0.16 + j * 0.32, -3.5 + i * 1.0);
+      g.add(t);
+    }
+  return g;
+}
+
+/* ---------- Desierto de la Tatacoa ---------- */
+function buildRedRock() {
+  // eroded red "cárcavas" formation
+  const g = new THREE.Group();
+  const red = mat("#b5603a", { flatShading: true, roughness: 1 });
+  const dark = mat("#8a4428", { flatShading: true, roughness: 1 });
+  for (let i = 0; i < 5; i++) {
+    const c = mesh(new THREE.ConeGeometry(1 + hashV(i) * 1.2, 3 + hashV(i * 3) * 4, 5), i % 2 ? red : dark);
+    c.position.set((i - 2) * 1.4, 1.5 + hashV(i * 3) * 2, hashV(i * 7) * 2 - 1);
+    g.add(c);
+  }
+  return g;
+}
+
+function buildCactus() {
+  const g = new THREE.Group();
+  const green = mat("#4f7a3a", { flatShading: true });
+  const trunk = mesh(new THREE.CylinderGeometry(0.25, 0.3, 3, 8), green);
+  trunk.position.y = 1.5;
+  g.add(trunk);
+  [[-1, 1.6], [1, 2.1]].forEach(([s, y]) => {
+    const arm = mesh(new THREE.CylinderGeometry(0.17, 0.17, 1, 8), green);
+    arm.position.set(s * 0.45, y + 0.5, 0);
+    const elbow = mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.5, 8), green);
+    elbow.rotation.z = Math.PI / 2;
+    elbow.position.set(s * 0.25, y, 0);
+    g.add(arm, elbow);
+  });
+  const flower = mesh(new THREE.SphereGeometry(0.15, 8, 6), mat("#ff4f9a", { emissive: "#661030", emissiveIntensity: 0.3 }), false);
+  flower.position.y = 3.05;
+  g.add(flower);
+  return g;
+}
+
+function buildObservatory() {
+  const g = new THREE.Group();
+  const white = mat("#f4f4f4");
+  const base = mesh(new THREE.CylinderGeometry(2.2, 2.4, 3, 16), white);
+  base.position.y = 1.5;
+  const dome = mesh(new THREE.SphereGeometry(2.2, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), mat("#d0d6de", { metalness: 0.6, roughness: 0.3 }));
+  dome.position.y = 3;
+  const slit = mesh(new THREE.BoxGeometry(0.5, 2.3, 0.1), mat("#111"), false);
+  slit.position.set(0, 4, 1.9);
+  slit.rotation.x = -0.6;
+  g.add(base, dome, slit);
+  return g;
+}
+
+/* ---------- Cartagena ---------- */
+function buildCityWall() {
+  // old stone city wall with battlements
+  const g = new THREE.Group();
+  const stone = mat("#c9b48a", { roughness: 1, flatShading: true });
+  const wall = mesh(new THREE.BoxGeometry(2.2, 3.2, 10), stone);
+  wall.position.y = 1.6;
+  g.add(wall);
+  for (let i = 0; i < 5; i++) {
+    const m = mesh(new THREE.BoxGeometry(2.2, 0.6, 1.0), stone);
+    m.position.set(0, 3.5, -4 + i * 2);
+    g.add(m);
+  }
+  return g;
+}
+
+const BALCONY_COLORS = ["#ffd23f", "#ff6b6b", "#4ecdc4", "#ff9f43", "#a06cd5", "#5fa8ff", "#f7f1e3"];
+function buildColonial(variant: number) {
+  // two-storey colonial house with a wooden balcony and bougainvillea
+  const g = new THREE.Group();
+  const wall = mat(BALCONY_COLORS[variant % BALCONY_COLORS.length], { roughness: 0.95 });
+  const wood = mat("#6b3f1f");
+  const w = 7;
+  const h = 6.2;
+  const body = mesh(new THREE.BoxGeometry(5, h, w), wall);
+  body.position.set(2.5, h / 2, 0);
+  g.add(body);
+  const roof = mesh(new THREE.BoxGeometry(5.4, 0.3, w + 0.4), mat("#b5532f"));
+  roof.position.set(2.5, h + 0.15, 0);
+  g.add(roof);
+  // balcony on the road side (-x)
+  const balcony = mesh(new THREE.BoxGeometry(0.9, 0.15, w - 1), wood);
+  balcony.position.set(-0.4, 3.4, 0);
+  g.add(balcony);
+  const rail = mesh(new THREE.BoxGeometry(0.1, 0.9, w - 1), wood);
+  rail.position.set(-0.8, 3.9, 0);
+  g.add(rail);
+  const roofB = mesh(new THREE.BoxGeometry(1.2, 0.1, w - 0.6), wood);
+  roofB.position.set(-0.45, 5.0, 0);
+  roofB.rotation.z = 0.25;
+  g.add(roofB);
+  for (let i = 0; i < 3; i++) {
+    const door = mesh(new THREE.BoxGeometry(0.1, 2.2, 1.0), wood, false);
+    door.position.set(-0.03, 1.1, -2 + i * 2);
+    g.add(door);
+  }
+  // bougainvillea clusters
+  const pink = mat("#e8336b", { flatShading: true });
+  for (let i = 0; i < 4; i++) {
+    const f = mesh(new THREE.IcosahedronGeometry(0.6, 0), pink);
+    f.position.set(-0.7, 4.5 + hashV(variant + i) * 0.8, -2.6 + i * 1.7);
+    f.scale.set(0.8, 0.6, 1.2);
+    g.add(f);
+  }
+  return g;
+}
+
+function buildCoconutPalm() {
+  const g = new THREE.Group();
+  const trunkMat = mat("#8a6a4a");
+  const pivot = new THREE.Group();
+  pivot.rotation.z = 0.25;
+  for (let i = 0; i < 6; i++) {
+    const seg = mesh(new THREE.CylinderGeometry(0.17, 0.22, 1.2, 7), trunkMat);
+    seg.position.set(i * 0.1, 0.6 + i * 1.15, 0);
+    pivot.add(seg);
+  }
+  const leafMat = mat("#3f9a3a", { side: THREE.DoubleSide, flatShading: true });
+  const leafGeo = new THREE.BoxGeometry(0.5, 0.04, 3);
+  for (let i = 0; i < 8; i++) {
+    const l = mesh(leafGeo, leafMat);
+    const a = (i / 8) * Math.PI * 2;
+    l.position.set(0.6 + Math.cos(a) * 1.3, 7.1, Math.sin(a) * 1.3);
+    l.rotation.y = -a + Math.PI / 2;
+    l.rotation.x = 0.55;
+    pivot.add(l);
+  }
+  [0, 1, 2].forEach((i) => {
+    const nut = mesh(new THREE.SphereGeometry(0.16, 8, 6), mat("#5a3d25"), false);
+    nut.position.set(0.6 + Math.cos(i * 2) * 0.25, 6.8, Math.sin(i * 2) * 0.25);
+    pivot.add(nut);
+  });
+  g.add(pivot);
+  return g;
+}
+
+function buildClockTower() {
+  // Torre del Reloj style gate tower
+  const g = new THREE.Group();
+  const yellow = mat("#f2c94c", { roughness: 0.9 });
+  const white = mat("#f7f1e3");
+  const base = mesh(new THREE.BoxGeometry(4, 6, 6), yellow);
+  base.position.y = 3;
+  const arch = mesh(new THREE.BoxGeometry(4.1, 3, 2), mat("#2a2420"), false);
+  arch.position.set(0, 1.5, 0);
+  const tower = mesh(new THREE.BoxGeometry(2.6, 4, 2.6), white);
+  tower.position.y = 8;
+  const clock = mesh(new THREE.CylinderGeometry(0.8, 0.8, 0.1, 20), mat("#ffffff", { emissive: "#ffffee", emissiveIntensity: 0.4 }), false);
+  clock.rotation.z = Math.PI / 2;
+  clock.position.set(-1.33, 8.4, 0);
+  const top = mesh(new THREE.ConeGeometry(1.6, 2.4, 4), mat("#b5532f"));
+  top.rotation.y = Math.PI / 4;
+  top.position.y = 11.2;
+  g.add(base, arch, tower, clock, top);
+  return g;
+}
+
+function buildSea() {
+  // a stretch of Caribbean sea beside the road
+  const g = new THREE.Group();
+  // +x local = away from the road
+  const sea = new THREE.Mesh(
+    new THREE.PlaneGeometry(70, 16),
+    new THREE.MeshStandardMaterial({ color: "#1fb5c9", roughness: 0.15, metalness: 0.3 }),
+  );
+  sea.rotation.x = -Math.PI / 2;
+  sea.position.set(45, 0.25, 0);
+  const sand = new THREE.Mesh(new THREE.PlaneGeometry(10, 16), new THREE.MeshStandardMaterial({ color: "#f2dca5", roughness: 1 }));
+  sand.rotation.x = -Math.PI / 2;
+  sand.position.set(6, 0.3, 0);
+  g.add(sea, sand);
+  return g;
+}
+
 /* =========================================================
  * Pools
  * ======================================================= */
@@ -1191,6 +1285,18 @@ const BUILDERS: Record<string, Builder> = {
   hut: buildHut,
   stairs: buildStairs,
   escalator: buildEscalator,
+  cow: buildCow,
+  tunjo: buildTunjo,
+  boost: buildBoost,
+  grandstand: buildGrandstand,
+  tireWall: buildTireWall,
+  redRock: buildRedRock,
+  cactus: buildCactus,
+  observatory: buildObservatory,
+  cityWall: buildCityWall,
+  coconutPalm: buildCoconutPalm,
+  clockTower: buildClockTower,
+  sea: buildSea,
   neonPalm: buildNeonPalm,
   bunting: buildBunting,
 };
@@ -1198,9 +1304,10 @@ for (let v = 0; v < 7; v++) BUILDERS[`house${v}`] = () => buildHouse(v);
 for (let v = 0; v < 5; v++) BUILDERS[`barrio${v}`] = () => buildBarrio(v);
 for (let v = 0; v < 8; v++) BUILDERS[`graffiti${v}`] = () => buildGraffiti(v);
 for (let v = 0; v < 3; v++) BUILDERS[`neonSign${v}`] = () => buildNeonSign(v);
+for (let v = 0; v < 7; v++) BUILDERS[`colonial${v}`] = () => buildColonial(v);
 
 const templates = new Map<string, THREE.Object3D>();
-const SOLID_KINDS = ["cone", "rock", "sacks", "barrier"] as const;
+const SOLID_KINDS = ["cone", "rock", "sacks", "barrier", "cow"] as const;
 
 /** Pool of cloned models per kind, so we never allocate during a race. */
 export class ModelPool {

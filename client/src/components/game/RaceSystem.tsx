@@ -3,9 +3,14 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { run, multiplierFor, MAX_HEARTS, NITRO_DURATION, INVULNERABLE_TIME } from "@/lib/game/run";
 import { input, steerInput } from "@/lib/input";
-import { roadX, roadY, roadCurvature, ROAD_HALF, LANES, hash, biomeAt } from "@/lib/track";
-import { ModelPool, OBSTACLE_SIZE, type ObstacleKind, type PickupKind, makeArch } from "@/lib/game/models";
-import { useRally } from "@/lib/stores/useRally";
+import { roadX, roadY, roadCurvature, ROAD_HALF, LANES, hash, biomeAt, lapLength, isCircuit } from "@/lib/track";
+import { ModelPool, OBSTACLE_SIZE, type ObstacleKind, type PickupKind, makeArch, makeFinishLine } from "@/lib/game/models";
+import { useRally, goalProgress } from "@/lib/stores/useRally";
+import { car, session } from "@/lib/game/session";
+import { chapterById } from "@/lib/game/story";
+import { race } from "@/lib/game/race";
+import { room, myId } from "@/lib/game/net";
+import { useProfile } from "@/lib/stores/useProfile";
 import { useBiome, BIOME_CONFIGS } from "@/lib/stores/useBiome";
 import { audioManager } from "@/lib/audio";
 
@@ -16,7 +21,8 @@ import { audioManager } from "@/lib/audio";
 
 const CAR_HALF_W = 0.9;
 const CAR_HALF_L = 1.9;
-const SOLID: ObstacleKind[] = ["cone", "rock", "sacks", "barrier"];
+const SOLID: ObstacleKind[] = ["cone", "rock", "sacks", "barrier", "cow"];
+const SMALL: ObstacleKind[] = ["cone", "sacks"];
 
 interface Entity {
   kind: ObstacleKind | PickupKind;
@@ -32,6 +38,7 @@ interface Entity {
   spin: number;
   obj: THREE.Object3D;
   seed: number;
+  walk: number; // cows: sideways walking speed (m/s)
 }
 
 const COLORS = {
@@ -42,6 +49,13 @@ const COLORS = {
   green: "#7bd389",
   orange: "#ff9f43",
 };
+
+/** Music style for each region. */
+function themeFor(b: string) {
+  if (b === "comuna_13") return "synthwave" as const;
+  if (b === "pueblo" || b === "cartagena") return "cumbia" as const;
+  return "default" as const;
+}
 
 export function RaceSystem({ carPositionRef, carSpeedRef }: {
   carPositionRef: React.MutableRefObject<THREE.Vector3>;
@@ -56,15 +70,22 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
   const countdownTimer = useRef(0);
   const lastCount = useRef(4);
   const arches = useRef<THREE.Object3D[]>([]);
+  const netTimer = useRef(0);
+  const lapItems = useMemo(() => circuitLayout(), []);
+  const circuitNext = useRef({ lap: 0, idx: 0 });
 
   const rally = useRally;
 
   // biome change banner
   useEffect(() => {
-    useBiome.getState().reset();
+    useBiome.getState().reset(biomeAt(0));
+    audioManager.setMusicTheme(themeFor(biomeAt(0)));
+    useProfile.getState().visitRegion(biomeAt(0));
     return useBiome.subscribe((s, prev) => {
       if (s.currentBiome !== prev.currentBiome) {
-        audioManager.setMusicTheme(s.currentBiome === "comuna_13" ? "synthwave" : "default");
+        audioManager.setMusicTheme(themeFor(s.currentBiome));
+        const isNew = useProfile.getState().visitRegion(s.currentBiome);
+        if (isNew) rally.getState().popup("NEW REGION ON YOUR MAP!", COLORS.green, true);
       }
       if (s.currentBiome !== prev.currentBiome && rally.getState().phase === "playing") {
         const c = BIOME_CONFIGS[s.currentBiome];
@@ -84,7 +105,7 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
 
   /* ---------------- spawning ---------------- */
   const add = (kind: Entity["kind"], z: number, lat: number, h = 0) => {
-    const pickup = kind === "jar" || kind === "nitro" || kind === "shield" || kind === "heart";
+    const pickup = kind === "jar" || kind === "nitro" || kind === "shield" || kind === "heart" || kind === "tunjo";
     const obj = pool.acquire(kind);
     obj.visible = true;
     obj.rotation.set(0, 0, 0);
@@ -92,7 +113,8 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
     if (mark) mark.visible = true;
     obj.scale.setScalar(1);
     group.current?.add(obj);
-    ents.current.push({ kind, pickup, z, lat, h, passed: false, done: false, fly: 0, vx: 0, vy: 0, spin: 0, obj, seed: Math.random() * 10 });
+    const walk = kind === "cow" ? (Math.random() < 0.5 ? -1 : 1) * (0.8 + Math.random() * 0.8) : 0;
+    ents.current.push({ kind, pickup, z, lat, h, passed: false, done: false, fly: 0, vx: 0, vy: 0, spin: 0, obj, seed: Math.random() * 10, walk });
   };
 
   const lane = (i: number) => LANES[((i % 3) + 3) % 3];
@@ -168,10 +190,22 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
         add("jar", z + 6, lane(li + 2));
         return 26;
       }],
+      [["coffee_hills", "andes_highland", "pueblo"].includes(biomeAt(z)) ? 0.9 : 0, () => { // cows crossing!
+        add("cow", z, lane(li) + (Math.random() - 0.5));
+        if (Math.random() < 0.5) add("cow", z + 9, lane(li + 1));
+        for (let i = 0; i < 3; i++) add("jar", z + 16 + i * 4, lane(li + 2));
+        return 34;
+      }],
+      [0.18, () => { // rare golden tunjo, guarded
+        add("tunjo", z + 6, lane(li));
+        add(solid(), z, lane(li + 1));
+        add(solid(), z + 12, lane(li + 2));
+        return 30;
+      }],
       [0.55, () => { // power-up
         const p = Math.random();
         const hearts = run.hearts;
-        const kind: PickupKind = hearts < MAX_HEARTS && p < 0.3 ? "heart" : p < 0.65 ? "nitro" : "shield";
+        const kind: PickupKind = hearts < run.maxHearts && p < 0.3 ? "heart" : p < 0.65 ? "nitro" : "shield";
         add(kind, z, lane(li));
         if (d > 0.3) add(solid(), z + 6, lane(li + 1));
         return 26;
@@ -196,7 +230,7 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
   const bumpCombo = () => {
     const before = multiplierFor(run.combo);
     run.combo++;
-    run.comboTimer = 4.5;
+    run.comboTimer = 4.5 + car.comboTime;
     run.bestCombo = Math.max(run.bestCombo, run.combo);
     const after = multiplierFor(run.combo);
     if (after > before) {
@@ -268,6 +302,11 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
       }
       updateVisuals(dt, state.clock.elapsedTime);
       writeCar();
+      hudTimer.current += dt;
+      if (hudTimer.current > 0.2) {
+        hudTimer.current = 0;
+        rally.getState().syncHud();
+      }
       return;
     }
     countdownTimer.current = 0;
@@ -279,11 +318,12 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
     }
 
     run.time += dt;
-    const d = Math.min(1, run.z / 3500);
+    const circ = race.active;
+    const d = circ ? 0.6 : Math.min(1, run.z / 3500);
 
-    /* --- speed --- */
-    const cruise = (100 + d * 50) / 3.6;
-    const top = (170 + d * 30) / 3.6;
+    /* --- speed (car stats apply) --- */
+    const top = ((circ ? 182 : 170 + d * 30) / 3.6) * car.top;
+    const cruise = circ ? top * 0.93 : ((100 + d * 50) / 3.6) * car.top;
     let target = input.up ? top : cruise;
     if (input.down || input.touchBrake) target = 40 / 3.6;
 
@@ -291,7 +331,7 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
     const wantNitro = input.nitro || input.touchNitro || input.nitroQueued;
     input.nitroQueued = false;
     if (wantNitro && run.nitro >= 1 && run.nitroTime <= 0) {
-      run.nitroTime = NITRO_DURATION;
+      run.nitroTime = NITRO_DURATION * car.nitroTime;
       run.nitro = 0;
       run.nitroUses++;
       run.shake = 0.5;
@@ -306,17 +346,17 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
       run.slowTime -= dt;
       target *= 0.55;
     }
-    if (run.offroad && !run.airborne) target *= 0.62;
-    const rate = target > run.speed ? (run.nitroTime > 0 ? 2.5 : 0.75) : 2.2;
+    if (run.offroad && !run.airborne) target *= car.offroad;
+    const rate = target > run.speed ? (run.nitroTime > 0 ? 2.5 : 0.75 * car.accel) : 2.2;
     run.speed += (target - run.speed) * Math.min(1, rate * dt);
 
     /* --- steering --- */
     const s = steerInput();
     run.steer += (s - run.steer) * Math.min(1, dt * 10);
-    const latMax = 7 + run.speed * 0.13;
+    const latMax = (7 + run.speed * 0.13) * car.handling;
     const air = run.airborne ? 0.35 : 1;
     run.latVel += (run.steer * latMax - run.latVel) * Math.min(1, dt * 9 * air);
-    const push = -roadCurvature(run.z) * run.speed * run.speed * 0.5; // bends push you outward
+    const push = -roadCurvature(run.z) * run.speed * run.speed * (circ ? 0.35 : 0.5); // bends push you outward
     run.lat += (run.latVel + push) * dt;
     const wall = ROAD_HALF + 3.2;
     if (Math.abs(run.lat) > wall) {
@@ -337,7 +377,7 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
         audioManager.playLand();
         run.shake = Math.max(run.shake, 0.35);
         if (run.airTime > 0.4) {
-          const pts = award(Math.round(run.airTime * 120));
+          const pts = award(Math.round(run.airTime * 120 * car.airBonus));
           run.totalAir += run.airTime;
           bumpCombo();
           rally.getState().popup(`BIG AIR +${pts}`, COLORS.cyan);
@@ -358,7 +398,7 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
     }
     if (run.invulnerable > 0) run.invulnerable -= dt;
 
-    if (run.z >= run.nextMilestone) {
+    if (!circ && run.z >= run.nextMilestone) {
       const pts = award(250);
       rally.getState().popup(`${run.nextMilestone} m!  +${pts}`, COLORS.gold, true);
       audioManager.playMilestone();
@@ -367,18 +407,68 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
 
     useBiome.getState().updateDistance(run.z);
 
-    /* --- spawn --- */
-    while (nextRow.current < run.z + 210) {
-      const z = nextRow.current;
-      // checkpoint arch every 500m
-      nextRow.current += spawnRow(z);
+    /* --- story goals --- */
+    if (session.mode === "story") {
+      const ch = chapterById(session.chapterId);
+      if (ch.stage.kind === "endless") {
+        if (goalProgress() >= ch.goal.value) {
+          rally.getState().popup("GOAL COMPLETE!", COLORS.green, true);
+          rally.getState().syncHud();
+          rally.getState().finishRace();
+          return;
+        }
+        if (run.z >= ch.stage.limit) {
+          rally.getState().syncHud();
+          rally.getState().finishRace();
+          return;
+        }
+      }
     }
-    const nextArchZ = Math.ceil((run.z + 1) / 500) * 500;
+
+    /* --- laps (circuits) --- */
+    if (circ) {
+      const L = lapLength();
+      const lapIdx = Math.floor(run.z / L);
+      if (lapIdx > race.lap) {
+        const lt = run.time - race.lapStart;
+        race.lapTimes.push(lt);
+        race.lap = lapIdx;
+        race.lapStart = run.time;
+        if (race.lap >= race.laps) {
+          race.finishedAt = run.time;
+          if (session.mode === "online") room.send({ t: "finish", id: myId, time: run.time });
+          rally.getState().syncHud();
+          rally.getState().finishRace();
+          return;
+        }
+        audioManager.playMilestone();
+        rally.getState().popup(race.lap === race.laps - 1 ? "FINAL LAP!" : `LAP ${race.lap + 1}/${race.laps}`, COLORS.gold, true);
+      }
+      netTimer.current += dt;
+      if (session.mode === "online" && netTimer.current > 0.1) {
+        netTimer.current = 0;
+        room.send({ t: "pos", id: myId, z: run.z, lat: run.lat, y: run.y, speed: run.speed });
+      }
+    }
+
+    /* --- spawn --- */
+    if (circ) spawnCircuit();
+    else
+      while (nextRow.current < run.z + 210) {
+        const z = nextRow.current;
+        nextRow.current += spawnRow(z);
+      }
+    // checkpoint arches (every 500 m) or the start/finish line on circuits
+    const step = circ ? lapLength() : 500;
+    const nextArchZ = Math.ceil((run.z + 1) / step) * step;
     if (nextArchZ - run.z < 220 && !arches.current.some((a) => a.userData.z === nextArchZ)) {
-      const a = makeArch(`${nextArchZ} m`);
+      const lapN = Math.round(nextArchZ / step) + 1;
+      const label = circ ? (lapN > race.laps ? "FINISH" : lapN === race.laps ? "FINAL LAP" : `LAP ${lapN}`) : `${nextArchZ} m`;
+      const a = makeArch(label);
       a.userData.z = nextArchZ;
       a.position.set(roadX(nextArchZ), roadY(nextArchZ), nextArchZ);
       a.rotation.y = Math.atan(roadX(nextArchZ + 0.5) - roadX(nextArchZ - 0.5));
+      if (circ) a.add(makeFinishLine());
       group.current?.add(a);
       arches.current.push(a);
     }
@@ -401,7 +491,7 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
       const dLat = Math.abs(e.lat - run.lat);
       if (e.pickup) {
         const heightOk = e.h === 0 ? run.y < 1.6 : Math.abs(run.y + 0.6 - e.h) < 1.6;
-        if (Math.abs(dzE) < 1.9 && dLat < 1.6 && heightOk) collect(e);
+        if (Math.abs(dzE) < 1.9 * car.pickupRange && dLat < 1.6 * car.pickupRange && heightOk) collect(e);
         continue;
       }
       const [hw, hl] = OBSTACLE_SIZE[e.kind as ObstacleKind];
@@ -418,7 +508,23 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
           e.done = true;
           continue;
         }
+        if (e.kind === "boost") {
+          if (!run.airborne) {
+            run.speed = Math.min(run.speed + 9, top + 12);
+            run.nitro = Math.min(1, run.nitro + 0.15 * car.nitroFill);
+            run.boosts++;
+            run.shake = Math.max(run.shake, 0.25);
+            audioManager.playNitroReady();
+            rally.getState().popup("BOOST!", COLORS.cyan);
+          }
+          e.done = true;
+          continue;
+        }
         if (run.airborne && run.y > 0.9) continue; // flew over it
+        if (e.kind === "puddle" && car.puddleProof) {
+          e.done = true;
+          continue;
+        }
         if (e.kind === "puddle") {
           run.slowTime = 0.7;
           e.done = true;
@@ -429,6 +535,8 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
         // solid hit
         if (run.nitroTime > 0) {
           smash(e, "SMASH!");
+        } else if (car.smashSmall && SMALL.includes(e.kind as ObstacleKind)) {
+          smash(e, "CHIVA SMASH!");
         } else if (run.invulnerable > 0) {
           e.passed = true;
         } else {
@@ -461,6 +569,25 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
     }
   });
 
+  /** Spawn the fixed per-lap layout (jars + boost pads) ahead of the car. */
+  function spawnCircuit() {
+    const L = lapLength();
+    const n = circuitNext.current;
+    for (let guard = 0; guard < 50; guard++) {
+      if (n.lap >= race.laps) return;
+      const item = lapItems[n.idx];
+      const z = n.lap * L + item.off;
+      if (z > run.z + 210) return;
+      if (item.kind === "jars") for (let i = 0; i < 5; i++) add("jar", z + i * 4, item.lat);
+      else add(item.kind as Entity["kind"], z, item.lat);
+      n.idx++;
+      if (n.idx >= lapItems.length) {
+        n.idx = 0;
+        n.lap++;
+      }
+    }
+  }
+
   function handlePass(e: Entity) {
     e.passed = true;
     if (e.done || e.pickup || !SOLID.includes(e.kind as ObstacleKind)) return;
@@ -485,7 +612,7 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
         bumpCombo();
         const pts = award(50);
         const wasReady = run.nitro >= 1;
-        run.nitro = Math.min(1, run.nitro + 0.07);
+        run.nitro = Math.min(1, run.nitro + (race.active ? 0.12 : 0.07) * car.nitroFill);
         audioManager.playPickup(run.combo);
         gs.popup(`+${pts}`, COLORS.gold);
         if (!wasReady && run.nitro >= 1) {
@@ -506,8 +633,17 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
         audioManager.playShield();
         gs.popup("SHIELD UP!", COLORS.cyan, true);
         break;
+      case "tunjo": {
+        run.tunjos++;
+        bumpCombo();
+        const pts = award(500);
+        audioManager.playShield();
+        audioManager.playMilestone();
+        gs.popup(`GOLDEN TUNJO! +${pts}`, COLORS.gold, true);
+        break;
+      }
       case "heart":
-        run.hearts = Math.min(MAX_HEARTS, run.hearts + 1);
+        run.hearts = Math.min(run.maxHearts, run.hearts + 1);
         audioManager.playHeart();
         gs.popup("+1 ♥", COLORS.red, true);
         break;
@@ -548,8 +684,17 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
         o.rotation.z += e.spin * 0.7 * dt;
         if (e.fly <= 0) o.visible = false;
       }
+      if (e.walk && !e.done) {
+        e.lat += e.walk * dt;
+        if (Math.abs(e.lat) > ROAD_HALF - 0.5) {
+          e.lat = Math.sign(e.lat) * (ROAD_HALF - 0.5);
+          e.walk = -e.walk;
+        }
+        o.rotation.y = e.walk > 0 ? 0 : Math.PI;
+        o.position.y += Math.abs(Math.sin(t * 6 + e.seed)) * 0.05;
+      }
       const z = e.z;
-      o.position.set(roadX(z) + e.lat, roadY(z) + e.h, z);
+      o.position.set(roadX(z) + e.lat, roadY(z) + e.h + (e.walk ? Math.abs(Math.sin(t * 6 + e.seed)) * 0.06 : 0), z);
       if (e.pickup && !e.done) {
         const spin = o.getObjectByName("spin");
         if (spin) {
@@ -560,7 +705,7 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
         if (ring) ring.scale.setScalar(1 + Math.sin(t * 4 + e.seed) * 0.12);
         const beam = o.getObjectByName("beam");
         if (beam) beam.rotation.y = t;
-      } else if (!e.pickup && e.fly <= 0) {
+      } else if (!e.pickup && e.fly <= 0 && !e.walk) {
         o.rotation.y = Math.atan(roadX(z + 0.5) - roadX(z - 0.5));
       }
     }
@@ -578,6 +723,21 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
   }
 
   return <group ref={group} />;
+}
+
+/** The same jars + boost pads every lap (deterministic, so online races match). */
+function circuitLayout() {
+  if (!isCircuit()) return [{ off: 0, kind: "jars", lat: 0 }];
+  const L = lapLength();
+  const items: { off: number; kind: string; lat: number }[] = [];
+  let i = 0;
+  for (let off = 90; off < L - 60; off += 55 + hash(i * 3.7) * 30) {
+    const r = hash(i * 9.1 + 4);
+    const lat = LANES[Math.floor(hash(i * 5.3 + 1) * 3)];
+    items.push({ off, kind: r < 0.35 ? "boost" : r < 0.42 ? "nitro" : "jars", lat });
+    i++;
+  }
+  return items;
 }
 
 /** Scenery along both sides of the road, recycled as you drive. */
@@ -609,7 +769,20 @@ export function Scenery() {
       const r3 = hash(i * 5.1 + 2);
       const heading = Math.atan(roadX(z + 0.5) - roadX(z - 0.5));
 
+      // circuits: grandstands around the start/finish straight, tyre walls in the bends
+      const circ = isCircuit();
+      const off = circ ? ((z % lapLength()) + lapLength()) % lapLength() : 0;
+      const nearStart = circ && (off < 150 || off > lapLength() - 60);
+      if (circ) {
+        for (const side of [-1, 1]) {
+          const away = heading + (side > 0 ? 0 : Math.PI);
+          if (nearStart) place("grandstand", z, side * (ROAD_HALF + 4.5), 1, away);
+          else if (i % 3 === 1) place("tireWall", z, side * (ROAD_HALF + 2.6), 1, heading);
+        }
+      }
+
       for (const side of [-1, 1]) {
+        if (nearStart) break;
         const near = side * (ROAD_HALF + 3 + r1 * 3);
         const far = side * (16 + r2 * 22);
         const face = heading + (side > 0 ? Math.PI : 0); // doors look at the road
@@ -630,6 +803,23 @@ export function Scenery() {
           place(`barrio${Math.floor(r2 * 5)}`, z + 4, side * (ROAD_HALF + 9 + r3 * 6), 1, away);
           if (i % 7 === 3) place("escalator", z + 8, side * (ROAD_HALF + 5), 1, away);
           if (i % 6 === 2) place(`neonSign${Math.floor(r3 * 3)}`, z, side * (ROAD_HALF + 3.6), 1, heading + side * 0.3);
+        } else if (biome === "tatacoa") {
+          // red canyons, cacti and the observatory
+          const away = heading + (side > 0 ? 0 : Math.PI);
+          place("cactus", z + side * 2, near, 0.8 + r3 * 0.6, r2 * 6);
+          if (r1 < 0.7) place("redRock", z + 4, far, 1 + r3 * 0.8, r2 * 6);
+          if (i % 19 === 7 && side > 0) place("observatory", z, side * (ROAD_HALF + 16), 1, away);
+        } else if (biome === "cartagena") {
+          // sea on the left, walls + colonial balconies on the right
+          const away = heading + (side > 0 ? 0 : Math.PI);
+          if (side < 0) {
+            if (i % 2 === 0) place("sea", z, -(ROAD_HALF + 4), 1, away);
+            if (r1 < 0.6) place("coconutPalm", z + 3, -(ROAD_HALF + 3 + r2 * 3), 0.9 + r3 * 0.3, r2 * 6);
+          } else {
+            if (r1 < 0.45) place("cityWall", z, ROAD_HALF + 4, 1, heading);
+            else place(`colonial${Math.floor(r3 * 7)}`, z, ROAD_HALF + 4, 1, away);
+            if (i % 23 === 11) place("clockTower", z + 4, ROAD_HALF + 12, 1, away);
+          }
         } else if (biome === "ciudad_perdida") {
           // dense jungle: ferns at the road, terraces, huts and giant ceibas behind
           place("fern", z + side * 2, near - side * 0.8, 0.9 + r3 * 0.6, r2 * 6);

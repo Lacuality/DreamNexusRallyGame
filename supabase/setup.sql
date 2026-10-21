@@ -223,3 +223,12 @@ DROP POLICY IF EXISTS "Anyone can update their achievements" ON player_achieveme
 INSERT INTO achievements (name, description, icon, requirement_type, requirement_value, points)
 SELECT 'Lost City Explorer', 'Reach Ciudad Perdida in one run (2400 m)', '🗿', 'distance', 2400, 25
 WHERE NOT EXISTS (SELECT 1 FROM achievements WHERE name = 'Lost City Explorer');
+
+-- ===== 5. Achievements for circuits, tunjos and exploring =====
+INSERT INTO achievements (name, description, icon, requirement_type, requirement_value, points)
+SELECT * FROM (VALUES
+  ('El Dorado', 'Find a golden Tunjo', '🗿', 'tunjos', 1, 20),
+  ('Campeón', 'Win a circuit race', '🏆', 'circuit_wins', 1, 25),
+  ('Explorador de Colombia', 'Visit all 7 regions of Colombia', '🇨🇴', 'regions', 7, 40)
+) AS v(name, description, icon, requirement_type, requirement_value, points)
+WHERE NOT EXISTS (SELECT 1 FROM achievements a WHERE a.name = v.name);

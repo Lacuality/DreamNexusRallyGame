@@ -1,10 +1,105 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Pause, Volume2, VolumeX, Maximize, Minimize, Heart, Shield, Zap } from "lucide-react";
 import { useRally } from "@/lib/stores/useRally";
 import { MAX_HEARTS, run } from "@/lib/game/run";
 import { audioManager } from "@/lib/audio";
 import { isTouchDevice } from "@/lib/input";
 import { IconButton, UI, panelStyle, useAudioSettings } from "./gameUi";
+import { formatTime, ordinal, race } from "@/lib/game/race";
+import { getTrack } from "@/lib/track";
+
+/** Small circuit map: a closed loop shaped by the circuit's curves, with every car on it. */
+function MiniMap({ touch }: { touch: boolean }) {
+  const ref = useRef<SVGSVGElement>(null);
+  const size = touch ? 92 : 130;
+  const path = useMemo(() => {
+    const t = getTrack();
+    if (t.kind !== "circuit") return "";
+    const pts: string[] = [];
+    for (let i = 0; i <= 120; i++) {
+      const [x, y] = loopPoint(i / 120, t.shape.curves);
+      pts.push(`${x * size},${y * size}`);
+    }
+    return "M" + pts.join("L");
+  }, [size]);
+
+  useEffect(() => {
+    let raf = 0;
+    const tick = () => {
+      const svg = ref.current;
+      const t = getTrack();
+      if (svg && t.kind === "circuit") {
+        const dots = svg.querySelectorAll<SVGCircleElement>("circle[data-i]");
+        const all = [{ z: run.z, me: true }, ...race.racers.map((r) => ({ z: r.z, me: false }))];
+        dots.forEach((d, i) => {
+          const r = all[i];
+          if (!r) {
+            d.setAttribute("r", "0");
+            return;
+          }
+          const u = ((r.z % t.shape.length) + t.shape.length) % t.shape.length / t.shape.length;
+          const [x, y] = loopPoint(u, t.shape.curves);
+          d.setAttribute("cx", String(x * size));
+          d.setAttribute("cy", String(y * size));
+          d.setAttribute("r", r.me ? "6" : "4");
+        });
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [size]);
+
+  return (
+    <svg
+      ref={ref}
+      width={size}
+      height={size}
+      style={{
+        position: "absolute",
+        right: 14,
+        ...(touch ? { top: "calc(max(12px, env(safe-area-inset-top)) + 140px)" } : { bottom: 22 }),
+        background: "rgba(14,27,36,0.65)",
+        borderRadius: 16,
+        border: "2px solid rgba(95,216,255,0.35)",
+      }}
+    >
+      <path d={path} fill="none" stroke="rgba(255,255,255,0.85)" strokeWidth={touch ? 5 : 7} strokeLinejoin="round" />
+      <path d={path} fill="none" stroke="#3a3d42" strokeWidth={touch ? 3 : 4} strokeLinejoin="round" />
+      {Array.from({ length: 9 }).map((_, i) => (
+        <circle key={i} data-i={i} r={0} fill={i === 0 ? "#ffd23f" : "#ff5a5f"} stroke="#0E1B24" strokeWidth={1.5} />
+      ))}
+    </svg>
+  );
+}
+
+/** A closed loop whose wiggles come from the circuit's curve settings. */
+function rawLoop(u: number, curves: [number, number, number][]): [number, number] {
+  const a = u * Math.PI * 2;
+  let r = 1;
+  for (const [amp, n, p] of curves) r += (amp / 60) * Math.sin(a * (n + 1) + p);
+  return [Math.cos(a) * r * 1.15, Math.sin(a) * r * 0.85];
+}
+
+const fitCache = new Map<string, [number, number, number]>();
+/** Point on the circuit loop, fitted into a 0..1 box (with padding). */
+export function loopPoint(u: number, curves: [number, number, number][]): [number, number] {
+  const key = JSON.stringify(curves);
+  let fit = fitCache.get(key);
+  if (!fit) {
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (let i = 0; i < 200; i++) {
+      const [x, y] = rawLoop(i / 200, curves);
+      minX = Math.min(minX, x); maxX = Math.max(maxX, x);
+      minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+    }
+    const scale = 0.84 / Math.max(maxX - minX, maxY - minY);
+    fit = [scale, (minX + maxX) / 2, (minY + maxY) / 2];
+    fitCache.set(key, fit);
+  }
+  const [x, y] = rawLoop(u, curves);
+  return [(x - fit[1]) * fit[0] + 0.5, (y - fit[2]) * fit[0] + 0.5];
+}
 
 interface GameHUDProps {
   isFullscreen?: boolean;
@@ -83,9 +178,9 @@ export function GameHUD({ isFullscreen = false, onToggleFullscreen }: GameHUDPro
           minWidth: touch ? 130 : 180,
         }}
       >
-        <div style={{ fontSize: touch ? 12 : 14, fontWeight: 800, color: UI.warm, letterSpacing: "0.12em" }}>SCORE</div>
+        <div style={{ fontSize: touch ? 12 : 14, fontWeight: 800, color: UI.warm, letterSpacing: "0.12em" }}>{hud.laps > 0 ? "JARS" : "SCORE"}</div>
         <div style={{ fontFamily: UI.display, fontSize: touch ? 28 : 40, lineHeight: 1.05, color: UI.gold, textShadow: "0 3px 0 rgba(0,0,0,0.4)" }}>
-          {hud.score.toLocaleString()}
+          {hud.laps > 0 ? `🍯 ${hud.jars}` : hud.score.toLocaleString()}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
           <span
@@ -105,7 +200,7 @@ export function GameHUD({ isFullscreen = false, onToggleFullscreen }: GameHUDPro
             <span style={{ fontWeight: 800, fontSize: touch ? 13 : 15, color: UI.warm }}>{hud.combo} combo</span>
           )}
         </div>
-        {!touch && (
+        {!touch && hud.mode === "endless" && (
           <div style={{ fontSize: 13, opacity: 0.75, marginTop: 4, fontWeight: 700 }}>Best {Math.max(highScore, hud.score).toLocaleString()}</div>
         )}
       </div>
@@ -122,7 +217,7 @@ export function GameHUD({ isFullscreen = false, onToggleFullscreen }: GameHUDPro
           alignItems: "center",
         }}
       >
-        {Array.from({ length: MAX_HEARTS }).map((_, i) => (
+        {hud.laps === 0 && Array.from({ length: hud.maxHearts || MAX_HEARTS }).map((_, i) => (
           <Heart
             key={`${i}-${hud.hearts > i}`}
             size={touch ? 32 : 42}
@@ -142,6 +237,63 @@ export function GameHUD({ isFullscreen = false, onToggleFullscreen }: GameHUDPro
           />
         )}
       </div>
+
+      {/* ---- circuits: position, lap, time ---- */}
+      {hud.laps > 0 && (
+        <div
+          style={{
+            ...panelStyle,
+            position: "absolute",
+            top: touch ? "calc(max(12px, env(safe-area-inset-top)) + 66px)" : "max(12px, env(safe-area-inset-top))",
+            left: touch ? "calc(50% - 30px)" : "50%",
+            transform: "translateX(-50%)",
+            padding: touch ? "4px 12px" : "6px 18px",
+            display: "flex",
+            alignItems: "center",
+            gap: touch ? 10 : 18,
+            whiteSpace: "nowrap",
+          }}
+        >
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontFamily: UI.display, fontSize: touch ? 26 : 38, lineHeight: 1, color: hud.position === 1 ? UI.gold : UI.white }}>
+              {ordinal(hud.position)}
+            </div>
+            <div style={{ fontSize: 12, fontWeight: 800, opacity: 0.8 }}>of {hud.racers}</div>
+          </div>
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontFamily: UI.display, fontSize: touch ? 18 : 24, color: UI.cyanBright }}>
+              LAP {hud.lap}/{hud.laps}
+            </div>
+            <div style={{ fontWeight: 800, fontSize: touch ? 13 : 15 }}>{formatTime(hud.lapTime)}</div>
+          </div>
+        </div>
+      )}
+      {hud.laps > 0 && <MiniMap touch={touch} />}
+
+      {/* ---- story goal ---- */}
+      {hud.mode === "story" && hud.goalValue > 0 && hud.laps === 0 && (
+        <div
+          style={{
+            ...panelStyle,
+            position: "absolute",
+            top: touch ? "calc(max(12px, env(safe-area-inset-top)) + 44px)" : 66,
+            left: "50%",
+            transform: "translateX(-50%)",
+            padding: "4px 14px",
+            textAlign: "center",
+            whiteSpace: "nowrap",
+            borderColor: hud.goalProgress >= hud.goalValue ? UI.gold : undefined,
+          }}
+        >
+          <div style={{ fontSize: touch ? 12 : 14, fontWeight: 800, color: UI.warm }}>{hud.goalLabel}</div>
+          <div style={{ fontFamily: UI.display, fontSize: touch ? 18 : 22 }}>
+            {Math.min(hud.goalProgress, hud.goalValue)} / {hud.goalValue}
+            {hud.limit > 0 && (
+              <span style={{ fontFamily: UI.body, fontWeight: 800, fontSize: 13, opacity: 0.8 }}> · {Math.max(0, hud.limit - hud.distance)} m left</span>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ---- top right: buttons ---- */}
       <div

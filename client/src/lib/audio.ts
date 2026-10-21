@@ -23,6 +23,8 @@ function loadSettings(): Settings {
   return { muted: false, music: 0.55, sfx: 0.8 };
 }
 
+export type MusicTheme = "default" | "synthwave" | "cumbia";
+
 export class AudioManager {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
@@ -32,7 +34,7 @@ export class AudioManager {
 
   private music: HTMLAudioElement | null = null;
   private mp3Gain: GainNode | null = null;
-  private theme: "default" | "synthwave" = "default";
+  private theme: MusicTheme = "default";
   private synth: { out: GainNode; timer: number; step: number; next: number } | null = null;
   private musicRouted = false;
   private wantMusic = false;
@@ -192,7 +194,7 @@ export class AudioManager {
    * gated snare, 8th-note saw bass, warm pads and a delayed arpeggio over
    * Am – F – C – G. Crossfades with the normal music track. */
 
-  setMusicTheme(theme: "default" | "synthwave") {
+  setMusicTheme(theme: MusicTheme) {
     if (theme === this.theme) return;
     this.theme = theme;
     this.applyTheme();
@@ -201,7 +203,7 @@ export class AudioManager {
   private applyTheme() {
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
-    const synthOn = this.theme === "synthwave";
+    const synthOn = this.theme !== "default";
     if (this.mp3Gain) this.mp3Gain.gain.setTargetAtTime(synthOn ? 0 : 1, t, 0.9);
     else if (this.music) this.music.muted = synthOn;
     if (synthOn) this.startSynth();
@@ -220,12 +222,13 @@ export class AudioManager {
     out.gain.setTargetAtTime(1, ctx.currentTime, 0.9);
     out.connect(this.musicGain);
     const synth = { out, timer: 0, step: 0, next: ctx.currentTime + 0.1 };
-    const sixteenth = 60 / 108 / 4;
     synth.timer = window.setInterval(() => {
       if (!this.ctx) return;
       while (synth.next < this.ctx.currentTime + 0.15) {
-        this.synthStep(synth.step, synth.next, out);
-        synth.next += sixteenth;
+        const cumbia = this.theme === "cumbia";
+        if (cumbia) this.cumbiaStep(synth.step, synth.next, out);
+        else this.synthStep(synth.step, synth.next, out);
+        synth.next += 60 / (cumbia ? 96 : 108) / 4;
         synth.step++;
       }
     }, 25);
@@ -362,6 +365,99 @@ export class AudioManager {
         o.start(tt);
         o.stop(tt + 0.13);
       });
+    }
+  }
+
+  /* ---------------- cumbia (Pueblo + Cartagena) ----------------
+   * Original loop in a Colombian cumbia feel: guacharaca scraper, tambora,
+   * llamador, root–fifth bass and a little accordion-style melody. C–F–G–C. */
+  private cumbiaStep(step: number, t: number, out: GainNode) {
+    const ctx = this.ctx!;
+    const s16 = step % 16;
+    const bar = Math.floor(step / 16) % 4;
+    const roots = [130.81, 174.61, 196, 130.81];
+    const root = roots[bar];
+    const hit = (node: AudioNode, peak: number, dur: number, at = t) => {
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, at);
+      g.gain.linearRampToValueAtTime(peak, at + 0.004);
+      g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+      node.connect(g).connect(out);
+    };
+    // guacharaca: "chi-ki-cha" scrape on every 8th, longer on the off-beats
+    if (this.noiseBuffer && s16 % 2 === 0) {
+      const n = ctx.createBufferSource();
+      n.buffer = this.noiseBuffer;
+      const f = ctx.createBiquadFilter();
+      f.type = "bandpass";
+      f.frequency.value = 3200;
+      f.Q.value = 1.2;
+      n.connect(f);
+      const long = s16 % 4 === 2;
+      hit(f, long ? 0.22 : 0.1, long ? 0.16 : 0.05);
+      n.start(t, Math.random());
+      n.stop(t + 0.2);
+    }
+    // tambora (low drum)
+    if (s16 === 0 || s16 === 6 || s16 === 8 || s16 === 14) {
+      const o = ctx.createOscillator();
+      o.frequency.setValueAtTime(110, t);
+      o.frequency.exponentialRampToValueAtTime(55, t + 0.18);
+      hit(o, s16 === 0 ? 0.7 : 0.45, 0.25);
+      o.start(t);
+      o.stop(t + 0.28);
+    }
+    // llamador (high drum) on the "and"
+    if (s16 === 4 || s16 === 12) {
+      const o = ctx.createOscillator();
+      o.type = "triangle";
+      o.frequency.setValueAtTime(320, t);
+      o.frequency.exponentialRampToValueAtTime(200, t + 0.06);
+      hit(o, 0.25, 0.09);
+      o.start(t);
+      o.stop(t + 0.1);
+    }
+    // bass: root on 1, fifth on 3, pickup notes
+    if (s16 === 0 || s16 === 8 || s16 === 14) {
+      const o = ctx.createOscillator();
+      o.type = "triangle";
+      o.frequency.value = (s16 === 8 ? root * 1.5 : root) / 2;
+      hit(o, 0.32, 0.3);
+      o.start(t);
+      o.stop(t + 0.32);
+    }
+    // accordion-ish melody on 8ths (two detuned reeds + vibrato)
+    if (s16 % 2 === 0) {
+      const scale = [261.63, 293.66, 329.63, 349.23, 392, 440, 493.88, 523.25];
+      const phrases = [
+        [4, 4, 2, 4, 5, 4, 2, 0],
+        [3, 3, 5, 3, 2, 3, 5, 7],
+        [4, 6, 4, 1, 4, 6, 7, 6],
+        [4, 2, 0, 2, 4, 2, 0, -1],
+      ];
+      const deg = phrases[bar][s16 / 2];
+      if (deg >= 0) {
+        [-7, 7].forEach((det) => {
+          const o = ctx.createOscillator();
+          o.type = "square";
+          o.frequency.value = scale[deg];
+          o.detune.value = det;
+          const vib = ctx.createOscillator();
+          vib.frequency.value = 6;
+          const vg = ctx.createGain();
+          vg.gain.value = 6;
+          vib.connect(vg).connect(o.detune);
+          const f = ctx.createBiquadFilter();
+          f.type = "lowpass";
+          f.frequency.value = 1800;
+          o.connect(f);
+          hit(f, 0.025, 0.24);
+          o.start(t);
+          vib.start(t);
+          o.stop(t + 0.26);
+          vib.stop(t + 0.26);
+        });
+      }
     }
   }
 

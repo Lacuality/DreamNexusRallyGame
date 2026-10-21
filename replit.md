@@ -55,11 +55,23 @@ Preferred communication style: Simple, everyday language.
 **3D Assets**: All in-game models are built in code in `client/src/lib/game/models.ts` (car with Pixel the Bunny, obstacles, pickups, scenery). The only model file used is `/pixel-bunny-3d.glb` on the title screen (optimised with meshopt + webp, ~0.7 MB).
 
 **Game code map**:
-- `client/src/lib/track.ts` – road shape (curves, hills) and biome per distance; everything reads it.
+- `client/src/lib/track.ts` – road shape (endless road or closed circuit loop) and region per distance; everything reads it.
+- `client/src/lib/game/session.ts` – which mode is being played (endless / story / circuit / online) and the car+driver stats in use.
 - `client/src/lib/game/run.ts` – live per-frame race state (hearts, combo, nitro, score).
-- `client/src/components/game/RaceSystem.tsx` – driving physics, spawn patterns, collisions, scoring, scenery placement.
-- `client/src/components/game/World.tsx` – sky, fog, lights, road and terrain.
-- `client/src/components/ui/*` – HUD, touch controls, pause, game over, title screen.
+- `client/src/lib/game/race.ts` – circuit state: laps, lap times, rivals/friends, positions.
+- `client/src/lib/game/garage.ts` – drivers (with perks + unlocks), cars (stats + prices), paint jobs.
+- `client/src/lib/game/vehicles.ts` – procedural 3D cars and animal drivers.
+- `client/src/lib/game/models.ts` – obstacles, pickups, scenery for every region, circuit pieces.
+- `client/src/lib/game/story.ts` / `circuits.ts` / `regions.ts` – Story Mode chapters, circuits + AI rivals, Colombia map data.
+- `client/src/lib/game/net.ts` – online rooms (Supabase Realtime; same-device BroadcastChannel fallback).
+- `client/src/lib/stores/useProfile.ts` – jars wallet, owned cars, selections, story stars, best laps (saved on the device).
+- `client/src/components/game/RaceSystem.tsx` – driving physics, spawn patterns, collisions, scoring, laps, story goals, scenery.
+- `client/src/components/game/Rivals.tsx` – AI rivals and friends' cars.
+- `client/src/components/ui/menus/*` – Garage, Map of Colombia / Story select, Circuit select, Online lobby, story dialogue.
+
+**Modes**: Rally Infinito (endless, 7 regions, leaderboard), Modo Historia (7 chapters), Circuito (5 circuits, 3 laps vs 5 AI), Con Amigos (online rooms with a 4-letter code).
+
+**Music**: background.mp3 by default; generated synthwave in Comuna 13 and generated cumbia in Guatapé/Cartagena (`lib/audio.ts`).
 
 **Fonts**: Inter font family loaded via @fontsource/inter package, applied globally through Tailwind configuration.
 

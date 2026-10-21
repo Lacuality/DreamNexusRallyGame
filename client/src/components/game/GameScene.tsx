@@ -5,6 +5,7 @@ import { World } from "./World";
 import { Car } from "./Car";
 import { Camera } from "./Camera";
 import { RaceSystem, Scenery } from "./RaceSystem";
+import { Rivals } from "./Rivals";
 import { NitroParticles, DustTrail, ExhaustSmoke } from "./ParticleEffects";
 import { AtmosphericParticles } from "./AtmosphericParticles";
 import { SpeedLines } from "./SpeedLines";
@@ -80,6 +81,7 @@ export function GameScene({ isFullscreen = false, onToggleFullscreen }: GameScen
             <World />
             <Scenery />
             <Car />
+            <Rivals />
             <RaceSystem carPositionRef={carPositionRef} carSpeedRef={carSpeedRef} />
             <NitroFx carPositionRef={carPositionRef} />
             <DustTrail carPositionRef={carPositionRef} speedRef={carSpeedRef} />

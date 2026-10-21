@@ -56,6 +56,10 @@ export function AtmosphericParticles({ carPositionRef }: { carPositionRef: React
         return new THREE.Color(0xE8F4F8);
       case "pueblo":
         return new THREE.Color(0xFFE5CC);
+      case "tatacoa":
+        return new THREE.Color(0xF2C48D); // desert dust
+      case "cartagena":
+        return new THREE.Color(0xFFFFFF); // sea breeze
       case "comuna_13":
         return new THREE.Color(0xFF8AD0); // neon dust
       case "ciudad_perdida":

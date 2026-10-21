@@ -25,6 +25,9 @@ export interface RunFacts {
   nitroUses: number;
   cleanDistance: number; // metres driven before the first crash
   playtime: number;
+  tunjos?: number;
+  circuitWins?: number; // lifetime, from this device
+  regions?: number; // regions visited, from this device
 }
 
 interface AchievementsState {
@@ -83,6 +86,12 @@ function progressFor(a: Achievement, stats: PlayerStats | null, run: RunFacts | 
       return run?.cleanDistance ?? 0;
     case "nitro_uses":
       return run?.nitroUses ?? 0;
+    case "tunjos":
+      return run?.tunjos ?? 0;
+    case "circuit_wins":
+      return run?.circuitWins ?? 0;
+    case "regions":
+      return run?.regions ?? 0;
     default:
       return 0;
   }

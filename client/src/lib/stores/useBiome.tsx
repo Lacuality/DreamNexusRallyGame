@@ -108,6 +108,36 @@ export const BIOME_CONFIGS: Record<BiomeType, BiomeConfig> = {
     shoulderColor: "#4a3d5e",
     mountainColor: "#2a1840",
   },
+  tatacoa: {
+    name: "Desierto de la Tatacoa",
+    subtitle: "Huila · red canyons & starry skies",
+    skyTop: "#2f6fd0",
+    skyHorizon: "#f6d7a7",
+    fogColor: "#f0cfa0",
+    fogNear: 70,
+    fogFar: 260,
+    sunIntensity: 1.8,
+    sunColor: "#fff0d0",
+    ambientIntensity: 0.55,
+    terrainColor: "#c8794a",
+    shoulderColor: "#a85a35",
+    mountainColor: "#9c4a2e",
+  },
+  cartagena: {
+    name: "Cartagena de Indias",
+    subtitle: "Bolívar · walled city on the Caribbean",
+    skyTop: "#1e90d6",
+    skyHorizon: "#bfefff",
+    fogColor: "#c6f0ff",
+    fogNear: 70,
+    fogFar: 250,
+    sunIntensity: 1.7,
+    sunColor: "#fff3d0",
+    ambientIntensity: 0.6,
+    terrainColor: "#d9c48a",
+    shoulderColor: "#c9b48a",
+    mountainColor: "#5a9a8a",
+  },
 };
 
 interface BiomeState {
@@ -118,7 +148,7 @@ interface BiomeState {
 
   updateDistance: (distance: number) => void;
   updateTransition: (delta: number) => void;
-  reset: () => void;
+  reset: (start?: BiomeType) => void;
   getCurrentConfig: () => BiomeConfig;
   getPreviousConfig: () => BiomeConfig | null;
 }
@@ -152,8 +182,8 @@ export const useBiome = create<BiomeState>((set, get) => ({
     else set({ transitionProgress: p });
   },
 
-  reset: () =>
-    set({ currentBiome: "coffee_hills", previousBiome: null, transitionProgress: 1, isTransitioning: false }),
+  reset: (start: BiomeType = "coffee_hills") =>
+    set({ currentBiome: start, previousBiome: null, transitionProgress: 1, isTransitioning: false }),
 
   getCurrentConfig: () => BIOME_CONFIGS[get().currentBiome],
 

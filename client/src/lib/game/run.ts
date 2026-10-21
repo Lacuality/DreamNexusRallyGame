@@ -22,6 +22,7 @@ export interface RunState {
 
   // health & power-ups
   hearts: number;
+  maxHearts: number;
   shield: boolean;
   invulnerable: number; // seconds left
   nitro: number; // meter 0..1
@@ -37,6 +38,8 @@ export interface RunState {
   nearMisses: number;
   smashes: number;
   jumps: number;
+  tunjos: number;
+  boosts: number;
   maxSpeedKmh: number;
   nitroUses: number;
   firstHitZ: number; // -1 until the first crash
@@ -62,6 +65,7 @@ export function freshRun(): RunState {
     offroad: false,
     steer: 0,
     hearts: MAX_HEARTS,
+    maxHearts: MAX_HEARTS,
     shield: false,
     invulnerable: 0,
     nitro: 0.5,
@@ -75,6 +79,8 @@ export function freshRun(): RunState {
     nearMisses: 0,
     smashes: 0,
     jumps: 0,
+    tunjos: 0,
+    boosts: 0,
     maxSpeedKmh: 0,
     nitroUses: 0,
     firstHitZ: -1,
@@ -88,8 +94,8 @@ export function freshRun(): RunState {
 
 export const run: RunState = freshRun();
 
-export function resetRun() {
-  Object.assign(run, freshRun());
+export function resetRun(hearts = MAX_HEARTS, shield = false) {
+  Object.assign(run, freshRun(), { hearts, maxHearts: hearts, shield });
 }
 
 /** Score multiplier from the current combo (x1 .. x5). */

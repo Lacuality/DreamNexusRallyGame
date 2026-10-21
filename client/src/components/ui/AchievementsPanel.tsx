@@ -4,6 +4,7 @@ import { useAchievements, type Achievement } from "@/lib/stores/useAchievements"
 import { useRally } from "@/lib/stores/useRally";
 import { isOnline } from "@/lib/db";
 import { readBests } from "@/lib/env";
+import { useProfile } from "@/lib/stores/useProfile";
 import { UI, panelStyle } from "./gameUi";
 
 const ONE_RUN = new Set(["distance", "collectibles", "distance_no_crash", "nitro_uses"]);
@@ -29,6 +30,10 @@ function progressOf(a: Achievement, stats: ReturnType<typeof useAchievements.get
       return best.cleanDistance;
     case "nitro_uses":
       return best.nitroUses;
+    case "circuit_wins":
+      return Object.values(useProfile.getState().circuitWins).reduce((a, b) => a + b, 0);
+    case "regions":
+      return useProfile.getState().progress.regions.length;
     default:
       return 0;
   }
