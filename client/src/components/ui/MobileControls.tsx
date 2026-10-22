@@ -78,7 +78,7 @@ function TouchButton({
 
 export function MobileControls() {
   const nitro = useRally((s) => s.hud.nitro);
-  const mode = useRally((s) => s.hud.mode);
+  const battle = useRally((s) => s.hud.battle);
   const item = useRally((s) => s.hud.item);
   const nitroActive = useRally((s) => s.hud.nitroActive);
   const [show, setShow] = useState(isTouchDevice());
@@ -152,7 +152,7 @@ export function MobileControls() {
           gap: 14,
         }}
       >
-        {mode === "battle" && (
+        {battle && (
           <TouchButton
             k="touchItem"
             size={big * 0.8}

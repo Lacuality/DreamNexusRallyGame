@@ -17,6 +17,7 @@ export function OnlineLobby({ onClose }: { onClose: () => void }) {
   const [joinCode, setJoinCode] = useState("");
   const [peers, setPeers] = useState<Peer[]>(Array.from(room.peers.values()));
   const [circuit, setCircuit] = useState("tocancipa");
+  const [battle, setBattle] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -46,18 +47,18 @@ export function OnlineLobby({ onClose }: { onClose: () => void }) {
 
   const start = () => {
     const def = circuitById(circuit);
-    room.send({ t: "start", circuitId: def.id, laps: def.laps, at: Date.now() });
-    useRally.getState().start({ mode: "online", circuitId: def.id, laps: def.laps, room: room.code });
+    room.send({ t: "start", circuitId: def.id, laps: def.laps, at: Date.now(), battle });
+    useRally.getState().start({ mode: "online", circuitId: def.id, laps: def.laps, room: room.code, battle });
   };
 
   const isHost = room.isHost();
 
   return (
     <MenuShell title="👥 Race with Friends" onClose={onClose}>
-      {!playerName && <p style={{ color: UI.warm, fontWeight: 800 }}>Tip: type your racer name on the start screen so friends know who you are.</p>}
+      {!playerName && <p style={{ color: UI.warm, fontWeight: 800 }}>Tip: tap your name at the top-left of the start screen so friends know who you are.</p>}
       {!room.online && (
-        <p style={{ fontWeight: 800, opacity: 0.85 }}>
-          <Wifi size={16} /> Online database not connected — rooms only work between tabs on this device.
+        <p style={{ fontWeight: 800, opacity: 0.85, display: "flex", gap: 8, alignItems: "center" }}>
+          <Wifi size={16} style={{ flexShrink: 0 }} /> Online database not connected — rooms only work between tabs on this device.
         </p>
       )}
 
@@ -150,6 +151,19 @@ export function OnlineLobby({ onClose }: { onClose: () => void }) {
 
           {isHost ? (
             <>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
+                {[
+                  { on: false, icon: "🏁", title: "Carrera", text: "Clean racing. Fastest driver wins." },
+                  { on: true, icon: "🥑", title: "Rally Loco", text: "Power-ups on! Avocados, bananas, voladores…" },
+                ].map((o) => (
+                  <Card key={o.title} active={battle === o.on} onClick={() => setBattle(o.on)} style={{ padding: 10 }}>
+                    <div style={{ fontFamily: UI.display, fontSize: 18 }}>
+                      {o.icon} {o.title}
+                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 700, opacity: 0.85 }}>{o.text}</div>
+                  </Card>
+                ))}
+              </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 8 }}>
                 {CIRCUITS.map((c) => (
                   <Card key={c.id} active={circuit === c.id} onClick={() => setCircuit(c.id)} style={{ padding: 8, textAlign: "center" }}>
@@ -162,7 +176,7 @@ export function OnlineLobby({ onClose }: { onClose: () => void }) {
               </div>
               <BigButton onClick={start} color={UI.gold}>
                 <span style={{ display: "inline-flex", gap: 8, alignItems: "center" }}>
-                  <Play size={24} fill="currentColor" /> START RACE FOR EVERYONE
+                  <Play size={24} fill="currentColor" /> {battle ? "START RALLY LOCO" : "START RACE FOR EVERYONE"}
                 </span>
               </BigButton>
             </>

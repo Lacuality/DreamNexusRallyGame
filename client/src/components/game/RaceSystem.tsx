@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { run, multiplierFor, MAX_HEARTS, NITRO_DURATION, INVULNERABLE_TIME } from "@/lib/game/run";
+import { burst, FX } from "@/lib/game/fx";
+import { run, multiplierFor, MAX_HEARTS, NITRO_DURATION, INVULNERABLE_TIME, speedGear } from "@/lib/game/run";
 import { input, steerInput } from "@/lib/input";
 import { roadX, roadY, roadCurvature, ROAD_HALF, LANES, hash, biomeAt, lapLength, isCircuit } from "@/lib/track";
 import { ModelPool, OBSTACLE_SIZE, type ObstacleKind, type PickupKind, makeArch, makeFinishLine } from "@/lib/game/models";
@@ -241,6 +242,10 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
     }
   };
 
+  /** Particle burst just in front of the player's car. */
+  const fxCar = (colors: string[], count = 14, speed = 6, up = 5) =>
+    burst(roadX(run.z) + run.lat, roadY(run.z) + run.y + 1, run.z + 1.5, colors, count, speed, up);
+
   const award = (pts: number) => {
     // nitro doubles everything you earn
     const p = Math.round(pts * multiplierFor(run.combo) * (run.nitroTime > 0 ? 2 : 1));
@@ -259,6 +264,7 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
       return;
     }
     run.hearts--;
+    fxCar(FX.hit, 22, 8, 6);
     if (run.firstHitZ < 0) run.firstHitZ = run.z;
     run.speed *= 0.4;
     run.invulnerable = INVULNERABLE_TIME;
@@ -324,8 +330,10 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
     const d = circ ? 0.6 : Math.min(1, run.z / 3500);
 
     /* --- speed (car stats apply) --- */
-    const top = ((circ ? 182 : 170 + d * 30) / 3.6) * car.top;
-    const cruise = circ ? top * 0.93 : ((100 + d * 50) / 3.6) * car.top;
+    // endless: the rally shifts up a gear every kilometre (announced on screen)
+    const gear = circ ? 0 : speedGear(run.z);
+    const top = ((circ ? 182 : 175 + gear * 10) / 3.6) * car.top;
+    const cruise = circ ? top * 0.93 : ((122 + gear * 12) / 3.6) * car.top;
     let target = input.up ? top : cruise;
     if (input.down || input.touchBrake) target = 40 / 3.6;
 
@@ -337,6 +345,7 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
       run.nitro = 0;
       run.nitroUses++;
       run.shake = 0.5;
+      fxCar(FX.nitro, 26, 9, 3);
       audioManager.playNitro();
       rally.getState().popup("NITRO! x2 POINTS", COLORS.orange, true);
     }
@@ -419,7 +428,12 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
 
     if (!circ && run.z >= run.nextMilestone) {
       const pts = award(250);
-      rally.getState().popup(`${run.nextMilestone} m!  +${pts}`, COLORS.gold, true);
+      const g = speedGear(run.nextMilestone);
+      if (run.nextMilestone % 1000 === 0 && g > speedGear(run.nextMilestone - 1)) {
+        rally.getState().popup(`⚡ MARCHA ${g + 1} — ¡MÁS RÁPIDO!  +${pts}`, COLORS.orange, true);
+        run.shake = Math.max(run.shake, 0.4);
+        audioManager.playNitro();
+      } else rally.getState().popup(`${run.nextMilestone} m!  +${pts}`, COLORS.gold, true);
       audioManager.playMilestone();
       run.nextMilestone += 500;
     }
@@ -466,7 +480,7 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
       netTimer.current += dt;
       if (session.mode === "online" && netTimer.current > 0.1) {
         netTimer.current = 0;
-        room.send({ t: "pos", id: myId, z: run.z, lat: run.lat, y: run.y, speed: run.speed });
+        room.send({ t: "pos", id: myId, z: run.z, lat: run.lat, y: run.y, speed: run.speed, sh: run.shield, sp: run.spin > 0 ? run.spin : 0, n: run.nitroTime > 0 });
       }
     }
 
@@ -625,6 +639,7 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
     e.done = true;
     e.obj.visible = false;
     const gs = rally.getState();
+    fxCar(e.kind === "jar" ? FX.jar : FX.nitro, e.kind === "jar" ? 10 : 18, 4, 4);
     switch (e.kind) {
       case "jar": {
         run.jars++;
@@ -683,6 +698,7 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
     fling(e);
     e.vy += 4;
     run.smashes++;
+    burst(roadX(e.z) + e.lat, roadY(e.z) + 0.8, e.z, FX.smash, 16, 7, 6);
     bumpCombo();
     const pts = award(75);
     run.shake = Math.max(run.shake, 0.5);

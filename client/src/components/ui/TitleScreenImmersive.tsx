@@ -1,6 +1,6 @@
 import { asset } from "@/lib/env";
 import { useEffect, useState } from "react";
-import { Volume2, VolumeX, Trophy, Maximize, Minimize, X, Medal, Car, Map as MapIcon } from "lucide-react";
+import { Volume2, VolumeX, Trophy, Maximize, Minimize, X, Medal, Car, Map as MapIcon, Pencil, Play } from "lucide-react";
 import { AchievementsPanel } from "./AchievementsPanel";
 import { useRally } from "@/lib/stores/useRally";
 import { useProfile } from "@/lib/stores/useProfile";
@@ -26,40 +26,138 @@ interface TitleScreenImmersiveProps {
 
 type Screen = "home" | "garage" | "map" | "story" | "circuits" | "battle" | "online" | "achievements" | "leaderboard";
 
-function ModeCard({ emoji, title, text, extra, onClick, color }: { emoji: string; title: string; text: string; extra?: string; onClick: () => void; color: string }) {
-  // short text on phones and smaller laptop screens
-  const compact = isTouchDevice() || window.innerWidth < 1200 || window.innerHeight < 700;
+/** Phone in landscape (short) or portrait (narrow)? Updates on rotate/resize. */
+function useViewport() {
+  const read = () => ({ narrow: window.innerWidth < 760, short: window.innerHeight < 520 });
+  const [v, setV] = useState(read);
+  useEffect(() => {
+    const on = () => setV(read());
+    window.addEventListener("resize", on);
+    window.addEventListener("orientationchange", on);
+    return () => {
+      window.removeEventListener("resize", on);
+      window.removeEventListener("orientationchange", on);
+    };
+  }, []);
+  return v;
+}
+
+function press(fn: () => void) {
+  audioManager.unlock();
+  audioManager.playClick();
+  fn();
+}
+
+/** The main button: jump straight into the endless rally. */
+function PlayCard({ short, wide, best, onClick }: { short: boolean; wide: boolean; best: number; onClick: () => void }) {
   return (
     <button
       type="button"
-      className="dnr-press"
-      onClick={() => {
-        audioManager.unlock();
-        audioManager.playClick();
-        onClick();
+      className="dnr-press dnr-in dnr-play"
+      onClick={() => press(onClick)}
+      style={{
+        gridColumn: wide ? "1 / -1" : undefined,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: short ? 8 : 14,
+        padding: short ? "8px 8px" : "14px 18px",
+        minHeight: short ? 58 : wide ? 84 : 112,
+        borderRadius: 20,
+        border: "3px solid #fff3b0",
+        background: "linear-gradient(135deg, #ffd23f 0%, #ff9f43 100%)",
+        color: UI.navy,
+        cursor: "pointer",
+        fontFamily: UI.display,
+        boxShadow: "0 7px 0 #b8641c, 0 12px 30px rgba(255,159,67,0.45)",
+        position: "relative",
+        overflow: "hidden",
       }}
+    >
+      <span
+        style={{
+          width: short ? 36 : 54,
+          height: short ? 36 : 54,
+          borderRadius: "50%",
+          background: UI.navy,
+          color: UI.gold,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+        }}
+      >
+        <Play size={short ? 22 : 30} fill="currentColor" />
+      </span>
+      <span style={{ textAlign: "left", minWidth: 0 }}>
+        <span style={{ display: "block", fontSize: short ? 19 : 30, lineHeight: 1 }}>¡JUGAR!</span>
+        <span style={{ display: short ? "none" : "block", fontFamily: UI.body, fontWeight: 900, fontSize: short ? 12 : 14 }}>
+          Rally Infinito{best > 0 ? ` · Best ${best.toLocaleString()}` : " · Enter ↵"}
+        </span>
+      </span>
+    </button>
+  );
+}
+
+function ModeCard({ i, layout, emoji, title, text, extra, onClick, color }: { i: number; layout: "tile" | "row" | "full"; emoji: string; title: string; text: string; extra?: string; onClick: () => void; color: string }) {
+  const short = layout === "tile";
+  const row = layout === "row";
+  return (
+    <button
+      type="button"
+      className="dnr-press dnr-in dnr-lift"
+      onClick={() => press(onClick)}
       style={{
         ...panelStyle,
-        textAlign: "left",
-        padding: compact ? "10px 10px" : "12px 14px",
+        padding: short ? "6px 4px" : row ? "8px 10px" : "10px 12px",
         cursor: "pointer",
         color: UI.white,
         fontFamily: UI.body,
         borderColor: color,
         borderWidth: 3,
         display: "flex",
-        gap: 10,
-        alignItems: "center",
+        flexDirection: row ? "row" : "column",
+        justifyContent: "center",
+        gap: row ? 10 : short ? 2 : 4,
+        alignItems: row ? "center" : short ? "center" : "flex-start",
+        textAlign: short ? "center" : "left",
         minWidth: 0,
-        boxShadow: `0 6px 0 rgba(0,0,0,0.35), 0 0 22px ${color}55`,
+        boxShadow: `0 6px 0 rgba(0,0,0,0.35), 0 0 22px ${color}44`,
+        animationDelay: `${0.08 + i * 0.07}s`,
       }}
     >
-      <span style={{ fontSize: compact ? 30 : 38, lineHeight: 1 }}>{emoji}</span>
-      <span style={{ minWidth: 0 }}>
-        <span style={{ display: "block", fontFamily: UI.display, fontSize: compact ? 15 : 17, lineHeight: 1.1, color }}>{title}</span>
-        {!compact && <span style={{ display: "block", fontSize: 13, fontWeight: 700, lineHeight: 1.25 }}>{text}</span>}
-        {extra && <span style={{ display: "block", fontSize: 12, fontWeight: 900, color: UI.gold, marginTop: 2 }}>{extra}</span>}
+      <span className="dnr-bob" style={{ fontSize: short ? 24 : 32, lineHeight: 1, animationDelay: `${i * 0.4}s` }}>{emoji}</span>
+      <span style={{ minWidth: 0, maxWidth: "100%" }}>
+        <span style={{ display: "block", fontFamily: UI.display, fontSize: short ? 12 : 16, lineHeight: 1.1, color }}>{title}</span>
+        {layout === "full" && <span style={{ display: "block", fontSize: 13, fontWeight: 700, lineHeight: 1.2, opacity: 0.9 }}>{text}</span>}
+        {extra && !short && <span style={{ display: "block", fontSize: 12, fontWeight: 900, color: UI.gold, marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{extra}</span>}
       </span>
+    </button>
+  );
+}
+
+function PillButton({ children, onClick, color = UI.cyanBright, short }: { children: React.ReactNode; onClick: () => void; color?: string; short: boolean }) {
+  return (
+    <button
+      type="button"
+      className="dnr-press"
+      onClick={() => press(onClick)}
+      style={{
+        ...panelStyle,
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        padding: short ? "0 14px" : "0 18px",
+        minHeight: short ? 40 : 48,
+        color: UI.white,
+        cursor: "pointer",
+        fontFamily: UI.display,
+        fontSize: short ? 14 : 16,
+        borderColor: color,
+        borderRadius: 999,
+      }}
+    >
+      {children}
     </button>
   );
 }
@@ -90,6 +188,8 @@ export function TitleScreenImmersive({ isFullscreen, onToggleFullscreen, isFulls
   const [nameInput, setNameInput] = useState("");
   const [screen, setScreen] = useState<Screen>("home");
   const [dialog, setDialog] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState(false);
+  const { narrow, short } = useViewport();
   const audio = useAudioSettings();
   const touch = isTouchDevice();
 
@@ -121,7 +221,7 @@ export function TitleScreenImmersive({ isFullscreen, onToggleFullscreen, isFulls
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Enter" && screen === "home" && !dialog) startEndless();
+      if (e.key === "Enter" && screen === "home" && !dialog && !editingName) startEndless();
       if (e.key === "Escape" && screen !== "home") setScreen("home");
     };
     window.addEventListener("keydown", onKeyDown);
@@ -153,107 +253,175 @@ export function TitleScreenImmersive({ isFullscreen, onToggleFullscreen, isFulls
         )}
       </div>
 
+      {/* profile chip (top-left): your driver + name, tap to rename */}
+      <button
+        type="button"
+        className="dnr-press dnr-in"
+        onClick={() => setEditingName(true)}
+        style={{
+          ...panelStyle,
+          position: "absolute",
+          top: "max(12px, env(safe-area-inset-top))",
+          left: 12,
+          zIndex: 20,
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          padding: short ? "4px 12px 4px 6px" : "6px 14px 6px 8px",
+          color: UI.white,
+          cursor: "pointer",
+          maxWidth: "min(46vw, 320px)",
+          animationDelay: "0.05s",
+        }}
+        aria-label="Change your racer name"
+      >
+        <span style={{ fontSize: short ? 26 : 34, lineHeight: 1, background: "rgba(255,255,255,0.12)", borderRadius: 12, padding: 4 }}>{driverById(driver).emoji}</span>
+        <span style={{ minWidth: 0, textAlign: "left" }}>
+          <span style={{ display: "block", fontFamily: UI.display, fontSize: short ? 14 : 17, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            {playerName || "Tu nombre"} <Pencil size={13} style={{ display: "inline", verticalAlign: "-1px", opacity: 0.7 }} />
+          </span>
+          <span style={{ display: "block", fontWeight: 900, fontSize: 13, color: UI.gold }}>🍯 {wallet.toLocaleString()}</span>
+        </span>
+      </button>
+
       {/* title */}
-      <div style={{ position: "absolute", top: "max(12px, env(safe-area-inset-top))", left: 0, right: 0, textAlign: "center", pointerEvents: "none", zIndex: 10, padding: touch ? "0 12px" : "0 80px" }}>
-        <img
-          src={asset("/dream-nexus-logo.png")}
-          alt="Dream Nexus"
+      <div
+        className="dnr-title"
+        style={{
+          position: "absolute",
+          top: short ? "max(8px, env(safe-area-inset-top))" : narrow ? "calc(max(12px, env(safe-area-inset-top)) + 64px)" : "max(14px, env(safe-area-inset-top))",
+          left: 0,
+          right: 0,
+          textAlign: "center",
+          pointerEvents: "none",
+          zIndex: 10,
+          padding: "0 12px",
+        }}
+      >
+        {!short && (
+          <img
+            src={asset("/dream-nexus-logo.png")}
+            alt="Dream Nexus"
+            style={{
+              width: narrow ? "clamp(100px, 30vw, 150px)" : "clamp(130px, 12vw, 190px)",
+              height: "auto",
+              display: "block",
+              margin: "0 auto",
+              filter: "drop-shadow(0 0 10px rgba(255,255,255,0.9))",
+              animation: "dnrFloat 3s ease-in-out infinite",
+            }}
+          />
+        )}
+        <h1
           style={{
-            width: touch ? "clamp(110px, 34vw, 160px)" : "clamp(140px, 14vw, 210px)",
-            height: "auto",
-            display: "block",
-            margin: touch ? "60px auto 0" : "0 auto",
-            filter: "drop-shadow(0 0 10px rgba(255,255,255,0.9))",
-            animation: "dnrFloat 3s ease-in-out infinite",
+            fontFamily: UI.display,
+            fontSize: short ? "clamp(22px, 5vw, 34px)" : narrow ? "clamp(30px, 10vw, 44px)" : "clamp(34px, 5vw, 64px)",
+            lineHeight: 1,
+            margin: "2px 0",
+            color: UI.white,
+            textShadow: "0 5px 0 #24A0CE, 0 10px 24px rgba(0,0,0,0.5)",
           }}
-        />
-        <h1 style={{ fontFamily: UI.display, fontSize: touch ? "clamp(28px, 9vw, 40px)" : "clamp(30px, 5vw, 60px)", lineHeight: 1, margin: "4px 0 2px", color: UI.white, textShadow: "0 5px 0 #24A0CE, 0 10px 24px rgba(0,0,0,0.5)" }}>
-          DREAM NEXUS{touch ? <br /> : " "}
-          <span style={{ color: UI.gold, textShadow: "0 5px 0 #c8772e, 0 10px 24px rgba(0,0,0,0.5)" }}>RALLY</span>
+        >
+          DREAM NEXUS{narrow ? <br /> : " "}
+          <span className="dnr-shine" style={{ color: UI.gold, textShadow: "0 5px 0 #c8772e, 0 10px 24px rgba(0,0,0,0.5)" }}>
+            RALLY
+          </span>
         </h1>
-        <p style={{ margin: 0, fontWeight: 800, fontSize: "clamp(14px, 1.8vw, 19px)", color: UI.warm, textShadow: "0 2px 6px rgba(0,0,0,0.7)" }}>
-          ¡Rally por toda Colombia con Pixel y sus amigos!
-        </p>
+        {!short && (
+          <p style={{ margin: 0, fontWeight: 800, fontSize: "clamp(14px, 1.8vw, 19px)", color: UI.warm, textShadow: "0 2px 6px rgba(0,0,0,0.7)" }}>
+            ¡Rally por toda Colombia con Pixel y sus amigos!
+          </p>
+        )}
       </div>
 
-      {/* bottom: name, garage, modes */}
+      {/* bottom: big PLAY, the other modes, then garage / map */}
       <div
         style={{
           position: "absolute",
           left: "50%",
-          bottom: "max(12px, env(safe-area-inset-bottom))",
+          bottom: "max(10px, env(safe-area-inset-bottom))",
           transform: "translateX(-50%)",
-          width: touch ? "min(560px, calc(100% - 20px))" : "min(980px, calc(100% - 32px))",
+          width: narrow ? "min(560px, calc(100% - 20px))" : "min(1040px, calc(100% - 32px))",
           display: "flex",
           flexDirection: "column",
-          gap: 10,
+          gap: short ? 6 : 10,
           zIndex: 10,
         }}
       >
-        <div style={{ ...panelStyle, padding: 10, display: "flex", gap: 8, alignItems: "stretch", flexWrap: "wrap" }}>
-          <input
-            id="player-name-input"
-            type="text"
-            value={nameInput}
-            onChange={(e) => setNameInput(e.target.value)}
-            onBlur={saveName}
-            placeholder="Your racer name"
-            maxLength={20}
-            aria-label="Your racer name"
-            autoComplete="off"
-            style={{
-              flex: "1 1 160px",
-              minHeight: 54,
-              minWidth: 0,
-              fontFamily: UI.body,
-              fontWeight: 800,
-              fontSize: 20,
-              padding: "0 14px",
-              background: "rgba(255,255,255,0.1)",
-              border: `3px solid ${UI.cyanBright}`,
-              borderRadius: 14,
-              color: UI.white,
-              outline: "none",
-              textAlign: "center",
-            }}
-          />
-          <button
-            type="button"
-            className="dnr-press"
-            onClick={() => open("garage")}
-            style={{ ...panelStyle, flex: "0 0 auto", display: "flex", alignItems: "center", gap: 8, padding: "0 14px", minHeight: 54, color: UI.white, cursor: "pointer", fontFamily: UI.display, fontSize: 16, borderColor: UI.gold }}
-          >
-            <span style={{ fontSize: 26 }}>{driverById(driver).emoji}</span> <Car size={22} /> GARAGE
-          </button>
-          <button
-            type="button"
-            className="dnr-press"
-            onClick={() => open("map")}
-            style={{ ...panelStyle, flex: "0 0 auto", display: "flex", alignItems: "center", gap: 8, padding: "0 14px", minHeight: 54, color: UI.white, cursor: "pointer", fontFamily: UI.display, fontSize: 16 }}
-          >
-            <MapIcon size={22} /> MAPA
-          </button>
-          <div style={{ ...panelStyle, flex: "0 0 auto", display: "flex", alignItems: "center", padding: "0 14px", minHeight: 54, fontFamily: UI.display, fontSize: 18, color: UI.gold }} title="Arequipe jars">
-            🍯 {wallet.toLocaleString()}
-          </div>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: short ? "1.4fr repeat(4, minmax(0, 1fr))" : narrow ? "1fr 1fr" : "1.7fr 1fr 1fr 1fr 1fr",
+            gap: short ? 6 : 8,
+          }}
+        >
+          <PlayCard short={short} wide={narrow && !short} best={highScore} onClick={startEndless} />
+          <ModeCard i={1} layout={short ? "tile" : narrow ? "row" : "full"} emoji="📖" title="HISTORIA" text={`${CHAPTERS.length} chapters across Colombia`} extra={`${chaptersDone}/${CHAPTERS.length} · ⭐ ${starCount}`} onClick={() => open("story")} color="#7bd389" />
+          <ModeCard i={2} layout={short ? "tile" : narrow ? "row" : "full"} emoji="🏎️" title="CIRCUITO" text="3 laps vs 5 rivals" extra="Real race tracks" onClick={() => open("circuits")} color={UI.cyanBright} />
+          <ModeCard i={3} layout={short ? "tile" : narrow ? "row" : "full"} emoji="🥑" title="RALLY LOCO" text="Power-ups & attacks" extra="Aguacates, voladores…" onClick={() => open("battle")} color={UI.orange} />
+          <ModeCard i={4} layout={short ? "tile" : narrow ? "row" : "full"} emoji="👥" title="AMIGOS" text="Race friends online" extra="Room code" onClick={() => open("online")} color="#ff4f9a" />
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: touch ? "1fr 1fr" : "repeat(5, 1fr)", gap: 8 }}>
-          <ModeCard emoji="🏁" title="RALLY INFINITO" text="Drive across all of Colombia. How far can you go?" extra={highScore > 0 ? `Best ${highScore.toLocaleString()}` : "Press Enter"} onClick={startEndless} color={UI.gold} />
-          <ModeCard emoji="📖" title="MODO HISTORIA" text={`La Ruta de Pixel: ${CHAPTERS.length} chapters to Cartagena`} extra={`${chaptersDone}/${CHAPTERS.length} · ⭐ ${starCount}`} onClick={() => open("story")} color="#7bd389" />
-          <ModeCard emoji="🏎️" title="CIRCUITO" text="3 laps vs 5 rivals on real circuits" extra="Win jars & best laps" onClick={() => open("circuits")} color={UI.cyanBright} />
-          <ModeCard emoji="🥑" title="RALLY LOCO" text="Power-ups! Avocados, banana peels, fireworks & tinto turbo" extra="Items & attacks" onClick={() => open("battle")} color={UI.orange} />
-          <ModeCard emoji="👥" title="CON AMIGOS" text="Race your friends live with a room code" extra="Online" onClick={() => open("online")} color="#ff4f9a" />
+        <div className="dnr-in" style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", animationDelay: "0.45s" }}>
+          <PillButton onClick={() => open("garage")} color={UI.gold} short={short}>
+            <Car size={20} /> GARAGE
+          </PillButton>
+          <PillButton onClick={() => open("map")} short={short}>
+            <MapIcon size={20} /> MAPA
+          </PillButton>
+          {!touch && !short && (
+            <span style={{ alignSelf: "center", fontWeight: 800, fontSize: 13, opacity: 0.85, textShadow: "0 1px 4px #000", marginLeft: 8 }}>
+              ⌨️ ← → steer · ↑ faster · ↓ brake · SPACE nitro · E power-up · P pause · by{" "}
+              <a href="https://dreamnexus.digital" target="_blank" rel="noreferrer" style={{ color: UI.cyanBright }}>
+                dreamnexus.digital
+              </a>
+            </span>
+          )}
         </div>
-        {!touch && (
-          <div style={{ textAlign: "center", fontWeight: 800, fontSize: 13, opacity: 0.85, textShadow: "0 1px 4px #000" }}>
-            ⌨️ ← → steer · ↑ faster · ↓ brake · SPACE nitro · P pause &nbsp;·&nbsp; made by{" "}
-            <a href="https://dreamnexus.digital" target="_blank" rel="noreferrer" style={{ color: UI.cyanBright }}>
-              dreamnexus.digital
-            </a>
-          </div>
-        )}
       </div>
+
+      {editingName && (
+        <Modal onClose={() => { saveName(); setEditingName(false); }}>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              saveName();
+              setEditingName(false);
+            }}
+            style={{ ...panelStyle, padding: 18, display: "flex", flexDirection: "column", gap: 12, color: UI.white }}
+          >
+            <div style={{ fontFamily: UI.display, fontSize: 22, color: UI.cyanBright }}>¿Cómo te llamas?</div>
+            <div style={{ fontWeight: 700, opacity: 0.85 }}>Your name shows on the leaderboard and to friends online.</div>
+            <input
+              id="player-name-input"
+              type="text"
+              autoFocus
+              value={nameInput}
+              onChange={(e) => setNameInput(e.target.value)}
+              placeholder="Your racer name"
+              maxLength={20}
+              aria-label="Your racer name"
+              autoComplete="off"
+              style={{
+                minHeight: 56,
+                fontFamily: UI.body,
+                fontWeight: 800,
+                fontSize: 22,
+                padding: "0 14px",
+                background: "rgba(255,255,255,0.1)",
+                border: `3px solid ${UI.cyanBright}`,
+                borderRadius: 14,
+                color: UI.white,
+                outline: "none",
+                textAlign: "center",
+              }}
+            />
+            <BigButton onClick={() => { saveName(); setEditingName(false); }} color={UI.gold}>
+              ¡LISTO!
+            </BigButton>
+          </form>
+        </Modal>
+      )}
 
       {screen === "garage" && <Garage onClose={() => setScreen("home")} />}
       {(screen === "map" || screen === "story") && (

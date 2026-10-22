@@ -7,6 +7,9 @@ import { input } from "@/lib/input";
 import { roadX, roadY, LANES, lapLength } from "@/lib/track";
 import { useRally } from "@/lib/stores/useRally";
 import { audioManager } from "@/lib/audio";
+import { room, myId } from "@/lib/game/net";
+import { burst, FX } from "@/lib/game/fx";
+import { session } from "@/lib/game/session";
 
 /**
  * Rally Loco: surprise boxes on the circuit give Colombian power-ups.
@@ -45,6 +48,7 @@ interface Projectile {
   obj: THREE.Object3D;
 }
 interface Trap {
+  owner: string;
   z: number;
   lat: number;
   life: number;
@@ -195,12 +199,35 @@ export function Battle() {
     run.item = null;
   }, [boxes]);
 
+  // online: friends' power-ups arrive over the network and play out here too
+  const online = session.mode === "online";
+  useEffect(() => {
+    if (!online) return;
+    return room.onMessage((msg) => {
+      if (msg.t === "hit" && msg.by === myId) {
+        const r = racerById(msg.id);
+        run.hitsLanded++;
+        run.score += 100;
+        audioManager.playSmash();
+        useRally.getState().popup(`¡Le diste a ${r?.name ?? "tu amigo"}!`, COLORS.gold, true);
+        return;
+      }
+      if (msg.t !== "item" || msg.id === myId || !(msg.item in ITEMS)) return;
+      if (useRally.getState().phase !== "playing") return;
+      const target = msg.target === myId ? "me" : msg.target;
+      use(msg.id, msg.item as ItemId, { z: msg.z, lat: msg.lat, speed: msg.speed }, target);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [online]);
+
   const carsNow = (): Car[] => [{ id: "me", z: run.z, lat: run.lat, name: "You" }, ...race.racers.map((r) => ({ id: r.id, z: r.z, lat: r.lat, name: r.name }))];
   const racerById = (id: string) => race.racers.find((r) => r.id === id);
 
   /** Something hits a car. Returns true if it landed (not blocked). */
   const hit = (targetId: string, by: string, label: string) => {
     const gs = useRally.getState();
+    const victim = carsNow().find((c) => c.id === targetId);
+    if (victim) burst(roadX(victim.z) + victim.lat, roadY(victim.z) + 1.2, victim.z, FX.hit, 20, 7, 6);
     if (targetId === "me") {
       if (run.shield) {
         run.shield = false;
@@ -215,10 +242,15 @@ export function Battle() {
       audioManager.playCrash();
       if (navigator.vibrate) navigator.vibrate(100);
       gs.popup(label, COLORS.red, true);
+      if (online && racerById(by)?.remote) room.send({ t: "hit", id: myId, by });
       return true;
     }
     const r = racerById(targetId);
     if (!r) return false;
+    if (r.remote) {
+      // a friend's own game decides if it landed and tells us (see the "hit" message)
+      return !r.shield;
+    }
     if (r.shield) {
       r.shield = false;
       if (by === "me") gs.popup(`${r.name} blocked it! 👒`, COLORS.cyan);
@@ -235,24 +267,27 @@ export function Battle() {
     return true;
   };
 
-  const use = (ownerId: string, item: ItemId) => {
+  const use = (ownerId: string, item: ItemId, from?: { z: number; lat: number; speed: number }, forcedTarget?: string) => {
     const cars = carsNow();
-    const me = cars.find((c) => c.id === ownerId)!;
+    const me = from ? { id: ownerId, ...from, name: racerById(ownerId)?.name ?? "Friend" } : cars.find((c) => c.id === ownerId);
+    if (!me) return;
     const gs = useRally.getState();
     const mine = ownerId === "me";
     const owner = mine ? null : racerById(ownerId);
+    let sentTarget: string | undefined;
     switch (item) {
       case "aguacate": {
         const obj = makeAguacate();
         group.current?.add(obj);
-        projectiles.current.push({ kind: "aguacate", owner: ownerId, target: null, z: me.z + 3, lat: me.lat, y: 1, speed: (mine ? run.speed : owner?.speed ?? 40) + 28, life: 3, obj });
+        const base = from ? from.speed : mine ? run.speed : owner?.speed ?? 40;
+        projectiles.current.push({ kind: "aguacate", owner: ownerId, target: null, z: me.z + 3, lat: me.lat, y: 1, speed: base + 28, life: 3, obj });
         audioManager.playJump();
         break;
       }
       case "platano": {
         const obj = makePlatano();
         group.current?.add(obj);
-        traps.current.push({ z: me.z - 4.5, lat: me.lat, life: 45, obj });
+        traps.current.push({ owner: ownerId, z: me.z - 4.5, lat: me.lat, life: 45, obj });
         audioManager.playClick();
         break;
       }
@@ -272,9 +307,10 @@ export function Battle() {
         break;
       case "volador": {
         // the leader (or 2nd place if you're leading)
-        const sorted = [...cars].sort((a, b) => b.z - a.z);
-        const target = sorted[0].id !== ownerId ? sorted[0] : sorted[1];
+        const sorted = [...cars].filter((c) => c.id !== ownerId).sort((a, b) => b.z - a.z);
+        const target = (forcedTarget && cars.find((c) => c.id === forcedTarget)) || sorted[0];
         if (!target) break;
+        sentTarget = target.id === "me" ? myId : target.id;
         const obj = makeVolador();
         group.current?.add(obj);
         projectiles.current.push({ kind: "volador", owner: ownerId, target: target.id, z: me.z + 2, lat: me.lat, y: 3, speed: 95, life: 8, obj });
@@ -305,6 +341,7 @@ export function Battle() {
         break;
       }
     }
+    if (mine && online) room.send({ t: "item", id: myId, item, z: run.z, lat: run.lat, speed: run.speed, target: sentTarget });
   };
 
   useFrame((state, delta) => {
@@ -338,12 +375,14 @@ export function Battle() {
           // pick-up by the player or any AI
           // every car gets its own box (AI grabbing one doesn't take it from you)
           for (const c of carsNow()) {
+            if (c.id !== "me" && racerById(c.id)?.remote) continue; // friends pick up boxes in their own game
             if (Math.abs(c.z - z) < 2.2 && Math.abs(c.lat - lat) < 1.6) {
               const holder = c.id === "me" ? run.item : racerById(c.id)?.item;
               const ckey = c.id === "me" ? key : `${key}:${c.id}`;
               if ((taken.current.get(ckey) ?? -1) >= now) continue;
               taken.current.set(ckey, now + 2.5);
               if (c.id === "me") audioManager.playClick();
+              burst(roadX(z) + lat, roadY(z) + 1.1, z, FX.box, 12, 5, 5);
               if (holder) continue;
               const pos = c.id === "me" ? playerPosition(run.z, null) : 1 + carsNow().filter((o) => o.z > c.z).length;
               const item = rollItem(pos, race.racers.length + 1);
@@ -442,7 +481,7 @@ export function Battle() {
       for (const c of carsNow()) {
         if (Math.abs(c.z - tr.z) < 2 && Math.abs(c.lat - tr.lat) < 1.4) {
           if (c.id === "me" && run.airborne) continue;
-          hit(c.id, "trap", "🍌 ¡RESBALÓN!");
+          hit(c.id, tr.owner, "🍌 ¡RESBALÓN!");
           tr.life = 0;
           break;
         }

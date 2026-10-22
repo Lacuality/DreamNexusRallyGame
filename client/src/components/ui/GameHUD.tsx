@@ -312,7 +312,7 @@ export function GameHUD({ isFullscreen = false, onToggleFullscreen }: GameHUDPro
       )}
 
       {/* ---- Rally Loco item slot ---- */}
-      {hud.mode === "battle" && (
+      {hud.battle && (
         <div
           style={{
             position: "absolute",
@@ -423,7 +423,14 @@ export function GameHUD({ isFullscreen = false, onToggleFullscreen }: GameHUDPro
           </span>
           <span style={{ fontWeight: 800, fontSize: touch ? 12 : 16, color: UI.warm }}>km/h</span>
         </div>
-        <div style={{ fontWeight: 800, fontSize: touch ? 13 : 17, color: UI.cyanBright }}>{hud.distance.toLocaleString()} m</div>
+        <div style={{ fontWeight: 800, fontSize: touch ? 13 : 17, color: UI.cyanBright }}>
+          {hud.distance.toLocaleString()} m
+          {hud.mode === "endless" && (
+            <span key={hud.gear} style={{ marginLeft: 8, color: UI.orange, display: "inline-block", animation: "dnrPop 0.5s ease-out" }}>
+              ⚡{hud.gear}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* ---- nitro meter (desktop; touch has its own button) ---- */}

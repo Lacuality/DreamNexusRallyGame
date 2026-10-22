@@ -7,7 +7,9 @@ import { Camera } from "./Camera";
 import { RaceSystem, Scenery } from "./RaceSystem";
 import { Rivals } from "./Rivals";
 import { Battle } from "./Battle";
-import { session } from "@/lib/game/session";
+import { Bursts } from "./Bursts";
+import { Effects } from "./Effects";
+import { session, isBattle } from "@/lib/game/session";
 import { NitroParticles, DustTrail, ExhaustSmoke } from "./ParticleEffects";
 import { AtmosphericParticles } from "./AtmosphericParticles";
 import { SpeedLines } from "./SpeedLines";
@@ -84,15 +86,17 @@ export function GameScene({ isFullscreen = false, onToggleFullscreen }: GameScen
             <Scenery />
             <Car />
             <Rivals />
-            {session.mode === "battle" && <Battle />}
+            {isBattle() && <Battle />}
             <RaceSystem carPositionRef={carPositionRef} carSpeedRef={carSpeedRef} />
             <NitroFx carPositionRef={carPositionRef} />
             <DustTrail carPositionRef={carPositionRef} speedRef={carSpeedRef} />
             <ExhaustSmoke carPositionRef={carPositionRef} speedRef={carSpeedRef} />
             <AtmosphericParticles carPositionRef={carPositionRef} />
             <SpeedLines carPositionRef={carPositionRef} speedRef={carSpeedRef} />
+            <Bursts />
             <Camera />
           </group>
+          <Effects />
         </Suspense>
       </Canvas>
 

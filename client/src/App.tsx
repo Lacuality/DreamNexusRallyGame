@@ -42,7 +42,7 @@ function App() {
       room.onMessage((m) => {
         if (m.t === "start") {
           audioManager.unlock();
-          useRally.getState().start({ mode: "online", circuitId: m.circuitId, laps: m.laps, room: room.code });
+          useRally.getState().start({ mode: "online", circuitId: m.circuitId, laps: m.laps, room: room.code, battle: !!m.battle });
         }
       }),
     [],

@@ -4,6 +4,12 @@
  * the useRally store.
  */
 export const MAX_HEARTS = 3;
+
+/** Endless rally gear: 0 at the start, +1 every km, up to 6. */
+export function speedGear(z: number) {
+  return Math.max(0, Math.min(6, Math.floor(z / 1000)));
+}
+
 export const NITRO_DURATION = 2.2; // seconds
 export const INVULNERABLE_TIME = 1.6; // seconds after a hit
 

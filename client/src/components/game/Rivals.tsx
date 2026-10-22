@@ -105,6 +105,9 @@ export function Rivals() {
           race.racers.push(r);
         }
         r.lastSeen = Date.now();
+        r.shield = !!m.sh;
+        if (m.sp && r.spin <= 0) r.spin = m.sp;
+        r.nitro = m.n ? 0.3 : 0;
         targets.current.set(m.id, { z: m.z, lat: m.lat, y: m.y, speed: m.speed });
       } else if (m.t === "finish") {
         const r = race.racers.find((x) => x.id === m.id);
@@ -132,6 +135,8 @@ export function Rivals() {
 
     for (const r of race.racers) {
       if (r.remote) {
+        if (r.spin > 0) r.spin -= dt;
+        if (r.nitro > 0) r.nitro -= dt;
         // smooth toward the latest network position (with a little prediction)
         const tg = targets.current.get(r.id);
         if (tg) {

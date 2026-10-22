@@ -29,7 +29,7 @@ export function PauseMenu() {
   const restart = useRally((s) => s.restart);
   const start = useRally((s) => s.start);
   const audio = useAudioSettings();
-  const { reducedMotion, toggleReducedMotion } = useSettings();
+  const { reducedMotion, toggleReducedMotion, graphics, toggleGraphics } = useSettings();
 
   return (
     <div
@@ -79,6 +79,10 @@ export function PauseMenu() {
           <label style={{ display: "flex", alignItems: "center", gap: 12, fontWeight: 800, fontSize: 18, cursor: "pointer" }}>
             <input type="checkbox" checked={reducedMotion} onChange={toggleReducedMotion} style={{ width: 26, height: 26, accentColor: UI.cyanBright }} />
             Less camera shake
+          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: 12, fontWeight: 800, fontSize: 18, cursor: "pointer" }}>
+            <input type="checkbox" checked={graphics === "high"} onChange={toggleGraphics} style={{ width: 26, height: 26, accentColor: UI.cyanBright }} />
+            ✨ High graphics (glow effects)
           </label>
         </div>
 

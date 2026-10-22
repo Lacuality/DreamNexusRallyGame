@@ -171,6 +171,24 @@ export function GameStyles() {
       @keyframes dnrGlow { 0%,100% { box-shadow: 0 0 12px rgba(255,159,67,0.6); } 50% { box-shadow: 0 0 34px rgba(255,159,67,1); } }
       @keyframes dnrHeart { 0% { transform: scale(1); } 30% { transform: scale(1.35); } 100% { transform: scale(1); } }
       @keyframes dnrFloat { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+      @keyframes dnrPop { 0% { transform: scale(0.4); opacity: 0; } 60% { transform: scale(1.3); opacity: 1; } 100% { transform: scale(1); } }
+      @keyframes dnrRise { from { opacity: 0; transform: translateY(26px) scale(0.96); } to { opacity: 1; transform: none; } }
+      @keyframes dnrDrop { 0% { opacity: 0; transform: translateY(-30px) scale(0.9); } 70% { opacity: 1; transform: translateY(4px) scale(1.02); } 100% { transform: none; } }
+      @keyframes dnrBob { 0%,100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-4px) rotate(-6deg); } }
+      @keyframes dnrSweep { 0% { transform: translateX(-120%) skewX(-20deg); } 60%,100% { transform: translateX(260%) skewX(-20deg); } }
+      @keyframes dnrPlayGlow { 0%,100% { box-shadow: 0 7px 0 #b8641c, 0 10px 26px rgba(255,159,67,0.4); } 50% { box-shadow: 0 7px 0 #b8641c, 0 12px 44px rgba(255,210,63,0.85); } }
+      @keyframes dnrShine { 0%,100% { filter: brightness(1); } 50% { filter: brightness(1.25); } }
+      .dnr-in { animation: dnrRise 0.5s cubic-bezier(.2,.9,.3,1.2) both; }
+      .dnr-title { animation: dnrDrop 0.7s cubic-bezier(.2,.9,.3,1.2) both; }
+      .dnr-play { animation: dnrRise 0.5s cubic-bezier(.2,.9,.3,1.2) both, dnrPlayGlow 2.2s ease-in-out 0.6s infinite; }
+      .dnr-play::after { content: ""; position: absolute; top: 0; bottom: 0; width: 40%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.55), transparent); animation: dnrSweep 3s ease-in-out 1s infinite; pointer-events: none; }
+      .dnr-lift { transition: transform 0.15s ease, filter 0.15s ease, box-shadow 0.15s ease; }
+      .dnr-lift:hover { transform: translateY(-4px); }
+      .dnr-bob { display: inline-block; animation: dnrBob 2.4s ease-in-out infinite; }
+      .dnr-shine { animation: dnrShine 2.5s ease-in-out infinite; }
+      @media (prefers-reduced-motion: reduce) {
+        .dnr-in, .dnr-title, .dnr-play, .dnr-bob, .dnr-shine, .dnr-play::after { animation: none !important; }
+      }
       @keyframes dnrFadeIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
     `}</style>
   );

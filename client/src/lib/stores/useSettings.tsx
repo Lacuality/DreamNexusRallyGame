@@ -1,12 +1,25 @@
 import { create } from "zustand";
 
 export type WeatherMode = "sunny" | "overcast";
+export type Graphics = "high" | "low";
+
+function initialGraphics(): Graphics {
+  try {
+    const saved = localStorage.getItem("dnr-graphics");
+    if (saved === "high" || saved === "low") return saved;
+  } catch {}
+  // phones start on "low" (no glow effects) so the game stays smooth
+  const coarse = typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches;
+  return coarse ? "low" : "high";
+}
 
 interface SettingsState {
   weather: WeatherMode;
   showPhotoMode: boolean;
   reducedMotion: boolean;
   highContrast: boolean;
+  graphics: Graphics;
+  toggleGraphics: () => void;
   
   toggleWeather: () => void;
   togglePhotoMode: () => void;
@@ -19,6 +32,15 @@ export const useSettings = create<SettingsState>((set) => ({
   showPhotoMode: false,
   reducedMotion: false,
   highContrast: false,
+  graphics: initialGraphics(),
+  toggleGraphics: () =>
+    set((state) => {
+      const graphics: Graphics = state.graphics === "high" ? "low" : "high";
+      try {
+        localStorage.setItem("dnr-graphics", graphics);
+      } catch {}
+      return { graphics };
+    }),
   
   toggleWeather: () => {
     set((state) => ({

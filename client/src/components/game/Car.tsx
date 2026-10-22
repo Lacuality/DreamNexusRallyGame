@@ -1,4 +1,5 @@
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
+import { burst } from "@/lib/game/fx";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { buildVehicle, type CarRig } from "@/lib/game/vehicles";
@@ -21,6 +22,7 @@ export function Car() {
   const { car, paint, driver } = useProfile.getState();
   const rig = useMemo(() => buildVehicle(car, paint, driver), [car, paint, driver]);
   const blob = useMemo(() => rig.root.getObjectByName("blob") as THREE.Mesh, [rig]);
+  const anim = useRef({ prevSpeed: 0, pitch: 0, wasAir: false, squash: 0 });
 
   useFrame((state, delta) => {
     const t = state.clock.elapsedTime;
@@ -32,7 +34,22 @@ export function Car() {
     // face along the road, plus a bit of steering yaw
     const heading = Math.atan(roadSlope(z));
     rig.root.rotation.set(0, heading + run.latVel * 0.025 + (run.spin > 0 ? (1 - run.spin) * Math.PI * 4 : 0), 0);
-    rig.body.rotation.x = -roadPitch(z) + (run.airborne ? -run.vy * 0.025 : 0);
+    // weight transfer: nose lifts when you accelerate / use nitro, dips when you brake or crash
+    const a = anim.current;
+    const accel = (run.speed - a.prevSpeed) / Math.max(delta, 1e-3);
+    a.prevSpeed = run.speed;
+    const want = THREE.MathUtils.clamp(-accel * 0.006, -0.09, 0.07) - (run.nitroTime > 0 ? 0.05 : 0);
+    a.pitch += (want - a.pitch) * Math.min(1, delta * 6);
+    // landing: squash and a puff of dust
+    if (a.wasAir && !run.airborne) {
+      a.squash = 1;
+      burst(x, y + 0.2, z, ["#c9a46a", "#e6d2a8", "#8b6b3e"], 14, 5, 2.5, 0.22);
+    }
+    a.wasAir = run.airborne;
+    a.squash = Math.max(0, a.squash - delta * 4);
+    const sq = Math.sin(a.squash * Math.PI) * 0.16;
+    rig.body.scale.set(1 + sq * 0.5, 1 - sq, 1 + sq * 0.3);
+    rig.body.rotation.x = -roadPitch(z) + (run.airborne ? -run.vy * 0.025 : a.pitch);
     rig.body.rotation.z = THREE.MathUtils.lerp(rig.body.rotation.z, run.steer * 0.06, Math.min(1, delta * 8));
 
     // suspension bounce (more off-road)

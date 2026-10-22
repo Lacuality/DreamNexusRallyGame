@@ -4,10 +4,10 @@ import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
 import { audioManager } from "@/lib/audio";
 import { useAchievements } from "./useAchievements";
-import { run, resetRun, multiplierFor, MAX_HEARTS } from "@/lib/game/run";
+import { run, resetRun, multiplierFor, MAX_HEARTS, speedGear } from "@/lib/game/run";
 import type { BiomeType } from "@/lib/track";
 import { lapLength, roadCurvature, cornerSpeed } from "@/lib/track";
-import { applySession, car as carLoadout, session, sessionCircuit, type Session } from "@/lib/game/session";
+import { applySession, car as carLoadout, session, sessionCircuit, isBattle, type Session } from "@/lib/game/session";
 import { race, resetRace, endRaceState, playerPosition, standings, type Standing } from "@/lib/game/race";
 import { chapterById, CHAPTERS } from "@/lib/game/story";
 import { useProfile } from "./useProfile";
@@ -37,6 +37,8 @@ export interface HudSnapshot {
   maxHearts: number;
   mode: Session["mode"];
   item: string | null;
+  battle: boolean;
+  gear: number; // endless speed gear (1..7)
   // next sharp corner on a circuit: 0 = none, 1..3 = how tight (+ left, - right)
   corner: number;
   cornerDist: number;
@@ -125,6 +127,8 @@ const emptyHud: HudSnapshot = {
   maxHearts: MAX_HEARTS,
   mode: "endless",
   item: null,
+  battle: false,
+  gear: 1,
   corner: 0,
   cornerDist: 0,
   lap: 1,
@@ -453,6 +457,8 @@ export const useRally = create<RallyState>()(
         maxHearts: run.maxHearts,
         mode: session.mode,
         item: run.item,
+        battle: isBattle(),
+        gear: speedGear(run.z) + 1,
         lap: Math.min(race.laps, race.lap + 1),
         laps: race.active ? race.laps : 0,
         position: race.active ? playerPosition(run.z, null) : 1,

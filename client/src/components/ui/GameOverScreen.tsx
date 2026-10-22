@@ -55,7 +55,7 @@ export function GameOverScreen() {
     if (online) {
       if (!isHost || session.mode !== "online") return;
       const c = circuitById(session.circuitId);
-      room.send({ t: "start", circuitId: c.id, laps: c.laps, at: Date.now() });
+      room.send({ t: "start", circuitId: c.id, laps: c.laps, at: Date.now(), battle: !!session.battle });
     }
     start();
   };
@@ -91,7 +91,7 @@ export function GameOverScreen() {
     ? [
         ["Race time", formatTime(summary.raceTime ?? 0)],
         ["Best lap", summary.bestLap ? formatTime(summary.bestLap) + (summary.newBestLap ? " ★" : "") : "—"],
-        mode === "battle" ? ["Hits landed 🥑", summary.hits] : ["Jars", summary.jars],
+        mode === "battle" || (online && session.mode === "online" && session.battle) ? ["Hits landed 🥑", summary.hits] : ["Jars", summary.jars],
         ["Top speed", `${summary.maxSpeed} km/h`],
       ]
     : [
@@ -136,7 +136,8 @@ export function GameOverScreen() {
         padding: "24px 16px",
       }}
     >
-      <div style={{ width: "min(540px, 100%)", textAlign: "center", animation: "dnrFadeIn 0.35s ease-out", margin: "auto 0" }}>
+      {(isNewBest || summary.position === 1 || (chapter && summary.success)) && <ConfettiRain />}
+      <div style={{ width: "min(540px, 100%)", textAlign: "center", animation: "dnrFadeIn 0.35s ease-out", margin: "auto 0", position: "relative" }}>
         {d.id === "pixel" ? (
           <img
             src={asset("/pixel-bunny.png")}
@@ -310,6 +311,47 @@ export function GameOverScreen() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/** Celebration: Colombian-flag confetti falling over the results. */
+function ConfettiRain() {
+  const pieces = Array.from({ length: 70 }, (_, i) => i);
+  const colors = ["#FCD116", "#003893", "#CE1126", "#ffffff", "#5fd8ff", "#ff9f43"];
+  return (
+    <div aria-hidden style={{ position: "fixed", inset: 0, pointerEvents: "none", overflow: "hidden", zIndex: 0 }}>
+      <style>{`
+        @keyframes dnrConfetti {
+          0% { transform: translate3d(0, -10vh, 0) rotate(0deg); opacity: 1; }
+          100% { transform: translate3d(var(--dx), 110vh, 0) rotate(var(--rot)); opacity: 0.9; }
+        }
+        @media (prefers-reduced-motion: reduce) { .dnr-confetti { display: none; } }
+      `}</style>
+      {pieces.map((i) => {
+        const left = (i * 37) % 100;
+        const delay = (i % 14) * 0.18;
+        const dur = 2.6 + ((i * 13) % 10) / 6;
+        const w = 6 + (i % 3) * 3;
+        return (
+          <span
+            key={i}
+            className="dnr-confetti"
+            style={{
+              position: "absolute",
+              top: 0,
+              left: `${left}%`,
+              width: w,
+              height: w * 1.6,
+              background: colors[i % colors.length],
+              borderRadius: 2,
+              animation: `dnrConfetti ${dur}s linear ${delay}s ${i < 40 ? "infinite" : "1"} both`,
+              ["--dx" as any]: `${((i * 53) % 120) - 60}px`,
+              ["--rot" as any]: `${360 + ((i * 97) % 720)}deg`,
+            }}
+          />
+        );
+      })}
     </div>
   );
 }

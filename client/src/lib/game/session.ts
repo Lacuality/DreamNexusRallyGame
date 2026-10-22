@@ -10,7 +10,7 @@ export type Session =
   | { mode: "circuit"; circuitId: string; laps: number }
   | { mode: "battle"; circuitId: string; laps: number }
   | { mode: "story"; chapterId: string }
-  | { mode: "online"; circuitId: string; laps: number; room: string };
+  | { mode: "online"; circuitId: string; laps: number; room: string; battle?: boolean };
 
 export let session: Session = { mode: "endless" };
 export let car: Loadout = loadout("rally7", "pixel");
@@ -23,6 +23,11 @@ export function sessionCircuit(): { id: string; laps: number } | null {
     if (ch.stage.kind === "circuit") return { id: ch.stage.circuitId, laps: ch.stage.laps };
   }
   return null;
+}
+
+/** Are power-ups (Rally Loco) on in this race? */
+export function isBattle() {
+  return session.mode === "battle" || (session.mode === "online" && !!session.battle);
 }
 
 export function applySession(s: Session) {
