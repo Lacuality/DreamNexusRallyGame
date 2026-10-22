@@ -46,6 +46,11 @@ export interface RunState {
   totalAir: number;
   nextMilestone: number;
 
+  // Rally Loco (items)
+  spin: number;
+  item: string | null;
+  hitsLanded: number;
+
   // feedback
   shake: number;
   flash: number; // red screen flash on hit
@@ -86,6 +91,9 @@ export function freshRun(): RunState {
     firstHitZ: -1,
     totalAir: 0,
     nextMilestone: 500,
+    spin: 0,
+    item: null,
+    hitsLanded: 0,
     shake: 0,
     flash: 0,
     time: 0,

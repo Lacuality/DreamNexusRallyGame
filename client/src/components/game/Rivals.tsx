@@ -63,6 +63,11 @@ export function Rivals() {
         remote: false,
         lastSeen: 0,
         nitro: 0,
+        spin: 0,
+        slow: 0,
+        shield: false,
+        item: null,
+        itemCd: 0,
       });
     });
   }, [online]);
@@ -91,6 +96,11 @@ export function Rivals() {
             remote: true,
             lastSeen: Date.now(),
             nitro: 0,
+            spin: 0,
+            slow: 0,
+            shield: false,
+            item: null,
+            itemCd: 0,
           };
           race.racers.push(r);
         }
@@ -170,7 +180,8 @@ export function Rivals() {
       }
       const z = r.z;
       rig.root.position.set(roadX(z) + r.lat, roadY(z) + r.y, z);
-      rig.root.rotation.set(0, Math.atan(roadSlope(z)), 0);
+      rig.root.rotation.set(0, Math.atan(roadSlope(z)) + (r.spin > 0 ? (1 - r.spin) * Math.PI * 4 : 0), 0);
+      rig.shield.visible = r.shield;
       rig.wheels.forEach((w) => (w.rotation.x += (r.speed * dt) / 0.42));
       animateWobble(rig, t + r.seed, r.speed, false);
       rig.flames.visible = r.nitro > 0;
@@ -201,7 +212,10 @@ export function Rivals() {
     const band = diff > 80 ? 0.9 : diff > 35 ? 0.96 : diff < -80 ? 1.1 : diff < -35 ? 1.04 : 1;
     if (r.nitro > 0) r.nitro -= dt;
     else if (r.z > race.length * 0.2 && Math.random() < dt * 0.03) r.nitro = 1.8;
-    const target = base * corner * band * (r.nitro > 0 ? 1.18 : 1);
+    if (r.spin > 0) r.spin -= dt;
+    if (r.slow > 0) r.slow -= dt;
+    const hurt = r.spin > 0 ? 0.25 : r.slow > 0 ? 0.6 : 1;
+    const target = base * corner * band * (r.nitro > 0 ? 1.18 : 1) * hurt;
     r.speed += (target - r.speed) * Math.min(1, dt * 0.9 * c.accel);
     r.z += r.speed * dt;
 

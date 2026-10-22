@@ -18,6 +18,12 @@ export interface Racer {
   remote: boolean; // a friend online
   lastSeen: number; // for remote cars (ms timestamp)
   nitro: number; // seconds of boost left (AI)
+  // Rally Loco (items)
+  spin: number; // seconds of spin-out left
+  slow: number; // seconds slowed by an aguacero
+  shield: boolean;
+  item: string | null;
+  itemCd: number;
 }
 
 export const race = {

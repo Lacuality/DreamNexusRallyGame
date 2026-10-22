@@ -8,6 +8,7 @@ import { useProfile } from "../stores/useProfile";
 export type Session =
   | { mode: "endless" }
   | { mode: "circuit"; circuitId: string; laps: number }
+  | { mode: "battle"; circuitId: string; laps: number }
   | { mode: "story"; chapterId: string }
   | { mode: "online"; circuitId: string; laps: number; room: string };
 
@@ -16,7 +17,7 @@ export let car: Loadout = loadout("rally7", "pixel");
 
 /** Is this race on a closed circuit (with laps and other cars)? */
 export function sessionCircuit(): { id: string; laps: number } | null {
-  if (session.mode === "circuit" || session.mode === "online") return { id: session.circuitId, laps: session.laps };
+  if (session.mode === "circuit" || session.mode === "battle" || session.mode === "online") return { id: session.circuitId, laps: session.laps };
   if (session.mode === "story") {
     const ch = chapterById(session.chapterId);
     if (ch.stage.kind === "circuit") return { id: ch.stage.circuitId, laps: ch.stage.laps };

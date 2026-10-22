@@ -62,7 +62,7 @@ export function OnlineLobby({ onClose }: { onClose: () => void }) {
       )}
 
       {!code ? (
-        <div style={{ display: "grid", gap: 12 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 12 }}>
           <Card>
             <div style={{ fontFamily: UI.display, fontSize: 20, marginBottom: 8 }}>Create a room</div>
             <p style={{ margin: "0 0 10px", fontWeight: 700 }}>You get a code to send to your friends (WhatsApp it!). Everyone races the same circuit live.</p>
@@ -78,8 +78,12 @@ export function OnlineLobby({ onClose }: { onClose: () => void }) {
                 onChange={(e) => setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4))}
                 placeholder="CODE"
                 aria-label="Room code"
+                size={4}
+                autoCapitalize="characters"
+                autoComplete="off"
                 style={{
                   flex: 1,
+                  width: "100%",
                   minWidth: 0,
                   minHeight: 60,
                   fontFamily: UI.display,
@@ -100,7 +104,7 @@ export function OnlineLobby({ onClose }: { onClose: () => void }) {
           {error && <p style={{ color: UI.red, fontWeight: 800 }}>{error}</p>}
         </div>
       ) : (
-        <div style={{ display: "grid", gap: 12 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 12 }}>
           <Card active>
             <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
               <div>

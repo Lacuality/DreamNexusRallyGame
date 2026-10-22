@@ -36,6 +36,7 @@ export interface HudSnapshot {
   offroad: boolean;
   maxHearts: number;
   mode: Session["mode"];
+  item: string | null;
   // circuits
   lap: number;
   laps: number;
@@ -60,6 +61,7 @@ export interface RunSummary {
   bestCombo: number;
   maxSpeed: number;
   airTime: number;
+  hits: number;
   mode: Session["mode"];
   success?: boolean; // story: goal reached
   title?: string;
@@ -99,6 +101,7 @@ const emptyHud: HudSnapshot = {
   offroad: false,
   maxHearts: MAX_HEARTS,
   mode: "endless",
+  item: null,
   lap: 1,
   laps: 0,
   position: 1,
@@ -128,6 +131,8 @@ export function goalProgress(): number {
       return run.jumps;
     case "nearMisses":
       return run.nearMisses;
+    case "combo":
+      return run.bestCombo;
     default:
       return 0;
   }
@@ -210,6 +215,7 @@ function endRun(completed: boolean) {
     bestCombo: run.bestCombo,
     maxSpeed: Math.floor(run.maxSpeedKmh),
     airTime: Math.round(run.totalAir * 10) / 10,
+    hits: run.hitsLanded,
     mode: sess.mode,
     reward: 0,
     newUnlocks: [],
@@ -419,6 +425,7 @@ export const useRally = create<RallyState>()(
         hearts: run.hearts,
         maxHearts: run.maxHearts,
         mode: session.mode,
+        item: run.item,
         lap: Math.min(race.laps, race.lap + 1),
         laps: race.active ? race.laps : 0,
         position: race.active ? playerPosition(run.z, null) : 1,

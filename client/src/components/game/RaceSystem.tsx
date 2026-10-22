@@ -54,6 +54,7 @@ const COLORS = {
 function themeFor(b: string) {
   if (b === "comuna_13") return "synthwave" as const;
   if (b === "pueblo" || b === "cartagena") return "cumbia" as const;
+  if (b === "cali") return "salsa" as const;
   return "default" as const;
 }
 
@@ -347,11 +348,15 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
       target *= 0.55;
     }
     if (run.offroad && !run.airborne) target *= car.offroad;
+    if (run.spin > 0) {
+      run.spin -= dt;
+      target = 8;
+    }
     const rate = target > run.speed ? (run.nitroTime > 0 ? 2.5 : 0.75 * car.accel) : 2.2;
     run.speed += (target - run.speed) * Math.min(1, rate * dt);
 
     /* --- steering --- */
-    const s = steerInput();
+    const s = run.spin > 0 ? 0 : steerInput();
     run.steer += (s - run.steer) * Math.min(1, dt * 10);
     const latMax = (7 + run.speed * 0.13) * car.handling;
     const air = run.airborne ? 0.35 : 1;
@@ -809,6 +814,17 @@ export function Scenery() {
           place("cactus", z + side * 2, near, 0.8 + r3 * 0.6, r2 * 6);
           if (r1 < 0.7) place("redRock", z + 4, far, 1 + r3 * 0.8, r2 * 6);
           if (i % 19 === 7 && side > 0) place("observatory", z, side * (ROAD_HALF + 16), 1, away);
+        } else if (biome === "cali") {
+          // sugar cane fields, fruit stands, salsa clubs, the cat by the river, Cristo Rey on the hill
+          const away = heading + (side > 0 ? 0 : Math.PI);
+          if (r1 < 0.45) place("sugarcane", z, side * (ROAD_HALF + 7 + r2 * 4), 1, r3 * 6);
+          else if (r1 < 0.6) place("fruitStand", z, side * (ROAD_HALF + 3), 1, away);
+          else place("coconutPalm", z, side * (ROAD_HALF + 3 + r2 * 2), 0.9 + r3 * 0.3, r2 * 6);
+          if (r2 > 0.55) place("sugarcane", z + 4, far, 1.2, r1 * 6);
+          else if (r2 < 0.2) place(`barrio${Math.floor(r3 * 5)}`, z + 4, side * (ROAD_HALF + 14 + r3 * 6), 1, away);
+          if (i % 11 === 5 && side < 0) place("gato", z, side * (ROAD_HALF + 4), 1, away + Math.PI);
+          if (i % 9 === 1 && side > 0) place("salsaSign", z, side * (ROAD_HALF + 3.6), 1, heading + 0.3);
+          if (i % 40 === 20 && side < 0) place("cristoRey", z + 60, side * 75, 1, 0);
         } else if (biome === "cartagena") {
           // sea on the left, walls + colonial balconies on the right
           const away = heading + (side > 0 ? 0 : Math.PI);

@@ -9,6 +9,9 @@ export const input = {
   down: false,
   nitro: false,
   nitroQueued: false, // a tap that happened between frames still counts
+  item: false,
+  itemQueued: false,
+  touchItem: false,
   // touch
   touchLeft: false,
   touchRight: false,
@@ -28,6 +31,8 @@ const KEYMAP: Record<string, keyof typeof input> = {
   Space: "nitro",
   ShiftLeft: "nitro",
   ShiftRight: "nitro",
+  KeyE: "item",
+  KeyQ: "item",
 };
 
 let installed = false;
@@ -39,6 +44,7 @@ export function installKeyboard() {
     if (k) {
       (input as any)[k] = true;
       if (k === "nitro") input.nitroQueued = true;
+      if (k === "item") input.itemQueued = true;
       // stop arrows/space from scrolling or pressing focused buttons
       if (!(e.target instanceof HTMLInputElement)) e.preventDefault();
     }

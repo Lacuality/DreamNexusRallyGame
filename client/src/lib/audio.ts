@@ -23,7 +23,7 @@ function loadSettings(): Settings {
   return { muted: false, music: 0.55, sfx: 0.8 };
 }
 
-export type MusicTheme = "default" | "synthwave" | "cumbia";
+export type MusicTheme = "default" | "synthwave" | "cumbia" | "salsa";
 
 export class AudioManager {
   private ctx: AudioContext | null = null;
@@ -225,10 +225,11 @@ export class AudioManager {
     synth.timer = window.setInterval(() => {
       if (!this.ctx) return;
       while (synth.next < this.ctx.currentTime + 0.15) {
-        const cumbia = this.theme === "cumbia";
-        if (cumbia) this.cumbiaStep(synth.step, synth.next, out);
+        const th = this.theme;
+        if (th === "cumbia") this.cumbiaStep(synth.step, synth.next, out);
+        else if (th === "salsa") this.salsaStep(synth.step, synth.next, out);
         else this.synthStep(synth.step, synth.next, out);
-        synth.next += 60 / (cumbia ? 96 : 108) / 4;
+        synth.next += 60 / (th === "cumbia" ? 96 : th === "salsa" ? 100 : 108) / 4;
         synth.step++;
       }
     }, 25);
@@ -458,6 +459,60 @@ export class AudioManager {
           vib.stop(t + 0.26);
         });
       }
+    }
+  }
+
+  /* ---------------- salsa (Cali) ----------------
+   * Original loop in a salsa feel: 2-3 clave, cowbell, conga tumbao,
+   * anticipated bass and a piano montuno over Am – Dm – E7 – Am. */
+  private salsaStep(step: number, t: number, out: GainNode) {
+    const ctx = this.ctx!;
+    const s32 = step % 32; // two bars = one clave cycle
+    const s16 = step % 16;
+    const bar = Math.floor(step / 16) % 4;
+    const hit = (node: AudioNode, peak: number, dur: number) => {
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(peak, t + 0.003);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      node.connect(g).connect(out);
+    };
+    const tone = (type: OscillatorType, f: number, peak: number, dur: number, f2?: number) => {
+      const o = ctx.createOscillator();
+      o.type = type;
+      o.frequency.setValueAtTime(f, t);
+      if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + dur);
+      hit(o, peak, dur);
+      o.start(t);
+      o.stop(t + dur + 0.02);
+    };
+    // clave 2-3: (2 side) beats 2 & 3, (3 side) 1, 2&, 4
+    if ([4, 8, 16, 22, 28].includes(s32)) tone("triangle", 2400, 0.16, 0.05);
+    // cowbell on the beat
+    if (s16 % 4 === 0) {
+      tone("square", 800, s16 === 0 ? 0.07 : 0.05, 0.08);
+      tone("square", 1210, 0.03, 0.06);
+    }
+    // conga tumbao: open tones on 4 and 4&, slap on 2
+    if (s16 === 12 || s16 === 14) tone("sine", 330, 0.3, 0.16, 300);
+    if (s16 === 4) tone("triangle", 520, 0.18, 0.07, 400);
+    if (s16 === 6 || s16 === 10) tone("sine", 260, 0.12, 0.08);
+    // bass tumbao: anticipates on 2& and 4
+    const roots = [110, 146.83, 164.81, 110];
+    if (s16 === 6 || s16 === 12) tone("triangle", (s16 === 12 ? roots[(bar + 1) % 4] : roots[bar]) / 2, 0.38, 0.3);
+    // piano montuno (octaves bouncing on the off-beats)
+    const chords = [
+      [220, 261.63, 329.63],
+      [293.66, 349.23, 440],
+      [329.63, 415.3, 493.88],
+      [220, 261.63, 329.63],
+    ];
+    const pattern = [0, 3, 6, 8, 10, 13, 14];
+    const idx = pattern.indexOf(s16);
+    if (idx >= 0) {
+      const ch = chords[bar];
+      const notes = idx % 2 ? [ch[1], ch[2]] : [ch[0], ch[0] * 2];
+      notes.forEach((f) => tone("triangle", f * 2, 0.045, 0.14));
     }
   }
 

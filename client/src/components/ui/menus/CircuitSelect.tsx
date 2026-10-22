@@ -24,12 +24,14 @@ export function CircuitThumb({ c, size = 90 }: { c: Circuit; size?: number }) {
 }
 
 /** Pick a circuit to race against 5 AI rivals. */
-export function CircuitSelect({ onClose, onRace, title = "🏎️ Circuit Race" }: { onClose: () => void; onRace: (id: string) => void; title?: string }) {
+export function CircuitSelect({ onClose, onRace, title = "🏎️ Circuit Race", intro }: { onClose: () => void; onRace: (id: string) => void; title?: string; intro?: string }) {
   const bestLaps = useProfile((s) => s.bestLaps);
   const wins = useProfile((s) => s.circuitWins);
   return (
     <MenuShell title={title} onClose={onClose}>
-      <p style={{ fontWeight: 800, marginTop: 0, opacity: 0.85 }}>3 laps against 5 rivals. Hit the blue boost pads, grab jars for nitro, and bump your way to the podium. 🏆 1st = 150 jars.</p>
+      <p style={{ fontWeight: 800, marginTop: 0, opacity: 0.85 }}>
+        {intro ?? "3 laps against 5 rivals. Hit the blue boost pads, grab jars for nitro, and bump your way to the podium. 🏆 1st = 150 jars."}
+      </p>
       <div style={{ display: "grid", gap: 10 }}>
         {CIRCUITS.map((c) => (
           <Card key={c.id}>

@@ -91,7 +91,7 @@ export function GameOverScreen() {
     ? [
         ["Race time", formatTime(summary.raceTime ?? 0)],
         ["Best lap", summary.bestLap ? formatTime(summary.bestLap) + (summary.newBestLap ? " ★" : "") : "—"],
-        ["Jars", summary.jars],
+        mode === "battle" ? ["Hits landed 🥑", summary.hits] : ["Jars", summary.jars],
         ["Top speed", `${summary.maxSpeed} km/h`],
       ]
     : [

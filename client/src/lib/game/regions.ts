@@ -67,6 +67,15 @@ export const REGIONS: Region[] = [
     fact: "Not really a desert but a dry tropical forest, with red and grey canyons and some of the clearest night skies in Colombia for stargazing.",
   },
   {
+    biome: "cali",
+    name: "Cali",
+    place: "Valle del Cauca",
+    emoji: "💃",
+    lon: -76.53,
+    lat: 3.45,
+    fact: "Cali calls itself the world capital of salsa. The Cristo Rey statue watches over the city from the western hills, and El Gato del Río sits by the Cali River.",
+  },
+  {
     biome: "cartagena",
     name: "Cartagena de Indias",
     place: "Bolívar · Caribbean coast",

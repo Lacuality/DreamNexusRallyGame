@@ -21,7 +21,8 @@ export type BiomeType =
   | "ciudad_perdida"
   | "comuna_13"
   | "tatacoa"
-  | "cartagena";
+  | "cartagena"
+  | "cali";
 export const BIOME_LENGTH = 800;
 export const BIOME_SEQUENCE: BiomeType[] = [
   "coffee_hills",
@@ -30,6 +31,7 @@ export const BIOME_SEQUENCE: BiomeType[] = [
   "ciudad_perdida",
   "comuna_13",
   "tatacoa",
+  "cali",
   "cartagena",
 ];
 

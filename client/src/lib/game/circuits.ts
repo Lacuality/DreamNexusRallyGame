@@ -90,6 +90,26 @@ export const CIRCUITS: Circuit[] = [
     },
   },
   {
+    id: "cali",
+    name: "Sucursal del Cielo",
+    place: "Cali, Valle del Cauca",
+    biome: "cali",
+    laps: 3,
+    blurb: "Salsa on the radio, sugar cane in the fields and Cristo Rey on the hill. ¡Oiga, mire, vea!",
+    shape: {
+      length: 1350,
+      curves: [
+        [13, 2, 1.2],
+        [5, 4, 0.6],
+        [2, 6, 2.2],
+      ],
+      hills: [
+        [1.5, 2, 0.4],
+        [0.6, 4, 1.9],
+      ],
+    },
+  },
+  {
     id: "nexus",
     name: "Nexus Neon Night",
     place: "Medellín · Dream Nexus Arena",

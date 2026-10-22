@@ -5,7 +5,7 @@ import { useRally } from "@/lib/stores/useRally";
 import { audioManager } from "@/lib/audio";
 import { UI } from "./gameUi";
 
-type Key = "touchLeft" | "touchRight" | "touchBrake" | "touchNitro";
+type Key = "touchLeft" | "touchRight" | "touchBrake" | "touchNitro" | "touchItem";
 
 /** Big thumb buttons. Pointer events so several fingers work at once. */
 function TouchButton({
@@ -29,6 +29,7 @@ function TouchButton({
   const set = (v: boolean) => {
     input[k] = v;
     if (v && k === "touchNitro") input.nitroQueued = true;
+    if (v && k === "touchItem") input.itemQueued = true;
     setDown(v);
   };
   useEffect(() => () => {
@@ -77,6 +78,8 @@ function TouchButton({
 
 export function MobileControls() {
   const nitro = useRally((s) => s.hud.nitro);
+  const mode = useRally((s) => s.hud.mode);
+  const item = useRally((s) => s.hud.item);
   const nitroActive = useRally((s) => s.hud.nitroActive);
   const [show, setShow] = useState(isTouchDevice());
 
@@ -149,6 +152,18 @@ export function MobileControls() {
           gap: 14,
         }}
       >
+        {mode === "battle" && (
+          <TouchButton
+            k="touchItem"
+            size={big * 0.8}
+            label="Use item"
+            color={item ? "rgba(255,210,63,0.55)" : "rgba(14,27,36,0.5)"}
+            border={item ? UI.gold : "rgba(255,255,255,0.4)"}
+            glow={!!item}
+          >
+            <span style={{ fontFamily: UI.display, fontSize: big * 0.16 }}>ITEM</span>
+          </TouchButton>
+        )}
         <TouchButton k="touchBrake" size={big * 0.72} label="Brake" color="rgba(14,27,36,0.6)" border="rgba(255,255,255,0.7)">
           <ChevronsDown size={big * 0.4} strokeWidth={3} />
         </TouchButton>

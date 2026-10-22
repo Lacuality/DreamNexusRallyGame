@@ -5,7 +5,7 @@ import type { BiomeType } from "../track";
  * Each chapter is one stage with a goal; finishing it unlocks the next.
  */
 
-export type GoalType = "jars" | "distance" | "cleanDistance" | "smashes" | "jumps" | "nearMisses" | "position";
+export type GoalType = "jars" | "distance" | "cleanDistance" | "smashes" | "jumps" | "nearMisses" | "combo" | "position";
 
 export interface Line {
   who: string; // name
@@ -38,6 +38,7 @@ const YAGUAR = { who: "Yaguar", emoji: "🐆" };
 const TITI = { who: "Titi", emoji: "🐒" };
 const KUNTUR = { who: "Kuntur", emoji: "🦅" };
 const NEXI = { who: "NEXI", emoji: "🤖" };
+const GATA = { who: "La Gata del Río", emoji: "🐈" };
 
 export const CHAPTERS: Chapter[] = [
   {
@@ -150,8 +151,26 @@ export const CHAPTERS: Chapter[] = [
     lose: [{ ...KUNTUR, text: "Closer, little one. Brush past them!" }],
   },
   {
-    id: "c7",
+    id: "c7cali",
     num: 7,
+    title: "Salsa en Cali",
+    region: "Valle del Cauca · Cali",
+    biome: "cali",
+    stage: { kind: "endless", limit: 1600 },
+    goal: { type: "combo", value: 20, label: "Dance a 20 combo (jars, near misses, jumps)" },
+    stars: [3500, 6000],
+    reward: 450,
+    map: { lon: -76.53, lat: 3.45 },
+    intro: [
+      { ...GATA, text: "¡Oiga, mire, vea! Welcome to Cali, la sucursal del cielo. Here even the cars dance salsa." },
+      { ...GATA, text: "Show me your flow: keep a 20 combo without stopping. One, two, three... ¡azúcar!" },
+    ],
+    win: [{ ...GATA, text: "¡Eso es salsa! Cali es Cali, lo demás es loma. Now go win in Cartagena!" }],
+    lose: [{ ...GATA, text: "You lost the rhythm, mi amor. Chain jars and near misses — don't stop dancing!" }],
+  },
+  {
+    id: "c7",
+    num: 8,
     title: "Gran Premio de Cartagena",
     region: "Bolívar · Cartagena de Indias",
     biome: "cartagena",

@@ -31,7 +31,7 @@ export function Car() {
 
     // face along the road, plus a bit of steering yaw
     const heading = Math.atan(roadSlope(z));
-    rig.root.rotation.set(0, heading + run.latVel * 0.025, 0);
+    rig.root.rotation.set(0, heading + run.latVel * 0.025 + (run.spin > 0 ? (1 - run.spin) * Math.PI * 4 : 0), 0);
     rig.body.rotation.x = -roadPitch(z) + (run.airborne ? -run.vy * 0.025 : 0);
     rig.body.rotation.z = THREE.MathUtils.lerp(rig.body.rotation.z, run.steer * 0.06, Math.min(1, delta * 8));
 

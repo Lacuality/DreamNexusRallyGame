@@ -24,7 +24,7 @@ export function MenuShell({ title, onClose, children, wide = false }: { title: s
       }}
     >
       <div style={{ width: wide ? "min(1100px, 100%)" : "min(760px, 100%)", display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-        <h2 style={{ fontFamily: UI.display, fontSize: "clamp(24px, 5vw, 40px)", margin: 0, flex: 1, color: UI.cyanBright }}>{title}</h2>
+        <h2 style={{ fontFamily: UI.display, fontSize: "clamp(22px, 5vw, 40px)", margin: 0, flex: 1, minWidth: 0, color: UI.cyanBright }}>{title}</h2>
         <div style={{ ...panelStyle, padding: "6px 14px", fontFamily: UI.display, fontSize: 20, color: UI.gold }} title="Arequipe jars to spend">
           🍯 {wallet.toLocaleString()}
         </div>
@@ -32,7 +32,7 @@ export function MenuShell({ title, onClose, children, wide = false }: { title: s
           <X size={28} strokeWidth={3} />
         </IconButton>
       </div>
-      <div style={{ width: wide ? "min(1100px, 100%)" : "min(760px, 100%)", animation: "dnrFadeIn 0.25s ease-out" }}>{children}</div>
+      <div style={{ width: wide ? "min(1100px, 100%)" : "min(760px, 100%)", minWidth: 0, maxWidth: "100%", animation: "dnrFadeIn 0.25s ease-out" }}>{children}</div>
     </div>
   );
 }

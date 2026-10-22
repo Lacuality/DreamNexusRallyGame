@@ -24,10 +24,11 @@ interface TitleScreenImmersiveProps {
   isFullscreenSupported: boolean;
 }
 
-type Screen = "home" | "garage" | "map" | "story" | "circuits" | "online" | "achievements" | "leaderboard";
+type Screen = "home" | "garage" | "map" | "story" | "circuits" | "battle" | "online" | "achievements" | "leaderboard";
 
 function ModeCard({ emoji, title, text, extra, onClick, color }: { emoji: string; title: string; text: string; extra?: string; onClick: () => void; color: string }) {
-  const compact = isTouchDevice();
+  // short text on phones and smaller laptop screens
+  const compact = isTouchDevice() || window.innerWidth < 1200 || window.innerHeight < 700;
   return (
     <button
       type="button"
@@ -55,7 +56,7 @@ function ModeCard({ emoji, title, text, extra, onClick, color }: { emoji: string
     >
       <span style={{ fontSize: compact ? 30 : 38, lineHeight: 1 }}>{emoji}</span>
       <span style={{ minWidth: 0 }}>
-        <span style={{ display: "block", fontFamily: UI.display, fontSize: 17, color }}>{title}</span>
+        <span style={{ display: "block", fontFamily: UI.display, fontSize: compact ? 15 : 17, lineHeight: 1.1, color }}>{title}</span>
         {!compact && <span style={{ display: "block", fontSize: 13, fontWeight: 700, lineHeight: 1.25 }}>{text}</span>}
         {extra && <span style={{ display: "block", fontSize: 12, fontWeight: 900, color: UI.gold, marginTop: 2 }}>{extra}</span>}
       </span>
@@ -237,10 +238,11 @@ export function TitleScreenImmersive({ isFullscreen, onToggleFullscreen, isFulls
           </div>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: touch ? "1fr 1fr" : "repeat(4, 1fr)", gap: 8 }}>
+        <div style={{ display: "grid", gridTemplateColumns: touch ? "1fr 1fr" : "repeat(5, 1fr)", gap: 8 }}>
           <ModeCard emoji="🏁" title="RALLY INFINITO" text="Drive across all of Colombia. How far can you go?" extra={highScore > 0 ? `Best ${highScore.toLocaleString()}` : "Press Enter"} onClick={startEndless} color={UI.gold} />
-          <ModeCard emoji="📖" title="MODO HISTORIA" text="La Ruta de Pixel: 7 chapters to Cartagena" extra={`${chaptersDone}/7 · ⭐ ${starCount}`} onClick={() => open("story")} color="#7bd389" />
+          <ModeCard emoji="📖" title="MODO HISTORIA" text={`La Ruta de Pixel: ${CHAPTERS.length} chapters to Cartagena`} extra={`${chaptersDone}/${CHAPTERS.length} · ⭐ ${starCount}`} onClick={() => open("story")} color="#7bd389" />
           <ModeCard emoji="🏎️" title="CIRCUITO" text="3 laps vs 5 rivals on real circuits" extra="Win jars & best laps" onClick={() => open("circuits")} color={UI.cyanBright} />
+          <ModeCard emoji="🥑" title="RALLY LOCO" text="Power-ups! Avocados, banana peels, fireworks & tinto turbo" extra="Items & attacks" onClick={() => open("battle")} color={UI.orange} />
           <ModeCard emoji="👥" title="CON AMIGOS" text="Race your friends live with a room code" extra="Online" onClick={() => open("online")} color="#ff4f9a" />
         </div>
         {!touch && (
@@ -271,6 +273,18 @@ export function TitleScreenImmersive({ isFullscreen, onToggleFullscreen, isFulls
             audioManager.unlock();
             const c = circuitById(id);
             start({ mode: "circuit", circuitId: c.id, laps: c.laps });
+          }}
+        />
+      )}
+      {screen === "battle" && (
+        <CircuitSelect
+          title="🥑 Rally Loco"
+          intro="Grab the ? boxes (yellow, blue and red, like the flag) for Colombian power-ups: 🥑 throw an aguacate, 🍌 drop a plátano peel, ☕ tinto turbo, 🎆 volador hits the leader, 👒 sombrero vueltiao shield, 🌧️ aguacero slows everyone ahead. Use them with E (or the ITEM button)."
+          onClose={() => setScreen("home")}
+          onRace={(id) => {
+            audioManager.unlock();
+            const c = circuitById(id);
+            start({ mode: "battle", circuitId: c.id, laps: c.laps });
           }}
         />
       )}

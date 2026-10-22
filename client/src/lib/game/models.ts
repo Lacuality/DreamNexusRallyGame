@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
 /**
  * Procedural low-poly models. Built once, then cloned (clones share
@@ -1254,6 +1255,125 @@ function buildSea() {
   return g;
 }
 
+/* ---------- Cali ---------- */
+function buildSugarcane() {
+  // a block of tall sugar cane from the Valle del Cauca fields (merged into 2 meshes, so it's cheap)
+  const g = new THREE.Group();
+  const stalks: THREE.BufferGeometry[] = [];
+  const leaves: THREE.BufferGeometry[] = [];
+  for (let i = 0; i < 28; i++) {
+    const x = (hashV(i * 3.1) - 0.5) * 6;
+    const z = (hashV(i * 7.7) - 0.5) * 8;
+    const st = new THREE.CylinderGeometry(0.05, 0.06, 3.2, 5);
+    st.rotateZ((hashV(i) - 0.5) * 0.15);
+    st.translate(x, 1.6, z);
+    stalks.push(st);
+    const lf = new THREE.BoxGeometry(0.05, 0.9, 0.25);
+    lf.rotateZ(-0.8);
+    lf.translate(x + 0.2, 3.0, z);
+    leaves.push(lf);
+  }
+  g.add(mesh(mergeGeometries(stalks)!, mat("#7fae3c", { flatShading: true })));
+  g.add(mesh(mergeGeometries(leaves)!, mat("#5e9a2e", { side: THREE.DoubleSide, flatShading: true }), false));
+  return g;
+}
+
+function buildCristoRey() {
+  // white statue with open arms on a hill, seen from the road
+  const g = new THREE.Group();
+  const hill = mesh(new THREE.ConeGeometry(22, 26, 8), mat("#4f8a3c", { flatShading: true }));
+  hill.position.y = 9;
+  g.add(hill);
+  const white = mat("#f4f1ea", { emissive: "#ffffff", emissiveIntensity: 0.15 });
+  const base = mesh(new THREE.BoxGeometry(2.4, 3, 2.4), mat("#cfc8ba"));
+  base.position.y = 23.5;
+  const robe = mesh(new THREE.CylinderGeometry(0.9, 1.5, 8, 10), white);
+  robe.position.y = 29;
+  const arms = mesh(new THREE.BoxGeometry(9, 0.8, 0.8), white);
+  arms.position.y = 32;
+  const head = mesh(new THREE.SphereGeometry(0.85, 12, 10), white);
+  head.position.y = 34;
+  g.add(base, robe, arms, head);
+  return g;
+}
+
+function buildGato() {
+  // bronze cat sculpture by the river
+  const g = new THREE.Group();
+  const bronze = mat("#8a5a2b", { metalness: 0.7, roughness: 0.35 });
+  const plinth = mesh(new THREE.BoxGeometry(2.2, 0.8, 2.2), mat("#9aa0a8"));
+  plinth.position.y = 0.4;
+  const body = mesh(new THREE.SphereGeometry(1, 14, 10), bronze);
+  body.scale.set(0.8, 1.2, 1);
+  body.position.y = 1.9;
+  const head = mesh(new THREE.SphereGeometry(0.65, 14, 10), bronze);
+  head.position.set(0, 3.3, 0.25);
+  g.add(plinth, body, head);
+  [-0.3, 0.3].forEach((x) => {
+    const ear = mesh(new THREE.ConeGeometry(0.2, 0.45, 4), bronze);
+    ear.position.set(x, 3.95, 0.2);
+    g.add(ear);
+  });
+  const tail = mesh(new THREE.TorusGeometry(0.7, 0.12, 6, 12, Math.PI), bronze);
+  tail.position.set(0, 1.2, -0.8);
+  tail.rotation.y = Math.PI / 2;
+  g.add(tail);
+  return g;
+}
+
+function buildSalsaSign() {
+  const tex = canvasTex(512, 160, (ctx) => {
+    ctx.fillStyle = "#12051f";
+    ctx.fillRect(0, 0, 512, 160);
+    ctx.shadowColor = "#ff4f9a";
+    ctx.shadowBlur = 26;
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "italic bold 82px 'Arial Black', sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("SALSA", 256, 70);
+    ctx.shadowColor = "#ffd23f";
+    ctx.fillStyle = "#ffd23f";
+    ctx.font = "bold 28px sans-serif";
+    ctx.fillText("♪ Cali Pachanguero ♪", 256, 132);
+  });
+  const g = new THREE.Group();
+  const face = mat("#ffffff", { map: tex, emissive: "#ffffff", emissiveMap: tex, emissiveIntensity: 1.3 });
+  const dark = mat("#111");
+  const board = mesh(new THREE.BoxGeometry(0.15, 1.6, 5), [face, face, dark, dark, dark, dark] as any);
+  board.position.y = 3.2;
+  g.add(board);
+  [-2, 2].forEach((z) => {
+    const p = mesh(new THREE.CylinderGeometry(0.07, 0.07, 3.2, 6), dark);
+    p.position.set(0, 1.6, z);
+    g.add(p);
+  });
+  return g;
+}
+
+function buildFruitStand() {
+  // cholado / lulada stand with a striped umbrella
+  const g = new THREE.Group();
+  const cart = mesh(new THREE.BoxGeometry(1.4, 1.0, 2.2), mat("#24A0CE"));
+  cart.position.y = 0.8;
+  g.add(cart);
+  const fruitCols = ["#ff5a5f", "#ffd23f", "#7bd389", "#ff9f43", "#a06cd5"];
+  for (let i = 0; i < 10; i++) {
+    const f = mesh(new THREE.SphereGeometry(0.14, 8, 6), mat(fruitCols[i % 5]), false);
+    f.position.set(-0.3 + (i % 3) * 0.3, 1.4, -0.8 + Math.floor(i / 3) * 0.5);
+    g.add(f);
+  }
+  const pole = mesh(new THREE.CylinderGeometry(0.04, 0.04, 2.2, 6), mat("#ddd"));
+  pole.position.y = 2.2;
+  g.add(pole);
+  for (let i = 0; i < 6; i++) {
+    const seg = mesh(new THREE.ConeGeometry(1.5, 0.6, 6, 1, true, (i / 6) * Math.PI * 2, Math.PI / 3), mat(i % 2 ? "#ffffff" : "#e23b3b", { side: THREE.DoubleSide }), false);
+    seg.position.y = 3.3;
+    g.add(seg);
+  }
+  return g;
+}
+
 /* =========================================================
  * Pools
  * ======================================================= */
@@ -1297,6 +1417,11 @@ const BUILDERS: Record<string, Builder> = {
   coconutPalm: buildCoconutPalm,
   clockTower: buildClockTower,
   sea: buildSea,
+  sugarcane: buildSugarcane,
+  cristoRey: buildCristoRey,
+  gato: buildGato,
+  salsaSign: buildSalsaSign,
+  fruitStand: buildFruitStand,
   neonPalm: buildNeonPalm,
   bunting: buildBunting,
 };

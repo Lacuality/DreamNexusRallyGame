@@ -7,6 +7,7 @@ import { isTouchDevice } from "@/lib/input";
 import { IconButton, UI, panelStyle, useAudioSettings } from "./gameUi";
 import { formatTime, ordinal, race } from "@/lib/game/race";
 import { getTrack } from "@/lib/track";
+import { ITEMS } from "../game/Battle";
 
 /** Small circuit map: a closed loop shaped by the circuit's curves, with every car on it. */
 function MiniMap({ touch }: { touch: boolean }) {
@@ -269,6 +270,46 @@ export function GameHUD({ isFullscreen = false, onToggleFullscreen }: GameHUDPro
         </div>
       )}
       {hud.laps > 0 && <MiniMap touch={touch} />}
+
+      {/* ---- Rally Loco item slot ---- */}
+      {hud.mode === "battle" && (
+        <div
+          style={{
+            position: "absolute",
+            ...(touch ? { right: 14, bottom: "calc(max(18px, env(safe-area-inset-bottom)) + 230px)" } : { left: "50%", bottom: 90, transform: "translateX(-50%)" }),
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            pointerEvents: "none",
+          }}
+        >
+          <div
+            style={{
+              width: touch ? 64 : 78,
+              height: touch ? 64 : 78,
+              borderRadius: "50%",
+              background: hud.item ? "rgba(255,210,63,0.25)" : "rgba(14,27,36,0.7)",
+              border: `4px solid ${hud.item ? UI.gold : "rgba(255,255,255,0.35)"}`,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: touch ? 34 : 42,
+              animation: hud.item ? "dnrPulse 0.8s ease-in-out infinite" : "none",
+              boxShadow: hud.item ? "0 0 24px rgba(255,210,63,0.7)" : "none",
+            }}
+          >
+            {hud.item ? ITEMS[hud.item as keyof typeof ITEMS].emoji : "❔"}
+          </div>
+          {!touch && (
+            <div style={{ fontWeight: 900, textShadow: "0 2px 4px #000" }}>
+              <div style={{ fontFamily: UI.display, color: hud.item ? UI.gold : "rgba(255,255,255,0.7)" }}>
+                {hud.item ? ITEMS[hud.item as keyof typeof ITEMS].name : "Drive through a ? box"}
+              </div>
+              <div style={{ fontSize: 13 }}>{hud.item ? `${ITEMS[hud.item as keyof typeof ITEMS].hint} — press E` : "to get a power-up"}</div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ---- story goal ---- */}
       {hud.mode === "story" && hud.goalValue > 0 && hud.laps === 0 && (
