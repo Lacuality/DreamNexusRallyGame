@@ -260,7 +260,8 @@ export function bendAhead(z: number, from: number, to: number) {
 
 /** Fastest speed (m/s) a bend of curvature `c` can be held at without sliding wide. */
 export function cornerSpeed(c: number) {
-  return Math.sqrt(9 / (0.35 * Math.max(1e-5, Math.abs(c))));
+  // matches the car's grip in RaceSystem (between normal and drifting)
+  return Math.sqrt(58 / Math.max(1e-5, Math.abs(c)));
 }
 
 export function roadPitch(z: number) {

@@ -2,10 +2,10 @@ import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { burst, FX } from "@/lib/game/fx";
-import { placeOnTrack, projectToTrack, surface, groundHeight } from "@/lib/game/physics";
+import { placeOnTrack, groundHeight } from "@/lib/game/physics";
 import { run, multiplierFor, MAX_HEARTS, NITRO_DURATION, INVULNERABLE_TIME, speedGear } from "@/lib/game/run";
 import { input, steerInput } from "@/lib/input";
-import { toWorld, headingAt, roadCurvature, ROAD_HALF, LANES, hash, biomeAt, lapLength, isCircuit } from "@/lib/track";
+import { toWorld, headingAt, frameAt, roadCurvature, ROAD_HALF, LANES, hash, biomeAt, lapLength, isCircuit } from "@/lib/track";
 
 const tmpV = { x: 0, y: 0, z: 0 };
 import { ModelPool, OBSTACLE_SIZE, type ObstacleKind, type PickupKind, makeArch, makeFinishLine } from "@/lib/game/models";
@@ -73,6 +73,8 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
   const rowCount = useRef(0);
   const hudTimer = useRef(0);
   const gravelMsg = useRef(-99);
+  const prevSpeed = useRef(0);
+  const lastDt = useRef(1 / 60);
   const driftSpark = useRef(0);
   const driftStage = useRef(0);
   const countdownTimer = useRef(0);
@@ -294,6 +296,7 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
   useFrame((state, delta) => {
     const phase = rally.getState().phase;
     const dt = Math.min(delta, 1 / 20);
+    lastDt.current = dt;
 
     // countdown 3-2-1-GO
     if (phase === "countdown") {
@@ -424,50 +427,41 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
     const rate = target > run.speed ? (run.nitroTime > 0 ? 2.5 : 0.75 * car.accel) : 2.2;
     run.speed += (target - run.speed) * Math.min(1, rate * dt);
 
-    /* --- steering: the car turns, the road doesn't turn the car --- */
+    /* --- steering (arcade): you slide across the track, bends push you wide --- */
     const s = run.spin > 0 || run.busted > 0 ? 0 : steerInput();
     run.steer += (s - run.steer) * Math.min(1, dt * 10);
     const drifting = run.drift > 0;
-    const air = run.airborne ? 0.3 : 1;
-    // how sharp the wheels can turn drops with speed; grip caps how fast you can actually turn
-    const maxWheel = (0.55 - Math.min(0.36, run.speed * 0.006)) * car.handling;
-    const grip = (drifting ? 34 : 21) * car.handling; // m/s² of cornering before you slide wide
-    const wanted = (run.speed / 2.6) * Math.tan(run.steer * maxWheel);
-    const limit = grip / Math.max(4, run.speed);
-    const yawRate = Math.max(-limit, Math.min(limit, wanted)) * air;
-    run.heading += yawRate * dt;
-    run.wx += Math.sin(run.heading) * run.speed * dt;
-    run.wz += Math.cos(run.heading) * run.speed * dt;
-    const prevLat = run.lat;
-    projectToTrack();
-    run.latVel += ((run.lat - prevLat) / Math.max(dt, 1e-3) - run.latVel) * Math.min(1, dt * 8);
+    const latMax = (7 + run.speed * 0.13) * car.handling * (drifting ? 1.45 : 1);
+    const air = run.airborne ? 0.35 : 1;
+    run.latVel += (run.steer * latMax - run.latVel) * Math.min(1, dt * 9 * air);
+    // the faster you go, the harder a bend throws you outward; drifting holds the line
+    const push = -roadCurvature(run.z) * run.speed * run.speed * (circ ? 0.2 : 0.5) * (drifting ? 0.55 : 1);
+    run.lat += (run.latVel + push) * dt;
 
-    const where = surface();
-    if (!circ && where === "lost") {
-      // endless road: fences keep you in the valley — bounce off them
-      const edge = ROAD_HALF + 3.2;
-      placeOnTrack(run.z, Math.sign(run.lat) * edge);
-      const roadH = headingAt(run.z);
-      let d = run.heading - roadH;
-      while (d > Math.PI) d -= Math.PI * 2;
-      while (d < -Math.PI) d += Math.PI * 2;
-      run.heading = roadH + Math.max(-0.08, Math.min(0.08, d)) - Math.sign(run.lat) * 0.1;
-      run.speed *= 0.9;
-      run.shake = Math.max(run.shake, 0.25);
-    }
-    if (circ && where === "lost") {
-      run.lostTime += dt;
-      if (run.lostTime > 1.6) {
-        // way off in the fields: the marshals put you back on the track
-        run.lostTime = 0;
-        placeOnTrack(run.z, 0);
-        run.speed = Math.min(run.speed, 8);
-        run.combo = 0;
-        rally.getState().popup("🚁 ¡TE SACARON DEL POTRERO!", COLORS.orange, true);
-        audioManager.playShieldBreak();
+    const wall = ROAD_HALF + (circ ? 3.85 : 3.2);
+    if (Math.abs(run.lat) > wall) {
+      const hard = circ && Math.abs(run.latVel + push) > 6 && run.speed > 25;
+      run.lat = Math.sign(run.lat) * wall;
+      run.latVel = circ ? -Math.sign(run.lat) * 1.5 : 0;
+      run.speed *= hard ? 0.8 : 0.985;
+      if (hard) {
+        run.shake = Math.max(run.shake, 0.45);
+        if (run.time - gravelMsg.current > 1.2) {
+          gravelMsg.current = run.time;
+          audioManager.playSmash();
+          fxCar(FX.smash, 12, 6, 4);
+          rally.getState().popup("¡CONTRA LA BARRERA! 💥", COLORS.orange);
+        }
       }
-    } else run.lostTime = 0;
-    run.offroad = where !== "road";
+    }
+    // world position + heading follow the track (used by the car, camera, friends online)
+    {
+      const f = frameAt(run.z);
+      run.wx = f.x + f.nx * run.lat;
+      run.wz = f.z + f.nz * run.lat;
+      run.heading = f.heading;
+    }
+    run.offroad = Math.abs(run.lat) > ROAD_HALF + 0.2;
 
     /* --- jump physics --- */
     if (run.airborne) {
@@ -828,7 +822,10 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
     carPositionRef.current.set(run.wx, groundHeight() + run.y, run.wz);
     carSpeedRef.current = run.speed * 3.6;
     if (rally.getState().phase === "playing") {
-      audioManager.updateEngineSound(run.speed * 3.6, run.offroad && !run.airborne, run.nitroTime > 0);
+      const accel = (run.speed - prevSpeed.current) / Math.max(1e-3, lastDt.current);
+      prevSpeed.current = run.speed;
+      const throttle = run.nitroTime > 0 ? 1 : input.up ? 1 : input.down || input.touchBrake ? 0 : run.busted > 0 ? 0.1 : 0.55;
+      audioManager.updateEngineSound(run.speed * 3.6, run.offroad && !run.airborne, run.nitroTime > 0, throttle, accel);
     }
   }
 

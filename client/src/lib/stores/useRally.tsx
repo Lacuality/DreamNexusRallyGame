@@ -97,7 +97,7 @@ function nextCorner() {
   for (let d = 20; d <= 150; d += 3) {
     const c = roadCurvature(run.z + d);
     const v = cornerSpeed(c);
-    if (v < 45) {
+    if (v < 46) {
       // find the apex of this corner
       let apex = c;
       for (let e = d; e <= d + 30; e += 3) {
@@ -105,7 +105,7 @@ function nextCorner() {
         if (Math.abs(k) > Math.abs(apex)) apex = k;
       }
       const va = cornerSpeed(apex);
-      const level = va < 25 ? 3 : va < 33 ? 2 : 1;
+      const level = va < 31 ? 3 : va < 38 ? 2 : 1;
       return { corner: Math.sign(apex) * level, cornerDist: d };
     }
   }

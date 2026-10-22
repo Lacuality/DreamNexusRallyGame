@@ -115,6 +115,31 @@ function makeStrip(cols: number, rows: number) {
 
 const tmpP = { x: 0, y: 0, z: 0 };
 
+/** Vertical strip (a barrier) `lat` metres from the centre, from height h0 to h1. */
+function fillWall(geo: THREE.BufferGeometry, z0: number, lat: number, h0: number, h1: number, vScale: number, rows: number) {
+  const pos = geo.attributes.position.array as Float32Array;
+  const uv = geo.attributes.uv.array as Float32Array;
+  for (let r = 0; r < rows; r++) {
+    const z = z0 + r * STEP;
+    toWorld(z, lat, 0, tmpP);
+    const i = r * 2;
+    pos[i * 3] = tmpP.x;
+    pos[i * 3 + 1] = tmpP.y + h0;
+    pos[i * 3 + 2] = tmpP.z;
+    pos[i * 3 + 3] = tmpP.x;
+    pos[i * 3 + 4] = tmpP.y + h1;
+    pos[i * 3 + 5] = tmpP.z;
+    uv[i * 2] = 0;
+    uv[i * 2 + 1] = z / vScale;
+    uv[i * 2 + 2] = 1;
+    uv[i * 2 + 3] = z / vScale;
+  }
+  geo.attributes.position.needsUpdate = true;
+  geo.attributes.uv.needsUpdate = true;
+  geo.computeVertexNormals();
+  geo.computeBoundingSphere();
+}
+
 function fillStrip(geo: THREE.BufferGeometry, z0: number, lats: number[], lift: number, vScale: number, rows: number) {
   const pos = geo.attributes.position.array as Float32Array;
   const uv = geo.attributes.uv.array as Float32Array;
@@ -283,6 +308,9 @@ function RoadAndTerrain() {
   const rightRumble = useMemo(() => makeStrip(2, rows), [rows]);
   const dashGeo = useMemo(() => makeStrip(2, rows), [rows]);
   const leftGravel = useMemo(() => makeStrip(2, rows), [rows]);
+  const leftRail = useMemo(() => makeStrip(2, rows), [rows]);
+  const rightRail = useMemo(() => makeStrip(2, rows), [rows]);
+  const railTex = useMemo(() => makeStripeTexture(["#ffffff", "#ffffff", "#e23b3b", "#e23b3b"]), []);
   const rightGravel = useMemo(() => makeStrip(2, rows), [rows]);
   const cols = circuit ? CIRCUIT_COLS : TERRAIN_COLS;
   const terrainGeo = useMemo(() => {
@@ -304,6 +332,9 @@ function RoadAndTerrain() {
       // gravel traps: leave the track and you bog down
       fillStrip(leftGravel, z0, [-ROAD_W - 3.6, -ROAD_W - 0.3], 0.01, 6, rows);
       fillStrip(rightGravel, z0, [ROAD_W + 0.3, ROAD_W + 3.6], 0.01, 6, rows);
+      // guard rails: the edge of the track you can't drive through
+      fillWall(leftRail, z0, -ROAD_W - 3.75, 0, 0.75, 6, rows);
+      fillWall(rightRail, z0, ROAD_W + 3.75, 0, 0.75, 6, rows);
     }
 
     // terrain: valley that rises away from the road, with bumpy hills
@@ -390,6 +421,16 @@ function RoadAndTerrain() {
           </mesh>
           <mesh geometry={rightGravel} receiveShadow frustumCulled={false}>
             <meshStandardMaterial map={gravelTex} roughness={1} />
+          </mesh>
+        </>
+      )}
+      {circuit && (
+        <>
+          <mesh geometry={leftRail} castShadow frustumCulled={false}>
+            <meshStandardMaterial map={railTex} roughness={0.6} side={THREE.DoubleSide} />
+          </mesh>
+          <mesh geometry={rightRail} castShadow frustumCulled={false}>
+            <meshStandardMaterial map={railTex} roughness={0.6} side={THREE.DoubleSide} />
           </mesh>
         </>
       )}

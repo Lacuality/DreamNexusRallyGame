@@ -624,21 +624,36 @@ export class AudioManager {
   }
 
   /** speed in km/h; offroad adds gravel rumble; boost makes it scream. */
-  updateEngineSound(speed: number, offroad = false, boost = false) {
+  private lastGear = -1;
+  private shiftAt = 0;
+
+  /**
+   * Engine note. `throttle` 0..1 (lifting off drops the revs and volume),
+   * `accel` m/s² (hard acceleration pushes the revs up). Gear changes dip the
+   * pitch, and there's a little wobble so it never sits on one note.
+   */
+  updateEngineSound(speed: number, offroad = false, boost = false, throttle = 0.6, accel = 0) {
     if (!this.ctx || !this.engine) return;
     const t = this.ctx.currentTime;
-    const r = Math.min(speed / 220, 1.2);
-    // fake gear changes: pitch climbs then drops a bit every gear
-    const gears = 5;
+    const r = Math.min(speed / 230, 1.2);
+    const gears = 6;
     const g = Math.min(gears - 1, Math.floor(r * gears));
     const inGear = r * gears - g;
-    const base = 42 + g * 14 + inGear * 55 + (boost ? 30 : 0);
-    this.engine.osc1.frequency.setTargetAtTime(base, t, 0.05);
-    this.engine.osc2.frequency.setTargetAtTime(base / 2, t, 0.05);
-    this.engine.filter.frequency.setTargetAtTime(350 + r * 1400 + (boost ? 900 : 0), t, 0.08);
-    this.engine.gain.gain.setTargetAtTime(0.035 + r * 0.04, t, 0.1);
+    if (g !== this.lastGear) {
+      this.lastGear = g;
+      this.shiftAt = t;
+    }
+    const sinceShift = t - this.shiftAt;
+    const dip = sinceShift < 0.25 ? (1 - sinceShift / 0.25) * 0.22 : 0; // clutch in, revs drop, back up
+    const wobble = Math.sin(t * 6.7) * 0.015 + Math.sin(t * 11.3) * 0.01 + (offroad ? (Math.random() - 0.5) * 0.08 : 0);
+    const load = Math.max(0, Math.min(1, throttle + accel * 0.04));
+    const revs = (48 + g * 11 + inGear * 64) * (1 - dip) * (1 + wobble) * (0.93 + load * 0.1) + (boost ? 38 : 0);
+    this.engine.osc1.frequency.setTargetAtTime(revs, t, 0.03);
+    this.engine.osc2.frequency.setTargetAtTime(revs / 2, t, 0.03);
+    this.engine.filter.frequency.setTargetAtTime(280 + r * 1300 + load * 700 + (boost ? 900 : 0), t, 0.06);
+    this.engine.gain.gain.setTargetAtTime((0.028 + r * 0.04) * (0.6 + load * 0.5) * (1 - dip * 0.6), t, 0.05);
     if (this.rumble) {
-      this.rumble.gain.gain.setTargetAtTime((offroad ? 0.25 : 0.03) * Math.min(1, r * 2), t, 0.08);
+      this.rumble.gain.gain.setTargetAtTime((offroad ? 0.28 : 0.03) * Math.min(1, r * 2), t, 0.08);
     }
   }
 
