@@ -1,7 +1,7 @@
 import { useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
-import { roadX, roadY, ROAD_HALF, hash, isCircuit } from "@/lib/track";
+import { roadX, roadY, toWorld, roadCurvature, currentLoop, ROAD_HALF, hash, isCircuit } from "@/lib/track";
 import { blendedBiome, useBiome } from "@/lib/stores/useBiome";
 import { run } from "@/lib/game/run";
 
@@ -93,12 +93,12 @@ function makeAsphaltTexture() {
 }
 
 /** A strip of quads following the road, between given lateral offsets. */
-function makeStrip(cols: number) {
+function makeStrip(cols: number, rows: number) {
   const geo = new THREE.BufferGeometry();
-  const pos = new Float32Array(ROWS * cols * 3);
-  const uv = new Float32Array(ROWS * cols * 2);
+  const pos = new Float32Array(rows * cols * 3);
+  const uv = new Float32Array(rows * cols * 2);
   const idx: number[] = [];
-  for (let r = 0; r < ROWS - 1; r++) {
+  for (let r = 0; r < rows - 1; r++) {
     for (let c = 0; c < cols - 1; c++) {
       const a = r * cols + c;
       const b = a + 1;
@@ -113,31 +113,27 @@ function makeStrip(cols: number) {
   return geo;
 }
 
-function fillStrip(
-  geo: THREE.BufferGeometry,
-  z0: number,
-  lats: number[],
-  lift: number,
-  vScale: number,
-) {
+const tmpP = { x: 0, y: 0, z: 0 };
+
+function fillStrip(geo: THREE.BufferGeometry, z0: number, lats: number[], lift: number, vScale: number, rows: number) {
   const pos = geo.attributes.position.array as Float32Array;
   const uv = geo.attributes.uv.array as Float32Array;
   const cols = lats.length;
-  for (let r = 0; r < ROWS; r++) {
+  for (let r = 0; r < rows; r++) {
     const z = z0 + r * STEP;
-    const cx = roadX(z);
-    const cy = roadY(z) + lift;
     for (let c = 0; c < cols; c++) {
       const i = r * cols + c;
-      pos[i * 3] = cx + lats[c];
-      pos[i * 3 + 1] = cy;
-      pos[i * 3 + 2] = z;
+      toWorld(z, lats[c], lift, tmpP);
+      pos[i * 3] = tmpP.x;
+      pos[i * 3 + 1] = tmpP.y;
+      pos[i * 3 + 2] = tmpP.z;
       uv[i * 2] = c / (cols - 1);
       uv[i * 2 + 1] = z / vScale;
     }
   }
   geo.attributes.position.needsUpdate = true;
   geo.attributes.uv.needsUpdate = true;
+  geo.computeVertexNormals();
   geo.computeBoundingSphere();
 }
 
@@ -223,13 +219,13 @@ function Atmosphere() {
     fog.color.set(b.fogColor);
     fog.near = b.fogNear;
     fog.far = b.fogFar;
-    const x = roadX(run.z) + run.lat;
-    const y = roadY(run.z);
+    toWorld(run.z, run.lat, 0, tmpP);
+    const x = tmpP.x, y = tmpP.y, zz = tmpP.z;
     if (sun.current) {
       sun.current.intensity = b.sunIntensity;
       sun.current.color.set(b.sunColor);
-      sun.current.position.set(x + 14, y + 26, run.z - 10);
-      target.position.set(x, y, run.z + 8);
+      sun.current.position.set(x + 14, y + 26, zz - 10);
+      target.position.set(x, y, zz + 8);
       sun.current.target = target;
     }
     if (amb.current) amb.current.intensity = b.ambientIntensity;
@@ -259,75 +255,82 @@ function Atmosphere() {
 }
 
 /* ---------------- Road + terrain ---------------- */
+// circuit terrain: a narrow shoulder strip; the big flat ground plane is underneath
+const CIRCUIT_COLS: [number, number][] = [
+  [-34, 0],
+  [-20, 0.5],
+  [-ROAD_W - 4, -0.05],
+  [ROAD_W + 4, -0.05],
+  [20, 0.5],
+  [34, 0],
+];
+
 function RoadAndTerrain() {
   const lastBuild = useRef(-9999);
-  const lastColor = useRef("");
+  const circuit = isCircuit();
+  const loop = currentLoop();
+  const L = loop ? loop.length : 0;
+  const rows = circuit ? Math.ceil(L / STEP) + 1 : ROWS;
+  const groundY = loop ? loop.minY - 0.45 : 0;
 
   const asphalt = useMemo(makeAsphaltTexture, []);
   const rumbleTex = useMemo(() => makeStripeTexture(["#e23b3b", "#ffffff"]), []);
-  const dashTex = useMemo(() => {
-    const t = makeStripeTexture(["#ffd23f", "#ffd23f", "rgba(0,0,0,0)", "rgba(0,0,0,0)", "rgba(0,0,0,0)"]);
-    return t;
-  }, []);
-
-  const roadGeo = useMemo(() => makeStrip(2), []);
-  const leftRumble = useMemo(() => makeStrip(2), []);
-  const rightRumble = useMemo(() => makeStrip(2), []);
-  const dashGeo = useMemo(() => makeStrip(2), []);
+  const dashTex = useMemo(() => makeStripeTexture(["#ffd23f", "#ffd23f", "rgba(0,0,0,0)", "rgba(0,0,0,0)", "rgba(0,0,0,0)"]), []);
   const gravelTex = useMemo(makeGravelTexture, []);
-  const leftGravel = useMemo(() => makeStrip(2), []);
-  const rightGravel = useMemo(() => makeStrip(2), []);
-  const circuit = isCircuit();
+
+  const roadGeo = useMemo(() => makeStrip(2, rows), [rows]);
+  const leftRumble = useMemo(() => makeStrip(2, rows), [rows]);
+  const rightRumble = useMemo(() => makeStrip(2, rows), [rows]);
+  const dashGeo = useMemo(() => makeStrip(2, rows), [rows]);
+  const leftGravel = useMemo(() => makeStrip(2, rows), [rows]);
+  const rightGravel = useMemo(() => makeStrip(2, rows), [rows]);
+  const cols = circuit ? CIRCUIT_COLS : TERRAIN_COLS;
   const terrainGeo = useMemo(() => {
-    const g = makeStrip(TERRAIN_COLS.length);
-    g.setAttribute("color", new THREE.BufferAttribute(new Float32Array(ROWS * TERRAIN_COLS.length * 3), 3));
+    const g = makeStrip(cols.length, rows);
+    g.setAttribute("color", new THREE.BufferAttribute(new Float32Array(rows * cols.length * 3), 3));
     return g;
-  }, []);
+  }, [cols, rows]);
+  const groundMat = useMemo(() => new THREE.MeshStandardMaterial({ color: "#5a8f3a", roughness: 1, flatShading: true }), []);
 
   const tmpA = useMemo(() => new THREE.Color(), []);
   const tmpB = useMemo(() => new THREE.Color(), []);
 
   const rebuild = (z0: number) => {
-    fillStrip(roadGeo, z0, [-ROAD_W, ROAD_W], 0, 10);
-    fillStrip(leftRumble, z0, [-ROAD_W - 0.35, -ROAD_W + 0.35], 0.02, 4);
-    fillStrip(rightRumble, z0, [ROAD_W - 0.35, ROAD_W + 0.35], 0.02, 4);
-    fillStrip(dashGeo, z0, [-0.12, 0.12], 0.015, 12);
+    fillStrip(roadGeo, z0, [-ROAD_W, ROAD_W], 0, 10, rows);
+    fillStrip(leftRumble, z0, [-ROAD_W - 0.35, -ROAD_W + 0.35], 0.02, 4, rows);
+    fillStrip(rightRumble, z0, [ROAD_W - 0.35, ROAD_W + 0.35], 0.02, 4, rows);
+    fillStrip(dashGeo, z0, [-0.12, 0.12], 0.015, 12, rows);
     if (circuit) {
       // gravel traps: leave the track and you bog down
-      fillStrip(leftGravel, z0, [-ROAD_W - 3.6, -ROAD_W - 0.3], 0.01, 6);
-      fillStrip(rightGravel, z0, [ROAD_W + 0.3, ROAD_W + 3.6], 0.01, 6);
-      leftGravel.computeVertexNormals();
-      rightGravel.computeVertexNormals();
+      fillStrip(leftGravel, z0, [-ROAD_W - 3.6, -ROAD_W - 0.3], 0.01, 6, rows);
+      fillStrip(rightGravel, z0, [ROAD_W + 0.3, ROAD_W + 3.6], 0.01, 6, rows);
     }
-    roadGeo.computeVertexNormals();
-    leftRumble.computeVertexNormals();
-    rightRumble.computeVertexNormals();
-    dashGeo.computeVertexNormals();
 
     // terrain: valley that rises away from the road, with bumpy hills
     const b = blendedBiome();
     tmpA.set(b.terrainColor);
     tmpB.set(b.shoulderColor);
+    groundMat.color.set(b.terrainColor);
     const pos = terrainGeo.attributes.position.array as Float32Array;
     const uv = terrainGeo.attributes.uv.array as Float32Array;
     const col = terrainGeo.attributes.color.array as Float32Array;
-    const cols = TERRAIN_COLS.length;
-    for (let r = 0; r < ROWS; r++) {
+    const nCols = cols.length;
+    for (let r = 0; r < rows; r++) {
       const z = z0 + r * STEP;
-      const cx = roadX(z);
-      const cy = roadY(z);
-      for (let c = 0; c < cols; c++) {
-        const [lat, base] = TERRAIN_COLS[c];
-        const i = r * cols + c;
+      const k = circuit ? roadCurvature(z) : 0;
+      for (let c = 0; c < nCols; c++) {
+        let [lat, base] = cols[c];
+        // inside a tight bend the strip would fold over itself: pull it in
+        if (circuit && lat * k > 0.8) lat = 0.8 / k;
+        const i = r * nCols + c;
         const far = Math.abs(lat) > 20 ? 1 : 0;
-        const bumps =
-          far *
-          (Math.sin(z * 0.021 + lat * 0.07) * 4 +
-            Math.sin(z * 0.053 + lat * 0.13 + 1.7) * 2 +
-            hash(Math.floor(z / STEP) * 13 + c) * 1.5);
-        pos[i * 3] = cx + lat;
-        pos[i * 3 + 1] = cy + base + bumps;
-        pos[i * 3 + 2] = z;
+        const bumps = circuit
+          ? 0
+          : far * (Math.sin(z * 0.021 + lat * 0.07) * 4 + Math.sin(z * 0.053 + lat * 0.13 + 1.7) * 2 + hash(Math.floor(z / STEP) * 13 + c) * 1.5);
+        toWorld(z, lat, base + bumps, tmpP);
+        pos[i * 3] = tmpP.x;
+        pos[i * 3 + 1] = circuit && Math.abs(cols[c][0]) >= 34 ? groundY : tmpP.y;
+        pos[i * 3 + 2] = tmpP.z;
         uv[i * 2] = lat / 8;
         uv[i * 2 + 1] = z / 8;
         const isShoulder = Math.abs(lat) < 9 ? 1 : 0;
@@ -343,12 +346,19 @@ function RoadAndTerrain() {
     terrainGeo.attributes.color.needsUpdate = true;
     terrainGeo.computeVertexNormals();
     terrainGeo.computeBoundingSphere();
-    lastColor.current = b.terrainColor;
   };
 
   useFrame(() => {
-    const z0 = Math.floor((run.z - BEHIND) / STEP) * STEP;
     const colorChanged = useBiome.getState().isTransitioning;
+    if (circuit) {
+      // the whole lap is built once (and again while the colours settle)
+      if (lastBuild.current === -9999 || colorChanged) {
+        lastBuild.current = 0;
+        rebuild(0);
+      }
+      return;
+    }
+    const z0 = Math.floor((run.z - BEHIND) / STEP) * STEP;
     if (Math.abs(z0 - lastBuild.current) >= REBUILD_EVERY || (colorChanged && Math.abs(z0 - lastBuild.current) >= STEP)) {
       lastBuild.current = z0;
       rebuild(z0);
@@ -357,6 +367,16 @@ function RoadAndTerrain() {
 
   return (
     <group>
+      {circuit && loop && (
+        <mesh
+          material={groundMat}
+          rotation={[-Math.PI / 2, 0, 0]}
+          position={[(loop.minX + loop.maxX) / 2, groundY - 0.02, (loop.minZ + loop.maxZ) / 2]}
+          receiveShadow
+        >
+          <planeGeometry args={[3000, 3000, 1, 1]} />
+        </mesh>
+      )}
       <mesh geometry={terrainGeo} receiveShadow frustumCulled={false}>
         <meshStandardMaterial vertexColors roughness={1} metalness={0} flatShading />
       </mesh>
@@ -380,30 +400,37 @@ function RoadAndTerrain() {
         <meshStandardMaterial map={rumbleTex} roughness={0.7} polygonOffset polygonOffsetFactor={-1} />
       </mesh>
       <mesh geometry={dashGeo} frustumCulled={false}>
-        <meshStandardMaterial
-          map={dashTex}
-          transparent
-          alphaTest={0.5}
-          roughness={0.6}
-          polygonOffset
-          polygonOffsetFactor={-2}
-        />
+        <meshStandardMaterial map={dashTex} transparent alphaTest={0.5} roughness={0.6} polygonOffset polygonOffsetFactor={-2} />
       </mesh>
     </group>
   );
 }
 
-/* ---------------- Far mountains (follow the car, so they feel infinitely far) */
+/* ---------------- Far mountains ---------------- */
+// Endless road: they follow the car so they feel infinitely far.
+// Circuits: a fixed ring of peaks around the whole track.
 function Mountains() {
   const group = useRef<THREE.Group>(null);
+  const loop = currentLoop();
   const mats = useMemo(
-    () => [new THREE.MeshStandardMaterial({ color: "#3f7f5a", flatShading: true, roughness: 1, fog: false }),
-      new THREE.MeshStandardMaterial({ color: "#f4f8ff", flatShading: true, roughness: 1, fog: false })],
+    () => [
+      new THREE.MeshStandardMaterial({ color: "#3f7f5a", flatShading: true, roughness: 1, fog: false }),
+      new THREE.MeshStandardMaterial({ color: "#f4f8ff", flatShading: true, roughness: 1, fog: false }),
+    ],
     [],
   );
   const tmp = useMemo(() => new THREE.Color(), []);
   const peaks = useMemo(() => {
     const arr: { x: number; z: number; s: number; h: number; snow: boolean }[] = [];
+    if (loop) {
+      const R = Math.max(loop.maxX - loop.minX, loop.maxZ - loop.minZ) / 2 + 240;
+      for (let i = 0; i < 22; i++) {
+        const a = (i / 22) * Math.PI * 2;
+        const r = R + hash(i * 3.1) * 120;
+        arr.push({ x: Math.cos(a) * r, z: Math.sin(a) * r, s: 60 + hash(i * 5.7) * 50, h: 60 + hash(i * 9.3) * 80, snow: hash(i * 2.2) > 0.5 });
+      }
+      return arr;
+    }
     for (let i = 0; i < 16; i++) {
       const side = i % 2 === 0 ? -1 : 1;
       arr.push({
@@ -415,11 +442,12 @@ function Mountains() {
       });
     }
     return arr;
-  }, []);
+  }, [loop]);
 
   useFrame(() => {
     if (!group.current) return;
-    group.current.position.set(roadX(run.z) * 0.85, roadY(run.z) - 8, run.z);
+    if (loop) group.current.position.set((loop.minX + loop.maxX) / 2, loop.minY - 8, (loop.minZ + loop.maxZ) / 2);
+    else group.current.position.set(roadX(run.z) * 0.85, roadY(run.z) - 8, run.z);
     const b = blendedBiome();
     // atmospheric haze: mix the mountain colour toward the horizon
     mats[0].color.set(b.mountainColor).lerp(tmp.set(b.skyHorizon), 0.35);

@@ -4,7 +4,9 @@ import * as THREE from "three";
 import { burst, FX } from "@/lib/game/fx";
 import { run, multiplierFor, MAX_HEARTS, NITRO_DURATION, INVULNERABLE_TIME, speedGear } from "@/lib/game/run";
 import { input, steerInput } from "@/lib/input";
-import { roadX, roadY, roadCurvature, ROAD_HALF, LANES, hash, biomeAt, lapLength, isCircuit } from "@/lib/track";
+import { toWorld, headingAt, roadCurvature, ROAD_HALF, LANES, hash, biomeAt, lapLength, isCircuit } from "@/lib/track";
+
+const tmpV = { x: 0, y: 0, z: 0 };
 import { ModelPool, OBSTACLE_SIZE, type ObstacleKind, type PickupKind, makeArch, makeFinishLine } from "@/lib/game/models";
 import { useRally, goalProgress } from "@/lib/stores/useRally";
 import { car, session } from "@/lib/game/session";
@@ -70,6 +72,8 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
   const rowCount = useRef(0);
   const hudTimer = useRef(0);
   const gravelMsg = useRef(-99);
+  const driftSpark = useRef(0);
+  const driftStage = useRef(0);
   const countdownTimer = useRef(0);
   const lastCount = useRef(4);
   const arches = useRef<THREE.Object3D[]>([]);
@@ -243,8 +247,10 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
   };
 
   /** Particle burst just in front of the player's car. */
-  const fxCar = (colors: string[], count = 14, speed = 6, up = 5) =>
-    burst(roadX(run.z) + run.lat, roadY(run.z) + run.y + 1, run.z + 1.5, colors, count, speed, up);
+  const fxCar = (colors: string[], count = 14, speed = 6, up = 5) => {
+    toWorld(run.z + 1.5, run.lat, run.y + 1, tmpV);
+    burst(tmpV.x, tmpV.y, tmpV.z, colors, count, speed, up);
+  };
 
   const award = (pts: number) => {
     // nitro doubles everything you earn
@@ -335,7 +341,40 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
     const top = ((circ ? 182 : 175 + gear * 10) / 3.6) * car.top;
     const cruise = circ ? top * 0.93 : ((122 + gear * 12) / 3.6) * car.top;
     let target = input.up ? top : cruise;
-    if (input.down || input.touchBrake) target = 40 / 3.6;
+    // brake + steer = drift (Mario Kart style): you keep rolling, turn tighter and charge a mini-turbo
+    const braking = input.down || input.touchBrake;
+    const steerNow = steerInput();
+    const canDrift = braking && steerNow !== 0 && run.speed > 14 && !run.airborne && run.spin <= 0;
+    if (canDrift) {
+      if (run.drift === 0) run.driftDir = steerNow;
+      run.drift += dt;
+      target = Math.max(run.speed * 0.985, cruise * 0.72);
+      const stage = run.drift > 2 ? 2 : run.drift > 1 ? 1 : 0;
+      driftSpark.current -= dt;
+      if (driftSpark.current <= 0) {
+        driftSpark.current = 0.07;
+        toWorld(run.z - 1.6, run.lat - run.driftDir * 0.9, 0.25, tmpV);
+        burst(tmpV.x, tmpV.y, tmpV.z, [["#5fd8ff", "#ffffff"], ["#ff9f43", "#ffd23f"], ["#c84bff", "#ff4f9a"]][stage], 4, 3, 2.5, 0.12);
+      }
+      if (stage !== driftStage.current) {
+        driftStage.current = stage;
+        if (stage > 0) audioManager.playClick();
+      }
+    } else {
+      if (run.drift > 0.55 && run.spin <= 0) {
+        // release = mini-turbo, bigger the longer you held it
+        const stage = run.drift > 2 ? 2 : run.drift > 1 ? 1 : 0;
+        run.nitroTime = Math.max(run.nitroTime, [0.55, 0.9, 1.4][stage]);
+        run.driftBoosts++;
+        run.shake = Math.max(run.shake, 0.25);
+        audioManager.playNitro();
+        rally.getState().popup(["¡MINI-TURBO!", "¡SUPER TURBO!", "¡ULTRA TURBO! 💜"][stage], [COLORS.cyan, COLORS.orange, "#c84bff"][stage], stage > 0);
+        fxCar(FX.nitro, 10 + stage * 8, 7, 3);
+      }
+      run.drift = 0;
+      driftStage.current = 0;
+      if (braking) target = 40 / 3.6;
+    }
 
     // nitro
     const wantNitro = input.nitro || input.touchNitro || input.nitroQueued;
@@ -381,10 +420,12 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
     /* --- steering --- */
     const s = run.spin > 0 ? 0 : steerInput();
     run.steer += (s - run.steer) * Math.min(1, dt * 10);
-    const latMax = (7 + run.speed * 0.13) * car.handling;
+    const drifting = run.drift > 0;
+    const latMax = (7 + run.speed * 0.13) * car.handling * (drifting ? 1.45 : 1);
     const air = run.airborne ? 0.35 : 1;
     run.latVel += (run.steer * latMax - run.latVel) * Math.min(1, dt * 9 * air);
-    const push = -roadCurvature(run.z) * run.speed * run.speed * (circ ? 0.35 : 0.5); // bends push you outward
+    // bends push you outward (much less while drifting: that's the point of it)
+    const push = -roadCurvature(run.z) * run.speed * run.speed * (circ ? 0.35 : 0.5) * (drifting ? 0.45 : 1);
     run.lat += (run.latVel + push) * dt;
     const wall = ROAD_HALF + (circ ? 3.6 : 3.2);
     if (Math.abs(run.lat) > wall) {
@@ -499,8 +540,8 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
       const label = circ ? (lapN > race.laps ? "FINISH" : lapN === race.laps ? "FINAL LAP" : `LAP ${lapN}`) : `${nextArchZ} m`;
       const a = makeArch(label);
       a.userData.z = nextArchZ;
-      a.position.set(roadX(nextArchZ), roadY(nextArchZ), nextArchZ);
-      a.rotation.y = Math.atan(roadX(nextArchZ + 0.5) - roadX(nextArchZ - 0.5));
+      toWorld(nextArchZ, 0, 0, a.position);
+      a.rotation.y = headingAt(nextArchZ);
       if (circ) a.add(makeFinishLine());
       group.current?.add(a);
       arches.current.push(a);
@@ -698,7 +739,8 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
     fling(e);
     e.vy += 4;
     run.smashes++;
-    burst(roadX(e.z) + e.lat, roadY(e.z) + 0.8, e.z, FX.smash, 16, 7, 6);
+    toWorld(e.z, e.lat, 0.8, tmpV);
+    burst(tmpV.x, tmpV.y, tmpV.z, FX.smash, 16, 7, 6);
     bumpCombo();
     const pts = award(75);
     run.shake = Math.max(run.shake, 0.5);
@@ -725,11 +767,10 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
           e.lat = Math.sign(e.lat) * (ROAD_HALF - 0.5);
           e.walk = -e.walk;
         }
-        o.rotation.y = e.walk > 0 ? 0 : Math.PI;
-        o.position.y += Math.abs(Math.sin(t * 6 + e.seed)) * 0.05;
+        o.rotation.y = headingAt(e.z) + (e.walk > 0 ? 0 : Math.PI);
       }
       const z = e.z;
-      o.position.set(roadX(z) + e.lat, roadY(z) + e.h + (e.walk ? Math.abs(Math.sin(t * 6 + e.seed)) * 0.06 : 0), z);
+      toWorld(z, e.lat, e.h + (e.walk ? Math.abs(Math.sin(t * 6 + e.seed)) * 0.06 : 0), o.position);
       if (e.pickup && !e.done) {
         const spin = o.getObjectByName("spin");
         if (spin) {
@@ -741,7 +782,7 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
         const beam = o.getObjectByName("beam");
         if (beam) beam.rotation.y = t;
       } else if (!e.pickup && e.fly <= 0 && !e.walk) {
-        o.rotation.y = Math.atan(roadX(z + 0.5) - roadX(z - 0.5));
+        o.rotation.y = headingAt(z);
       }
     }
     // feedback decay
@@ -750,7 +791,7 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
   }
 
   function writeCar() {
-    carPositionRef.current.set(roadX(run.z) + run.lat, roadY(run.z) + run.y, run.z);
+    toWorld(run.z, run.lat, run.y, carPositionRef.current);
     carSpeedRef.current = run.speed * 3.6;
     if (rally.getState().phase === "playing") {
       audioManager.updateEngineSound(run.speed * 3.6, run.offroad && !run.airborne, run.nitroTime > 0);
@@ -780,14 +821,14 @@ export function Scenery() {
   const group = useRef<THREE.Group>(null);
   const pool = useMemo(() => new ModelPool(), []);
   const placed = useRef<{ z: number; obj: THREE.Object3D }[]>([]);
-  const nextZ = useRef(-30);
+  const nextZ = useRef(isCircuit() ? 0 : -30);
   const idx = useRef(0);
 
   useEffect(() => () => placed.current.forEach((p) => pool.release(p.obj)), [pool]);
 
   const place = (kind: string, z: number, lat: number, scale = 1, rotY = 0) => {
     const o = pool.acquire(kind);
-    o.position.set(roadX(z) + lat, roadY(z) + (Math.abs(lat) > 12 ? 0.2 : -0.1), z);
+    toWorld(z, lat, Math.abs(lat) > 12 ? 0.2 : -0.1, o.position);
     o.rotation.set(0, rotY, 0);
     o.scale.setScalar(scale);
     group.current?.add(o);
@@ -795,14 +836,16 @@ export function Scenery() {
   };
 
   useFrame(() => {
-    while (nextZ.current < run.z + 250) {
+    const circuitAll = isCircuit();
+    const limit = circuitAll ? lapLength() : run.z + 250;
+    while (nextZ.current < limit) {
       const z = nextZ.current;
       const i = idx.current++;
       const biome = biomeAt(z);
       const r1 = hash(i * 1.7);
       const r2 = hash(i * 3.3 + 1);
       const r3 = hash(i * 5.1 + 2);
-      const heading = Math.atan(roadX(z + 0.5) - roadX(z - 0.5));
+      const heading = headingAt(z);
 
       // circuits: grandstands around the start/finish straight, tyre walls in the bends
       const circ = isCircuit();
@@ -886,8 +929,9 @@ export function Scenery() {
       }
       if (biome === "pueblo" && i % 3 === 0) place("bunting", z + 3, 0, 1, heading);
 
-      nextZ.current += biome === "pueblo" ? 13 : 9;
+      nextZ.current += circuitAll ? 12 : biome === "pueblo" ? 13 : 9;
     }
+    if (circuitAll) return; // the whole circuit stays dressed for every lap
     placed.current = placed.current.filter((p) => {
       if (p.z < run.z - 40) {
         pool.release(p.obj);

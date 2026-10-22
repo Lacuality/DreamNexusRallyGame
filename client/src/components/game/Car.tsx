@@ -4,7 +4,7 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { buildVehicle, type CarRig } from "@/lib/game/vehicles";
 import { run } from "@/lib/game/run";
-import { roadX, roadY, roadSlope, roadPitch } from "@/lib/track";
+import { toWorld, headingAt, roadPitch } from "@/lib/track";
 import { useProfile } from "@/lib/stores/useProfile";
 import type { CarId, DriverId, PaintId } from "@/lib/game/garage";
 
@@ -27,13 +27,13 @@ export function Car() {
   useFrame((state, delta) => {
     const t = state.clock.elapsedTime;
     const z = run.z;
-    const x = roadX(z) + run.lat;
-    const y = roadY(z);
-    rig.root.position.set(x, y + run.y, z);
+    toWorld(z, run.lat, run.y, rig.root.position);
+    const x = rig.root.position.x, y = rig.root.position.y - run.y;
 
-    // face along the road, plus a bit of steering yaw
-    const heading = Math.atan(roadSlope(z));
-    rig.root.rotation.set(0, heading + run.latVel * 0.025 + (run.spin > 0 ? (1 - run.spin) * Math.PI * 4 : 0), 0);
+    // face along the road, plus steering yaw and the drift slide angle
+    const heading = headingAt(z);
+    const slide = run.driftDir * 0.55 * Math.min(1, run.drift * 4);
+    rig.root.rotation.set(0, heading + run.latVel * 0.025 + slide + (run.spin > 0 ? (1 - run.spin) * Math.PI * 4 : 0), 0);
     // weight transfer: nose lifts when you accelerate / use nitro, dips when you brake or crash
     const a = anim.current;
     const accel = (run.speed - a.prevSpeed) / Math.max(delta, 1e-3);
@@ -43,7 +43,7 @@ export function Car() {
     // landing: squash and a puff of dust
     if (a.wasAir && !run.airborne) {
       a.squash = 1;
-      burst(x, y + 0.2, z, ["#c9a46a", "#e6d2a8", "#8b6b3e"], 14, 5, 2.5, 0.22);
+      burst(x, y + 0.2, rig.root.position.z, ["#c9a46a", "#e6d2a8", "#8b6b3e"], 14, 5, 2.5, 0.22);
     }
     a.wasAir = run.airborne;
     a.squash = Math.max(0, a.squash - delta * 4);

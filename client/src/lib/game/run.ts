@@ -52,6 +52,11 @@ export interface RunState {
   totalAir: number;
   nextMilestone: number;
 
+  // drifting (brake + steer): seconds held, direction, boosts earned
+  drift: number;
+  driftDir: number;
+  driftBoosts: number;
+
   // Rally Loco (items)
   spin: number;
   item: string | null;
@@ -97,6 +102,9 @@ export function freshRun(): RunState {
     firstHitZ: -1,
     totalAir: 0,
     nextMilestone: 500,
+    drift: 0,
+    driftDir: 0,
+    driftBoosts: 0,
     spin: 0,
     item: null,
     hitsLanded: 0,

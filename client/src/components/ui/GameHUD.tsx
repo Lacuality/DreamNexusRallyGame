@@ -6,7 +6,7 @@ import { audioManager } from "@/lib/audio";
 import { isTouchDevice } from "@/lib/input";
 import { IconButton, UI, panelStyle, useAudioSettings } from "./gameUi";
 import { formatTime, ordinal, race } from "@/lib/game/race";
-import { getTrack } from "@/lib/track";
+import { getTrack, outlinePoint, lapLength, type CircuitShape } from "@/lib/track";
 import { ITEMS } from "../game/Battle";
 
 /** Small circuit map: a closed loop shaped by the circuit's curves, with every car on it. */
@@ -38,7 +38,8 @@ function MiniMap({ touch }: { touch: boolean }) {
             d.setAttribute("r", "0");
             return;
           }
-          const u = ((r.z % t.shape.length) + t.shape.length) % t.shape.length / t.shape.length;
+          const L = lapLength();
+          const u = (((r.z % L) + L) % L) / L;
           const [x, y] = loopPoint(u, t.shape);
           d.setAttribute("cx", String(x * size));
           d.setAttribute("cy", String(y * size));
@@ -74,40 +75,9 @@ function MiniMap({ touch }: { touch: boolean }) {
   );
 }
 
-/** A closed loop whose wiggles come from the circuit's curve settings. */
-type LoopShape = { curves: [number, number, number][]; corners?: [number, number, number][]; length: number };
-function rawLoop(u: number, shape: LoopShape): [number, number] {
-  const a = u * Math.PI * 2;
-  let r = 1;
-  for (const [amp, n, p] of shape.curves) r += (amp / 60) * Math.sin(a * (n + 1) + p);
-  for (const [at, amp, w] of shape.corners ?? []) {
-    let d = u - at;
-    if (d > 0.5) d -= 1;
-    else if (d < -0.5) d += 1;
-    const k = (d * shape.length) / w;
-    r += (amp / 40) * Math.exp(-k * k);
-  }
-  return [Math.cos(a) * r * 1.15, Math.sin(a) * r * 0.85];
-}
-
-const fitCache = new Map<string, [number, number, number]>();
-/** Point on the circuit loop, fitted into a 0..1 box (with padding). */
-export function loopPoint(u: number, shape: LoopShape): [number, number] {
-  const key = JSON.stringify(shape);
-  let fit = fitCache.get(key);
-  if (!fit) {
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-    for (let i = 0; i < 200; i++) {
-      const [x, y] = rawLoop(i / 200, shape);
-      minX = Math.min(minX, x); maxX = Math.max(maxX, x);
-      minY = Math.min(minY, y); maxY = Math.max(maxY, y);
-    }
-    const scale = 0.84 / Math.max(maxX - minX, maxY - minY);
-    fit = [scale, (minX + maxX) / 2, (minY + maxY) / 2];
-    fitCache.set(key, fit);
-  }
-  const [x, y] = rawLoop(u, shape);
-  return [(x - fit[1]) * fit[0] + 0.5, (y - fit[2]) * fit[0] + 0.5];
+/** Point on the circuit loop, fitted into a 0..1 box (for minimaps). */
+export function loopPoint(u: number, shape: CircuitShape): [number, number] {
+  return outlinePoint(shape, u);
 }
 
 interface GameHUDProps {

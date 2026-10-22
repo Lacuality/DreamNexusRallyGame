@@ -4,7 +4,13 @@ import * as THREE from "three";
 import { race, playerPosition, type Racer } from "@/lib/game/race";
 import { run } from "@/lib/game/run";
 import { input } from "@/lib/input";
-import { roadX, roadY, LANES, lapLength } from "@/lib/track";
+import { toWorld, LANES, lapLength } from "@/lib/track";
+
+const tmpV = { x: 0, y: 0, z: 0 };
+const burstAt = (z: number, lat: number, h: number, colors: string[], count: number, speed: number, up: number) => {
+  toWorld(z, lat, h, tmpV);
+  burst(tmpV.x, tmpV.y, tmpV.z, colors, count, speed, up);
+};
 import { useRally } from "@/lib/stores/useRally";
 import { audioManager } from "@/lib/audio";
 import { room, myId } from "@/lib/game/net";
@@ -227,7 +233,7 @@ export function Battle() {
   const hit = (targetId: string, by: string, label: string) => {
     const gs = useRally.getState();
     const victim = carsNow().find((c) => c.id === targetId);
-    if (victim) burst(roadX(victim.z) + victim.lat, roadY(victim.z) + 1.2, victim.z, FX.hit, 20, 7, 6);
+    if (victim) burstAt(victim.z, victim.lat, 1.2, FX.hit, 20, 7, 6);
     if (targetId === "me") {
       if (run.shield) {
         run.shield = false;
@@ -368,7 +374,7 @@ export function Battle() {
           const visible = z < total && z > run.z - 30 && z < run.z + 260 && back < now;
           b.visible = visible;
           if (!visible) continue;
-          b.position.set(roadX(z) + lat, roadY(z) + Math.sin(t * 3 + li) * 0.15, z);
+          toWorld(z, lat, Math.sin(t * 3 + li) * 0.15, b.position);
           const s = b.getObjectByName("spin");
           if (s) s.rotation.set(t * 1.2, t * 2, 0);
           if (phase !== "playing") continue;
@@ -382,7 +388,7 @@ export function Battle() {
               if ((taken.current.get(ckey) ?? -1) >= now) continue;
               taken.current.set(ckey, now + 2.5);
               if (c.id === "me") audioManager.playClick();
-              burst(roadX(z) + lat, roadY(z) + 1.1, z, FX.box, 12, 5, 5);
+              burstAt(z, lat, 1.1, FX.box, 12, 5, 5);
               if (holder) continue;
               const pos = c.id === "me" ? playerPosition(run.z, null) : 1 + carsNow().filter((o) => o.z > c.z).length;
               const item = rollItem(pos, race.racers.length + 1);
@@ -466,7 +472,7 @@ export function Battle() {
           }
         }
       }
-      p.obj.position.set(roadX(p.z) + p.lat, roadY(p.z) + p.y, p.z);
+      toWorld(p.z, p.lat, p.y, p.obj.position);
       p.obj.rotation.set(t * (p.kind === "aguacate" ? 8 : 0), 0, 0);
       if (p.life <= 0) {
         p.obj.parent?.remove(p.obj);
@@ -486,7 +492,7 @@ export function Battle() {
           break;
         }
       }
-      tr.obj.position.set(roadX(tr.z) + tr.lat, roadY(tr.z), tr.z);
+      toWorld(tr.z, tr.lat, 0, tr.obj.position);
       if (tr.life <= 0 || tr.z < run.z - 400) {
         tr.obj.parent?.remove(tr.obj);
         return false;
@@ -498,7 +504,7 @@ export function Battle() {
     clouds.current = clouds.current.filter((c) => {
       c.time -= dt;
       const tg = c.target === "me" ? { z: run.z, lat: run.lat } : racerById(c.target);
-      if (tg) c.obj.position.set(roadX(tg.z) + tg.lat, roadY(tg.z) + 5, tg.z);
+      if (tg) toWorld(tg.z, tg.lat, 5, c.obj.position);
       const drops = c.obj.getObjectByName("drops");
       drops?.children.forEach((d) => {
         d.position.y -= dt * 9;

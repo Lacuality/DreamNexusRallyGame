@@ -371,7 +371,7 @@ export function TitleScreenImmersive({ isFullscreen, onToggleFullscreen, isFulls
           </PillButton>
           {!touch && !short && (
             <span style={{ alignSelf: "center", fontWeight: 800, fontSize: 13, opacity: 0.85, textShadow: "0 1px 4px #000", marginLeft: 8 }}>
-              ⌨️ ← → steer · ↑ faster · ↓ brake · SPACE nitro · E power-up · P pause · by{" "}
+              ⌨️ ← → steer · ↑ faster · ↓ brake · ↓+← → drift · SPACE nitro · E item · B look back · by{" "}
               <a href="https://dreamnexus.digital" target="_blank" rel="noreferrer" style={{ color: UI.cyanBright }}>
                 dreamnexus.digital
               </a>

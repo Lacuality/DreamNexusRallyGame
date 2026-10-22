@@ -8,7 +8,7 @@ import { RIVALS } from "@/lib/game/circuits";
 import { carById, type CarId, type DriverId, type PaintId } from "@/lib/game/garage";
 import { buildVehicle, type CarRig } from "@/lib/game/vehicles";
 import { room, myId } from "@/lib/game/net";
-import { roadX, roadY, roadSlope, roadCurvature, ROAD_HALF, bendAhead, cornerSpeed } from "@/lib/track";
+import { toWorld, headingAt, roadCurvature, ROAD_HALF, bendAhead, cornerSpeed } from "@/lib/track";
 import { useRally } from "@/lib/stores/useRally";
 import { audioManager } from "@/lib/audio";
 import { animateWobble } from "./Car";
@@ -184,8 +184,8 @@ export function Rivals() {
         group.current?.add(rig.root);
       }
       const z = r.z;
-      rig.root.position.set(roadX(z) + r.lat, roadY(z) + r.y, z);
-      rig.root.rotation.set(0, Math.atan(roadSlope(z)) + (r.spin > 0 ? (1 - r.spin) * Math.PI * 4 : 0), 0);
+      toWorld(z, r.lat, r.y, rig.root.position);
+      rig.root.rotation.set(0, headingAt(z) + (r.spin > 0 ? (1 - r.spin) * Math.PI * 4 : 0), 0);
       rig.shield.visible = r.shield;
       rig.wheels.forEach((w) => (w.rotation.x += (r.speed * dt) / 0.42));
       animateWobble(rig, t + r.seed, r.speed, false);

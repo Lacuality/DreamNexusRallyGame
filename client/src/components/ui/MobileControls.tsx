@@ -1,11 +1,11 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { ChevronLeft, ChevronRight, Zap, ChevronsDown } from "lucide-react";
+import { ChevronLeft, ChevronRight, Zap, ChevronsDown, Eye } from "lucide-react";
 import { input, isTouchDevice } from "@/lib/input";
 import { useRally } from "@/lib/stores/useRally";
 import { audioManager } from "@/lib/audio";
 import { UI } from "./gameUi";
 
-type Key = "touchLeft" | "touchRight" | "touchBrake" | "touchNitro" | "touchItem";
+type Key = "touchLeft" | "touchRight" | "touchBrake" | "touchNitro" | "touchItem" | "touchLook";
 
 /** Big thumb buttons. Pointer events so several fingers work at once. */
 function TouchButton({
@@ -122,6 +122,16 @@ export function MobileControls() {
       }}
       data-touch-controls
     >
+      {/* look behind you */}
+      <div style={{ position: "absolute", left: "max(14px, env(safe-area-inset-left))", bottom: `calc(max(18px, env(safe-area-inset-bottom)) + ${big + 16}px)` }}>
+        <TouchButton k="touchLook" size={big * 0.62} label="Look behind" color="rgba(14,27,36,0.55)" border="rgba(255,255,255,0.6)">
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+            <Eye size={big * 0.26} strokeWidth={3} />
+            <span style={{ fontFamily: UI.display, fontSize: big * 0.11 }}>ATRÁS</span>
+          </div>
+        </TouchButton>
+      </div>
+
       {/* steering: left thumb */}
       <div
         style={{

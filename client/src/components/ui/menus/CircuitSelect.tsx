@@ -30,7 +30,7 @@ export function CircuitSelect({ onClose, onRace, title = "🏎️ Circuit Race",
   return (
     <MenuShell title={title} onClose={onClose}>
       <p style={{ fontWeight: 800, marginTop: 0, opacity: 0.85 }}>
-        {intro ?? "3 laps against 5 rivals. Hit the blue boost pads, grab jars for nitro, and bump your way to the podium. 🏆 1st = 150 jars."}
+        {intro ?? "3 laps against 5 rivals. Brake + steer to drift round the corners and let go for a mini-turbo. Hit the blue boost pads and bump your way to the podium. 🏆 1st = 150 jars."}
       </p>
       <div style={{ display: "grid", gap: 10 }}>
         {CIRCUITS.map((c) => (

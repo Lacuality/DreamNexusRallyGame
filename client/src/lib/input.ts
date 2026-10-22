@@ -12,6 +12,8 @@ export const input = {
   item: false,
   itemQueued: false,
   touchItem: false,
+  lookBack: false,
+  touchLook: false,
   // touch
   touchLeft: false,
   touchRight: false,
@@ -33,6 +35,9 @@ const KEYMAP: Record<string, keyof typeof input> = {
   ShiftRight: "nitro",
   KeyE: "item",
   KeyQ: "item",
+  KeyB: "lookBack",
+  KeyV: "lookBack",
+  KeyC: "lookBack",
 };
 
 let installed = false;
