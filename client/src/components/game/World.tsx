@@ -1,7 +1,7 @@
 import { useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
-import { roadX, roadY, ROAD_HALF, hash } from "@/lib/track";
+import { roadX, roadY, ROAD_HALF, hash, isCircuit } from "@/lib/track";
 import { blendedBiome, useBiome } from "@/lib/stores/useBiome";
 import { run } from "@/lib/game/run";
 
@@ -51,6 +51,23 @@ function makeStripeTexture(colors: string[], size = 64, vertical = true) {
   tex.magFilter = THREE.NearestFilter;
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
+}
+
+function makeGravelTexture() {
+  const c = document.createElement("canvas");
+  c.width = c.height = 64;
+  const g = c.getContext("2d")!;
+  g.fillStyle = "#c9b48a";
+  g.fillRect(0, 0, 64, 64);
+  for (let i = 0; i < 420; i++) {
+    const v = 150 + Math.floor(Math.random() * 90);
+    g.fillStyle = `rgb(${v},${v - 14},${v - 40})`;
+    g.fillRect(Math.random() * 64, Math.random() * 64, 2, 2);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
 }
 
 function makeAsphaltTexture() {
@@ -257,6 +274,10 @@ function RoadAndTerrain() {
   const leftRumble = useMemo(() => makeStrip(2), []);
   const rightRumble = useMemo(() => makeStrip(2), []);
   const dashGeo = useMemo(() => makeStrip(2), []);
+  const gravelTex = useMemo(makeGravelTexture, []);
+  const leftGravel = useMemo(() => makeStrip(2), []);
+  const rightGravel = useMemo(() => makeStrip(2), []);
+  const circuit = isCircuit();
   const terrainGeo = useMemo(() => {
     const g = makeStrip(TERRAIN_COLS.length);
     g.setAttribute("color", new THREE.BufferAttribute(new Float32Array(ROWS * TERRAIN_COLS.length * 3), 3));
@@ -271,6 +292,13 @@ function RoadAndTerrain() {
     fillStrip(leftRumble, z0, [-ROAD_W - 0.35, -ROAD_W + 0.35], 0.02, 4);
     fillStrip(rightRumble, z0, [ROAD_W - 0.35, ROAD_W + 0.35], 0.02, 4);
     fillStrip(dashGeo, z0, [-0.12, 0.12], 0.015, 12);
+    if (circuit) {
+      // gravel traps: leave the track and you bog down
+      fillStrip(leftGravel, z0, [-ROAD_W - 3.6, -ROAD_W - 0.3], 0.01, 6);
+      fillStrip(rightGravel, z0, [ROAD_W + 0.3, ROAD_W + 3.6], 0.01, 6);
+      leftGravel.computeVertexNormals();
+      rightGravel.computeVertexNormals();
+    }
     roadGeo.computeVertexNormals();
     leftRumble.computeVertexNormals();
     rightRumble.computeVertexNormals();
@@ -335,6 +363,16 @@ function RoadAndTerrain() {
       <mesh geometry={roadGeo} receiveShadow frustumCulled={false}>
         <meshStandardMaterial map={asphalt} roughness={0.9} metalness={0.05} />
       </mesh>
+      {circuit && (
+        <>
+          <mesh geometry={leftGravel} receiveShadow frustumCulled={false}>
+            <meshStandardMaterial map={gravelTex} roughness={1} />
+          </mesh>
+          <mesh geometry={rightGravel} receiveShadow frustumCulled={false}>
+            <meshStandardMaterial map={gravelTex} roughness={1} />
+          </mesh>
+        </>
+      )}
       <mesh geometry={leftRumble} receiveShadow frustumCulled={false}>
         <meshStandardMaterial map={rumbleTex} roughness={0.7} polygonOffset polygonOffsetFactor={-1} />
       </mesh>

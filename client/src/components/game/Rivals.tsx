@@ -8,7 +8,7 @@ import { RIVALS } from "@/lib/game/circuits";
 import { carById, type CarId, type DriverId, type PaintId } from "@/lib/game/garage";
 import { buildVehicle, type CarRig } from "@/lib/game/vehicles";
 import { room, myId } from "@/lib/game/net";
-import { roadX, roadY, roadSlope, roadCurvature, ROAD_HALF } from "@/lib/track";
+import { roadX, roadY, roadSlope, roadCurvature, ROAD_HALF, bendAhead, cornerSpeed } from "@/lib/track";
 import { useRally } from "@/lib/stores/useRally";
 import { audioManager } from "@/lib/audio";
 import { animateWobble } from "./Car";
@@ -205,8 +205,9 @@ export function Rivals() {
     }
     const c = carById(r.car).stats;
     const base = (182 / 3.6) * c.top * r.skill;
-    const curv = Math.abs(roadCurvature(r.z + 15));
-    const corner = 1 - Math.min(0.22, curv * 35);
+    // brake for corners like a real driver: look ahead, judge more distance the faster you go
+    const look = 10 + r.speed * 1.1;
+    const corner = Math.min(1, (cornerSpeed(bendAhead(r.z, 0, look)) * (1 + (r.skill - 1) * 2)) / base);
     const diff = r.z - run.z;
     // rubber band so races stay close and exciting
     const band = diff > 80 ? 0.9 : diff > 35 ? 0.96 : diff < -80 ? 1.1 : diff < -35 ? 1.04 : 1;
@@ -216,7 +217,7 @@ export function Rivals() {
     if (r.slow > 0) r.slow -= dt;
     const hurt = r.spin > 0 ? 0.25 : r.slow > 0 ? 0.6 : 1;
     const target = base * corner * band * (r.nitro > 0 ? 1.18 : 1) * hurt;
-    r.speed += (target - r.speed) * Math.min(1, dt * 0.9 * c.accel);
+    r.speed += (target - r.speed) * Math.min(1, dt * (target < r.speed ? 2.2 : 0.9 * c.accel));
     r.z += r.speed * dt;
 
     // racing line: hug the inside of bends, dodge whoever is ahead

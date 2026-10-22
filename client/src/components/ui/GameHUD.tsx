@@ -18,7 +18,7 @@ function MiniMap({ touch }: { touch: boolean }) {
     if (t.kind !== "circuit") return "";
     const pts: string[] = [];
     for (let i = 0; i <= 120; i++) {
-      const [x, y] = loopPoint(i / 120, t.shape.curves);
+      const [x, y] = loopPoint(i / 120, t.shape);
       pts.push(`${x * size},${y * size}`);
     }
     return "M" + pts.join("L");
@@ -39,7 +39,7 @@ function MiniMap({ touch }: { touch: boolean }) {
             return;
           }
           const u = ((r.z % t.shape.length) + t.shape.length) % t.shape.length / t.shape.length;
-          const [x, y] = loopPoint(u, t.shape.curves);
+          const [x, y] = loopPoint(u, t.shape);
           d.setAttribute("cx", String(x * size));
           d.setAttribute("cy", String(y * size));
           d.setAttribute("r", r.me ? "6" : "4");
@@ -75,22 +75,30 @@ function MiniMap({ touch }: { touch: boolean }) {
 }
 
 /** A closed loop whose wiggles come from the circuit's curve settings. */
-function rawLoop(u: number, curves: [number, number, number][]): [number, number] {
+type LoopShape = { curves: [number, number, number][]; corners?: [number, number, number][]; length: number };
+function rawLoop(u: number, shape: LoopShape): [number, number] {
   const a = u * Math.PI * 2;
   let r = 1;
-  for (const [amp, n, p] of curves) r += (amp / 60) * Math.sin(a * (n + 1) + p);
+  for (const [amp, n, p] of shape.curves) r += (amp / 60) * Math.sin(a * (n + 1) + p);
+  for (const [at, amp, w] of shape.corners ?? []) {
+    let d = u - at;
+    if (d > 0.5) d -= 1;
+    else if (d < -0.5) d += 1;
+    const k = (d * shape.length) / w;
+    r += (amp / 40) * Math.exp(-k * k);
+  }
   return [Math.cos(a) * r * 1.15, Math.sin(a) * r * 0.85];
 }
 
 const fitCache = new Map<string, [number, number, number]>();
 /** Point on the circuit loop, fitted into a 0..1 box (with padding). */
-export function loopPoint(u: number, curves: [number, number, number][]): [number, number] {
-  const key = JSON.stringify(curves);
+export function loopPoint(u: number, shape: LoopShape): [number, number] {
+  const key = JSON.stringify(shape);
   let fit = fitCache.get(key);
   if (!fit) {
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
     for (let i = 0; i < 200; i++) {
-      const [x, y] = rawLoop(i / 200, curves);
+      const [x, y] = rawLoop(i / 200, shape);
       minX = Math.min(minX, x); maxX = Math.max(maxX, x);
       minY = Math.min(minY, y); maxY = Math.max(maxY, y);
     }
@@ -98,7 +106,7 @@ export function loopPoint(u: number, curves: [number, number, number][]): [numbe
     fit = [scale, (minX + maxX) / 2, (minY + maxY) / 2];
     fitCache.set(key, fit);
   }
-  const [x, y] = rawLoop(u, curves);
+  const [x, y] = rawLoop(u, shape);
   return [(x - fit[1]) * fit[0] + 0.5, (y - fit[2]) * fit[0] + 0.5];
 }
 
@@ -270,6 +278,38 @@ export function GameHUD({ isFullscreen = false, onToggleFullscreen }: GameHUDPro
         </div>
       )}
       {hud.laps > 0 && <MiniMap touch={touch} />}
+
+      {/* ---- next corner warning ---- */}
+      {hud.laps > 0 && hud.corner !== 0 && (
+        <div
+          aria-live="polite"
+          style={{
+            position: "absolute",
+            top: touch ? "calc(max(12px, env(safe-area-inset-top)) + 128px)" : "calc(max(12px, env(safe-area-inset-top)) + 96px)",
+            left: touch ? "calc(50% - 30px)" : "50%",
+            transform: "translateX(-50%)",
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: touch ? "3px 12px" : "5px 16px",
+            borderRadius: 14,
+            background: "rgba(14,27,36,0.72)",
+            border: `3px solid ${[UI.gold, "#ff9f1c", UI.red][Math.abs(hud.corner) - 1]}`,
+            color: [UI.gold, "#ff9f1c", UI.red][Math.abs(hud.corner) - 1],
+            fontFamily: UI.display,
+            fontSize: touch ? 18 : 24,
+            whiteSpace: "nowrap",
+            pointerEvents: "none",
+            animation: hud.cornerDist < 60 ? "dnrPulse 0.5s ease-in-out infinite" : "none",
+          }}
+        >
+          {hud.corner > 0 && <span>{"◀".repeat(Math.abs(hud.corner))}</span>}
+          <span style={{ color: UI.white, fontSize: touch ? 14 : 17 }}>
+            {Math.abs(hud.corner) === 3 ? "¡FRENA!" : "CURVA"} {Math.round(hud.cornerDist / 10) * 10}m
+          </span>
+          {hud.corner < 0 && <span>{"▶".repeat(Math.abs(hud.corner))}</span>}
+        </div>
+      )}
 
       {/* ---- Rally Loco item slot ---- */}
       {hud.mode === "battle" && (

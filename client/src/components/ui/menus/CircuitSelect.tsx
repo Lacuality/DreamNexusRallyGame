@@ -9,11 +9,11 @@ import { BigButton, UI } from "../gameUi";
 export function CircuitThumb({ c, size = 90 }: { c: Circuit; size?: number }) {
   const pts: string[] = [];
   for (let i = 0; i <= 100; i++) {
-    const [x, y] = loopPoint(i / 100, c.shape.curves);
+    const [x, y] = loopPoint(i / 100, c.shape);
     pts.push(`${x * size},${y * size}`);
   }
   const d = "M" + pts.join("L");
-  const [sx, sy] = loopPoint(0, c.shape.curves);
+  const [sx, sy] = loopPoint(0, c.shape);
   return (
     <svg width={size} height={size} style={{ flex: "none", background: c.night ? "#1a0b2e" : "rgba(0,0,0,0.3)", borderRadius: 14 }}>
       <path d={d} fill="none" stroke="#fff" strokeWidth={6} strokeLinejoin="round" />

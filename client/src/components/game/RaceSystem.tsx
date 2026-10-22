@@ -68,6 +68,7 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
   const nextRow = useRef(60);
   const rowCount = useRef(0);
   const hudTimer = useRef(0);
+  const gravelMsg = useRef(-99);
   const countdownTimer = useRef(0);
   const lastCount = useRef(4);
   const arches = useRef<THREE.Object3D[]>([]);
@@ -347,7 +348,20 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
       run.slowTime -= dt;
       target *= 0.55;
     }
-    if (run.offroad && !run.airborne) target *= car.offroad;
+    if (run.offroad && !run.airborne) {
+      if (circ) {
+        // circuits: grass costs a lot, the gravel trap nearly stops you
+        const deep = Math.abs(run.lat) > ROAD_HALF + 1.4;
+        target = deep ? Math.min(target, 9 + car.offroad * 6) : target * car.offroad * 0.75;
+        if (deep && run.speed > 14) {
+          run.shake = Math.max(run.shake, 0.3);
+          if (run.time - gravelMsg.current > 4) {
+            gravelMsg.current = run.time;
+            rally.getState().popup("¡FUERA DE PISTA! 🪨", COLORS.orange);
+          }
+        }
+      } else target *= car.offroad;
+    }
     if (run.spin > 0) {
       run.spin -= dt;
       target = 8;
@@ -363,7 +377,7 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
     run.latVel += (run.steer * latMax - run.latVel) * Math.min(1, dt * 9 * air);
     const push = -roadCurvature(run.z) * run.speed * run.speed * (circ ? 0.35 : 0.5); // bends push you outward
     run.lat += (run.latVel + push) * dt;
-    const wall = ROAD_HALF + 3.2;
+    const wall = ROAD_HALF + (circ ? 3.6 : 3.2);
     if (Math.abs(run.lat) > wall) {
       run.lat = Math.sign(run.lat) * wall;
       run.latVel = 0;
@@ -782,7 +796,7 @@ export function Scenery() {
         for (const side of [-1, 1]) {
           const away = heading + (side > 0 ? 0 : Math.PI);
           if (nearStart) place("grandstand", z, side * (ROAD_HALF + 4.5), 1, away);
-          else if (i % 3 === 1) place("tireWall", z, side * (ROAD_HALF + 2.6), 1, heading);
+          else if (i % 3 === 1) place("tireWall", z, side * (ROAD_HALF + 4.3), 1, heading);
         }
       }
 

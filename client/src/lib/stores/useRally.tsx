@@ -6,7 +6,7 @@ import { audioManager } from "@/lib/audio";
 import { useAchievements } from "./useAchievements";
 import { run, resetRun, multiplierFor, MAX_HEARTS } from "@/lib/game/run";
 import type { BiomeType } from "@/lib/track";
-import { lapLength } from "@/lib/track";
+import { lapLength, roadCurvature, cornerSpeed } from "@/lib/track";
 import { applySession, car as carLoadout, session, sessionCircuit, type Session } from "@/lib/game/session";
 import { race, resetRace, endRaceState, playerPosition, standings, type Standing } from "@/lib/game/race";
 import { chapterById, CHAPTERS } from "@/lib/game/story";
@@ -37,6 +37,9 @@ export interface HudSnapshot {
   maxHearts: number;
   mode: Session["mode"];
   item: string | null;
+  // next sharp corner on a circuit: 0 = none, 1..3 = how tight (+ left, - right)
+  corner: number;
+  cornerDist: number;
   // circuits
   lap: number;
   laps: number;
@@ -87,6 +90,26 @@ function unlockedNow() {
   return ids;
 }
 
+/** Look ahead for the next corner you have to slow down for. */
+function nextCorner() {
+  for (let d = 20; d <= 150; d += 3) {
+    const c = roadCurvature(run.z + d);
+    const v = cornerSpeed(c);
+    if (v < 45) {
+      // find the apex of this corner
+      let apex = c;
+      for (let e = d; e <= d + 30; e += 3) {
+        const k = roadCurvature(run.z + e);
+        if (Math.abs(k) > Math.abs(apex)) apex = k;
+      }
+      const va = cornerSpeed(apex);
+      const level = va < 25 ? 3 : va < 33 ? 2 : 1;
+      return { corner: Math.sign(apex) * level, cornerDist: d };
+    }
+  }
+  return { corner: 0, cornerDist: 0 };
+}
+
 const emptyHud: HudSnapshot = {
   distance: 0,
   speed: 0,
@@ -102,6 +125,8 @@ const emptyHud: HudSnapshot = {
   maxHearts: MAX_HEARTS,
   mode: "endless",
   item: null,
+  corner: 0,
+  cornerDist: 0,
   lap: 1,
   laps: 0,
   position: 1,
@@ -417,7 +442,9 @@ export const useRally = create<RallyState>()(
     },
 
     syncHud: () => {
+      const bend = race.active ? nextCorner() : { corner: 0, cornerDist: 0 };
       const hud: HudSnapshot = {
+        ...bend,
         distance: Math.floor(run.z),
         speed: Math.floor(run.speed * 3.6),
         score: Math.floor(run.score),

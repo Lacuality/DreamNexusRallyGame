@@ -41,6 +41,9 @@ export interface CircuitShape {
   // [amplitude, whole waves per lap, phase] for the sideways curve and for hills
   curves: [number, number, number][];
   hills: [number, number, number][];
+  // real corners: [position along the lap 0..1, sideways size in metres (+ = left), length in metres].
+  // Each one is a smooth bump, so you get a turn-in, a tight apex and an exit.
+  corners?: [number, number, number][];
 }
 
 export type TrackDef =
@@ -74,8 +77,23 @@ function periodic(z: number, parts: [number, number, number][], L: number) {
   return v;
 }
 
+function cornerSum(z: number, corners: [number, number, number][] | undefined, L: number) {
+  if (!corners) return 0;
+  let v = 0;
+  const zz = ((z % L) + L) % L;
+  for (const [at, amp, w] of corners) {
+    let d = zz - at * L;
+    if (d > L / 2) d -= L;
+    else if (d < -L / 2) d += L;
+    const k = d / w;
+    if (k > -4 && k < 4) v += amp * Math.exp(-k * k);
+  }
+  return v;
+}
+
 export function roadX(z: number) {
-  if (track.kind === "circuit") return periodic(z, track.shape.curves, track.shape.length);
+  if (track.kind === "circuit")
+    return periodic(z, track.shape.curves, track.shape.length) + cornerSum(z, track.shape.corners, track.shape.length);
   return (Math.sin(z * 0.0105) * 10 + Math.sin(z * 0.0041 + 1.3) * 16) * ramp(z);
 }
 
@@ -92,6 +110,21 @@ export function roadSlope(z: number) {
 /** Curvature (d²x/dz²), used to push the car outwards in bends. */
 export function roadCurvature(z: number) {
   return (roadX(z + 2) - 2 * roadX(z) + roadX(z - 2)) / 4;
+}
+
+/** Sharpest bend between `from` and `to` metres ahead (signed curvature, + = bends left). */
+export function bendAhead(z: number, from: number, to: number) {
+  let best = 0;
+  for (let d = from; d <= to; d += 4) {
+    const c = roadCurvature(z + d);
+    if (Math.abs(c) > Math.abs(best)) best = c;
+  }
+  return best;
+}
+
+/** Fastest speed (m/s) a bend of curvature `c` can be held at without sliding wide. */
+export function cornerSpeed(c: number) {
+  return Math.sqrt(9 / (0.35 * Math.max(1e-5, Math.abs(c))));
 }
 
 export function roadPitch(z: number) {
