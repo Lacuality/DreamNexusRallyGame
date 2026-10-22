@@ -8,6 +8,7 @@ import { RaceSystem, Scenery } from "./RaceSystem";
 import { Rivals } from "./Rivals";
 import { Battle } from "./Battle";
 import { Bursts } from "./Bursts";
+import { Police } from "./Police";
 import { Effects } from "./Effects";
 import { session, isBattle } from "@/lib/game/session";
 import { NitroParticles, DustTrail, ExhaustSmoke } from "./ParticleEffects";
@@ -20,6 +21,7 @@ import { PauseMenu } from "../ui/PauseMenu";
 import { MobileControls } from "../ui/MobileControls";
 import { installKeyboard, isTouchDevice } from "@/lib/input";
 import { run } from "@/lib/game/run";
+import { placeOnTrack } from "@/lib/game/physics";
 
 interface GameSceneProps {
   isFullscreen?: boolean;
@@ -87,6 +89,7 @@ export function GameScene({ isFullscreen = false, onToggleFullscreen }: GameScen
             <Car />
             <Rivals />
             {isBattle() && <Battle />}
+            {(session.mode === "endless" || session.mode === "story") && <Police />}
             <RaceSystem carPositionRef={carPositionRef} carSpeedRef={carSpeedRef} />
             <NitroFx carPositionRef={carPositionRef} />
             <DustTrail carPositionRef={carPositionRef} speedRef={carSpeedRef} />
@@ -130,4 +133,7 @@ export function GameScene({ isFullscreen = false, onToggleFullscreen }: GameScen
 }
 
 // Handy for debugging in the browser console
-if (typeof window !== "undefined") (window as any).__rally = run;
+if (typeof window !== "undefined") {
+  (window as any).__rally = run;
+  (window as any).__place = placeOnTrack;
+}

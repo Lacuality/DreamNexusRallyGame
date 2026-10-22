@@ -559,7 +559,53 @@ export class AudioManager {
     }
   }
 
+  private siren: { osc: OscillatorNode; lfo: OscillatorNode; gain: GainNode } | null = null;
+
+  /** Police siren (wailing two-tone). `distance` fades it with how far the cop is. */
+  setSiren(on: boolean, distance = 0) {
+    if (!this.ctx || !this.sfxGain) return;
+    const ctx = this.ctx;
+    if (on && !this.siren) {
+      const osc = ctx.createOscillator();
+      osc.type = "triangle";
+      osc.frequency.value = 760;
+      const lfo = ctx.createOscillator();
+      lfo.type = "sine";
+      lfo.frequency.value = 1.1;
+      const depth = ctx.createGain();
+      depth.gain.value = 160;
+      lfo.connect(depth).connect(osc.frequency);
+      const gain = ctx.createGain();
+      gain.gain.value = 0;
+      osc.connect(gain).connect(this.sfxGain);
+      osc.start();
+      lfo.start();
+      this.siren = { osc, lfo, gain };
+    }
+    if (!this.siren) return;
+    if (!on) {
+      const s = this.siren;
+      this.siren = null;
+      s.gain.gain.setTargetAtTime(0, ctx.currentTime, 0.15);
+      setTimeout(() => {
+        try {
+          s.osc.stop();
+          s.lfo.stop();
+        } catch {}
+      }, 600);
+      return;
+    }
+    const vol = 0.14 * Math.max(0.15, 1 - distance / 70);
+    this.siren.gain.gain.setTargetAtTime(vol, ctx.currentTime, 0.1);
+  }
+
+  playWhistle() {
+    this.tone(2200, 0.12, { type: "square", vol: 0.12, slideTo: 2600 });
+    this.tone(2400, 0.25, { type: "square", vol: 0.12, delay: 0.14, slideTo: 1900 });
+  }
+
   stopEngineSound() {
+    this.setSiren(false);
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
     if (this.engine) {

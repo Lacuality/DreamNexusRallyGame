@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { burst, FX } from "@/lib/game/fx";
+import { placeOnTrack, projectToTrack, surface, groundHeight } from "@/lib/game/physics";
 import { run, multiplierFor, MAX_HEARTS, NITRO_DURATION, INVULNERABLE_TIME, speedGear } from "@/lib/game/run";
 import { input, steerInput } from "@/lib/input";
 import { toWorld, headingAt, roadCurvature, ROAD_HALF, LANES, hash, biomeAt, lapLength, isCircuit } from "@/lib/track";
@@ -296,6 +297,7 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
 
     // countdown 3-2-1-GO
     if (phase === "countdown") {
+      placeOnTrack(run.z, run.lat); // sit on the grid facing down the track
       countdownTimer.current += dt;
       const left = 3 - Math.floor(countdownTimer.current / 0.8);
       if (left !== lastCount.current) {
@@ -401,6 +403,7 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
         // circuits: grass costs a lot, the gravel trap nearly stops you
         const deep = Math.abs(run.lat) > ROAD_HALF + 1.4;
         target = deep ? Math.min(target, 9 + car.offroad * 6) : target * car.offroad * 0.75;
+        if (Math.abs(run.lat) > ROAD_HALF + 3.9) target = Math.min(target, 12 + car.offroad * 8); // grass
         if (deep && run.speed > 14) {
           run.shake = Math.max(run.shake, 0.3);
           if (run.time - gravelMsg.current > 4) {
@@ -414,26 +417,57 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
       run.spin -= dt;
       target = 8;
     }
+    if (run.busted > 0) {
+      run.busted -= dt;
+      target = 0;
+    }
     const rate = target > run.speed ? (run.nitroTime > 0 ? 2.5 : 0.75 * car.accel) : 2.2;
     run.speed += (target - run.speed) * Math.min(1, rate * dt);
 
-    /* --- steering --- */
-    const s = run.spin > 0 ? 0 : steerInput();
+    /* --- steering: the car turns, the road doesn't turn the car --- */
+    const s = run.spin > 0 || run.busted > 0 ? 0 : steerInput();
     run.steer += (s - run.steer) * Math.min(1, dt * 10);
     const drifting = run.drift > 0;
-    const latMax = (7 + run.speed * 0.13) * car.handling * (drifting ? 1.45 : 1);
-    const air = run.airborne ? 0.35 : 1;
-    run.latVel += (run.steer * latMax - run.latVel) * Math.min(1, dt * 9 * air);
-    // bends push you outward (much less while drifting: that's the point of it)
-    const push = -roadCurvature(run.z) * run.speed * run.speed * (circ ? 0.35 : 0.5) * (drifting ? 0.45 : 1);
-    run.lat += (run.latVel + push) * dt;
-    const wall = ROAD_HALF + (circ ? 3.6 : 3.2);
-    if (Math.abs(run.lat) > wall) {
-      run.lat = Math.sign(run.lat) * wall;
-      run.latVel = 0;
-      run.speed *= 0.985;
+    const air = run.airborne ? 0.3 : 1;
+    // how sharp the wheels can turn drops with speed; grip caps how fast you can actually turn
+    const maxWheel = (0.55 - Math.min(0.36, run.speed * 0.006)) * car.handling;
+    const grip = (drifting ? 34 : 21) * car.handling; // m/s² of cornering before you slide wide
+    const wanted = (run.speed / 2.6) * Math.tan(run.steer * maxWheel);
+    const limit = grip / Math.max(4, run.speed);
+    const yawRate = Math.max(-limit, Math.min(limit, wanted)) * air;
+    run.heading += yawRate * dt;
+    run.wx += Math.sin(run.heading) * run.speed * dt;
+    run.wz += Math.cos(run.heading) * run.speed * dt;
+    const prevLat = run.lat;
+    projectToTrack();
+    run.latVel += ((run.lat - prevLat) / Math.max(dt, 1e-3) - run.latVel) * Math.min(1, dt * 8);
+
+    const where = surface();
+    if (!circ && where === "lost") {
+      // endless road: fences keep you in the valley — bounce off them
+      const edge = ROAD_HALF + 3.2;
+      placeOnTrack(run.z, Math.sign(run.lat) * edge);
+      const roadH = headingAt(run.z);
+      let d = run.heading - roadH;
+      while (d > Math.PI) d -= Math.PI * 2;
+      while (d < -Math.PI) d += Math.PI * 2;
+      run.heading = roadH + Math.max(-0.08, Math.min(0.08, d)) - Math.sign(run.lat) * 0.1;
+      run.speed *= 0.9;
+      run.shake = Math.max(run.shake, 0.25);
     }
-    run.offroad = Math.abs(run.lat) > ROAD_HALF + 0.2;
+    if (circ && where === "lost") {
+      run.lostTime += dt;
+      if (run.lostTime > 1.6) {
+        // way off in the fields: the marshals put you back on the track
+        run.lostTime = 0;
+        placeOnTrack(run.z, 0);
+        run.speed = Math.min(run.speed, 8);
+        run.combo = 0;
+        rally.getState().popup("🚁 ¡TE SACARON DEL POTRERO!", COLORS.orange, true);
+        audioManager.playShieldBreak();
+      }
+    } else run.lostTime = 0;
+    run.offroad = where !== "road";
 
     /* --- jump physics --- */
     if (run.airborne) {
@@ -521,7 +555,7 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
       netTimer.current += dt;
       if (session.mode === "online" && netTimer.current > 0.1) {
         netTimer.current = 0;
-        room.send({ t: "pos", id: myId, z: run.z, lat: run.lat, y: run.y, speed: run.speed, sh: run.shield, sp: run.spin > 0 ? run.spin : 0, n: run.nitroTime > 0 });
+        room.send({ t: "pos", id: myId, z: run.z, lat: run.lat, y: run.y, speed: run.speed, sh: run.shield, sp: run.spin > 0 ? run.spin : 0, n: run.nitroTime > 0, h: run.heading });
       }
     }
 
@@ -791,7 +825,7 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
   }
 
   function writeCar() {
-    toWorld(run.z, run.lat, run.y, carPositionRef.current);
+    carPositionRef.current.set(run.wx, groundHeight() + run.y, run.wz);
     carSpeedRef.current = run.speed * 3.6;
     if (rally.getState().phase === "playing") {
       audioManager.updateEngineSound(run.speed * 3.6, run.offroad && !run.airborne, run.nitroTime > 0);

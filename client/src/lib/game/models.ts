@@ -1015,7 +1015,7 @@ function buildBoost() {
     new THREE.PlaneGeometry(2.6, 3.2),
     new THREE.MeshStandardMaterial({ map: tex, emissive: "#ffffff", emissiveMap: tex, emissiveIntensity: 1.2, polygonOffset: true, polygonOffsetFactor: -4 }),
   );
-  pad.rotation.x = -Math.PI / 2;
+  pad.rotation.set(-Math.PI / 2, 0, Math.PI); // chevrons point the way you're driving
   pad.position.y = 0.04;
   g.add(pad);
   return g;

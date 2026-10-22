@@ -14,9 +14,14 @@ export const NITRO_DURATION = 2.2; // seconds
 export const INVULNERABLE_TIME = 1.6; // seconds after a hit
 
 export interface RunState {
-  // car
-  z: number;
-  lat: number; // lateral offset from road centre
+  // car (world position + heading: the car drives freely, see physics.ts)
+  wx: number;
+  wz: number;
+  heading: number; // radians around Y, 0 = +z
+  z: number; // progress along the track (projected)
+  lat: number; // lateral offset from road centre (projected)
+  busted: number; // seconds left stopped by the police
+  lostTime: number; // seconds spent way off the track
   latVel: number;
   speed: number; // m/s
   y: number; // jump height above road
@@ -70,8 +75,13 @@ export interface RunState {
 
 export function freshRun(): RunState {
   return {
+    wx: 0,
+    wz: 0,
+    heading: 0,
     z: 0,
     lat: 0,
+    busted: 0,
+    lostTime: 0,
     latVel: 0,
     speed: 0,
     y: 0,

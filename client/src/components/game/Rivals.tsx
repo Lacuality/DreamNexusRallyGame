@@ -12,6 +12,7 @@ import { toWorld, headingAt, roadCurvature, ROAD_HALF, bendAhead, cornerSpeed } 
 import { useRally } from "@/lib/stores/useRally";
 import { audioManager } from "@/lib/audio";
 import { animateWobble } from "./Car";
+import { shoveLat } from "@/lib/game/physics";
 
 function nameTag(text: string, color: string) {
   const c = document.createElement("canvas");
@@ -108,6 +109,7 @@ export function Rivals() {
         r.shield = !!m.sh;
         if (m.sp && r.spin <= 0) r.spin = m.sp;
         r.nitro = m.n ? 0.3 : 0;
+        if (typeof m.h === "number") r.heading = m.h;
         targets.current.set(m.id, { z: m.z, lat: m.lat, y: m.y, speed: m.speed });
       } else if (m.t === "finish") {
         const r = race.racers.find((x) => x.id === m.id);
@@ -156,9 +158,9 @@ export function Rivals() {
           const cd = bumpCd.current.get(r.id) ?? 0;
           const dir = Math.sign(dlat) || 1;
           const push = 1.8 - Math.abs(dlat);
-          run.lat += dir * push * 0.6;
+          shoveLat(dir * push * 0.6);
           r.lat -= dir * push * 0.4;
-          run.latVel = dir * 4;
+          run.heading += dir * 0.03;
           if (dz > 0) run.speed *= 0.985;
           else r.speed *= 0.96;
           if (t > cd) {
@@ -185,7 +187,7 @@ export function Rivals() {
       }
       const z = r.z;
       toWorld(z, r.lat, r.y, rig.root.position);
-      rig.root.rotation.set(0, headingAt(z) + (r.spin > 0 ? (1 - r.spin) * Math.PI * 4 : 0), 0);
+      rig.root.rotation.set(0, (r.remote && r.heading !== undefined ? r.heading : headingAt(z)) + (r.spin > 0 ? (1 - r.spin) * Math.PI * 4 : 0), 0);
       rig.shield.visible = r.shield;
       rig.wheels.forEach((w) => (w.rotation.x += (r.speed * dt) / 0.42));
       animateWobble(rig, t + r.seed, r.speed, false);

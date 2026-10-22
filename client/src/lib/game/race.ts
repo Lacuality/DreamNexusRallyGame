@@ -24,6 +24,7 @@ export interface Racer {
   shield: boolean;
   item: string | null;
   itemCd: number;
+  heading?: number; // online friends: which way their car is pointing
 }
 
 export const race = {

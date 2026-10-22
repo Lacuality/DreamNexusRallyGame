@@ -2,7 +2,7 @@ import { useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { run } from "@/lib/game/run";
-import { frameAt, toWorld } from "@/lib/track";
+import { groundHeight } from "@/lib/game/physics";
 import { input } from "@/lib/input";
 import { useSettings } from "@/lib/stores/useSettings";
 
@@ -25,9 +25,13 @@ export function Camera() {
     const behind = input.lookBack || input.touchLook;
     const dir = behind ? -1 : 1;
 
-    toWorld(z, run.lat, run.y * 0.6, car.current);
-    const f = frameAt(z - 6 * dir);
-    const tx = Math.sin(f.heading), tz = Math.cos(f.heading);
+    car.current.set(run.wx, groundHeight() + run.y * 0.6, run.wz);
+    // follow the car's own heading, with a little lag so corners feel like corners
+    heading.current += (run.heading - heading.current) * Math.min(1, dt * 6);
+    const h = heading.current;
+    const tx = Math.sin(h), tz = Math.cos(h);
+    const f = { nx: Math.cos(h), nz: -Math.sin(h) };
+    void z;
 
     const portrait = size.width < size.height;
     const back = 8.2 + sp * 1.6 + (portrait ? 3 : 0);
@@ -35,14 +39,11 @@ export function Camera() {
     // behind the car along the road, leaning slightly into the steer / drift
     const lean = (run.latVel * 0.06 + run.driftDir * 0.8 * Math.min(1, run.drift * 3)) * dir;
     tmp.current.set(car.current.x - tx * back * dir - f.nx * lean, 0, car.current.z - tz * back * dir - f.nz * lean);
-    const groundY = toWorld(z - back * dir, 0, 0, { x: 0, y: 0, z: 0 }).y;
-    tmp.current.y = Math.max(car.current.y, groundY) + height;
+    tmp.current.y = car.current.y + height;
     // snap when flipping to the rear view so it doesn't swing through the car
     pos.current.lerp(tmp.current, behind !== lastBehind.current ? 1 : 1 - Math.exp(-dt * 7));
 
-    const aheadZ = z + 9 * dir;
-    toWorld(aheadZ, run.lat * 0.65, 0, tmp.current);
-    tmp.current.y = tmp.current.y * 0.5 + car.current.y * 0.5 + 1.2;
+    tmp.current.set(car.current.x + tx * 9 * dir, car.current.y + 1.2, car.current.z + tz * 9 * dir);
     look.current.lerp(tmp.current, behind !== lastBehind.current ? 1 : 1 - Math.exp(-dt * 10));
     lastBehind.current = behind;
 
@@ -63,5 +64,6 @@ export function Camera() {
   });
 
   const lastBehind = useRef(false);
+  const heading = useRef(0);
   return null;
 }

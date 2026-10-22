@@ -4,7 +4,8 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { buildVehicle, type CarRig } from "@/lib/game/vehicles";
 import { run } from "@/lib/game/run";
-import { toWorld, headingAt, roadPitch } from "@/lib/track";
+import { roadPitch } from "@/lib/track";
+import { groundHeight } from "@/lib/game/physics";
 import { useProfile } from "@/lib/stores/useProfile";
 import type { CarId, DriverId, PaintId } from "@/lib/game/garage";
 
@@ -27,13 +28,13 @@ export function Car() {
   useFrame((state, delta) => {
     const t = state.clock.elapsedTime;
     const z = run.z;
-    toWorld(z, run.lat, run.y, rig.root.position);
-    const x = rig.root.position.x, y = rig.root.position.y - run.y;
+    const y = groundHeight();
+    rig.root.position.set(run.wx, y + run.y, run.wz);
+    const x = run.wx;
 
-    // face along the road, plus steering yaw and the drift slide angle
-    const heading = headingAt(z);
+    // the car faces where it's going, plus the drift slide angle
     const slide = run.driftDir * 0.55 * Math.min(1, run.drift * 4);
-    rig.root.rotation.set(0, heading + run.latVel * 0.025 + slide + (run.spin > 0 ? (1 - run.spin) * Math.PI * 4 : 0), 0);
+    rig.root.rotation.set(0, run.heading + slide + (run.spin > 0 ? (1 - run.spin) * Math.PI * 4 : 0), 0);
     // weight transfer: nose lifts when you accelerate / use nitro, dips when you brake or crash
     const a = anim.current;
     const accel = (run.speed - a.prevSpeed) / Math.max(delta, 1e-3);

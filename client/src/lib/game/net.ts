@@ -19,7 +19,7 @@ export interface Peer {
 export type NetMessage =
   | { t: "start"; circuitId: string; laps: number; at: number; battle?: boolean }
   // sh = shield on, sp = spinning, n = turbo on (so friends see it)
-  | { t: "pos"; id: string; z: number; lat: number; y: number; speed: number; sh?: boolean; sp?: number; n?: boolean }
+  | { t: "pos"; id: string; z: number; lat: number; y: number; speed: number; sh?: boolean; sp?: number; n?: boolean; h?: number }
   // Rally Loco: someone used a power-up
   | { t: "item"; id: string; item: string; z: number; lat: number; speed: number; target?: string }
   // Rally Loco: "I got hit by you" (so the thrower gets the credit)
