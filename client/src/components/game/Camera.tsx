@@ -27,7 +27,11 @@ export function Camera() {
 
     car.current.set(run.wx, groundHeight() + run.y * 0.6, run.wz);
     // follow the car's own heading, with a little lag so corners feel like corners
-    heading.current += (run.heading - heading.current) * Math.min(1, dt * 6);
+    let dh = run.heading - heading.current;
+    while (dh > Math.PI) dh -= Math.PI * 2;
+    while (dh < -Math.PI) dh += Math.PI * 2;
+    heading.current += dh * Math.min(1, dt * 6);
+    (window as any).__camH = heading.current; // debug
     const h = heading.current;
     const tx = Math.sin(h), tz = Math.cos(h);
     const f = { nx: Math.cos(h), nz: -Math.sin(h) };

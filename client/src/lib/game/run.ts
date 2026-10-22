@@ -5,9 +5,9 @@
  */
 export const MAX_HEARTS = 3;
 
-/** Endless rally gear: 0 at the start, +1 every km, up to 6. */
+/** Endless rally gear: 0 at the start, +1 every km, up to 7. */
 export function speedGear(z: number) {
-  return Math.max(0, Math.min(6, Math.floor(z / 1000)));
+  return Math.max(0, Math.min(7, Math.floor(z / 1000)));
 }
 
 export const NITRO_DURATION = 2.2; // seconds

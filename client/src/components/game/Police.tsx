@@ -163,7 +163,8 @@ export function Police() {
         c.z += c.speed * dt;
         if (c.timer <= 0 || run.z - c.z > 120) {
           c.state = "idle";
-          c.nextAt = run.z + 650 + Math.random() * 500;
+          // the further you get, the more often they come after you
+          c.nextAt = run.z + Math.max(380, 650 - run.z * 0.04) + Math.random() * 400;
         }
       }
     }

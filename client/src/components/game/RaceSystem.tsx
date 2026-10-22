@@ -130,7 +130,8 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
   const lane = (i: number) => LANES[((i % 3) + 3) % 3];
 
   const spawnRow = (z: number) => {
-    const d = Math.min(1, z / 3500); // difficulty 0..1
+    const d = Math.min(1, z / 2400); // difficulty 0..1 over the first 2.4 km
+    const d2 = Math.max(0, Math.min(1, (z - 2400) / 4000)); // ...and keeps climbing to ~6 km
     const r = Math.random();
     const li = Math.floor(Math.random() * 3);
     rowCount.current++;
@@ -163,7 +164,8 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
     const patterns: [number, () => number][] = [
       [3, () => { // jar line
         for (let i = 0; i < 6; i++) add("jar", z + i * 4, lane(li));
-        if (Math.random() < 0.5 + d * 0.4) add(solid(), z + 10, lane(li + 1 + Math.floor(Math.random() * 2)));
+        if (Math.random() < 0.55 + d * 0.4) add(solid(), z + 10, lane(li + 1 + Math.floor(Math.random() * 2)));
+        if (d2 > 0.3 && Math.random() < d2) add(solid(), z + 22, lane(li));
         return 32;
       }],
       [1.6, () => { // jar weave
@@ -175,14 +177,23 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
         if (Math.random() < 0.7) for (let i = 0; i < 3; i++) add("jar", z + i * 3.5 - 3.5, lane(li + 1));
         return 24;
       }],
-      [1 + d * 3, () => { // double: thread the gap
+      [d * 1.5 + d2 * 2, () => { // zigzag: three walls, you have to change lane twice
+        add("barrier", z, lane(li));
+        add("barrier", z + 15, lane(li + 1));
+        add("barrier", z + 30, lane(li + 2));
+        add("jar", z + 7, lane(li + 1));
+        add("jar", z + 22, lane(li + 2));
+        add("jar", z + 37, lane(li));
+        return 46;
+      }],
+      [1 + d * 3.5 + d2 * 2, () => { // double: thread the gap
         add(solid(), z, lane(li));
         add(solid(), z, lane(li + 1));
         add("jar", z, lane(li + 2));
         add("jar", z + 4, lane(li + 2));
         return 28;
       }],
-      [0.5 + d * 1.5, () => { // cone slalom
+      [0.5 + d * 2, () => { // cone slalom
         for (let i = 0; i < 4; i++) add("cone", z + i * 11, i % 2 ? 2.4 : -2.4);
         for (let i = 0; i < 4; i++) add("jar", z + i * 11 + 5.5, 0);
         return 50;
@@ -200,7 +211,7 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
         add("jar", z + 6, lane(li + 2));
         return 26;
       }],
-      [["coffee_hills", "andes_highland", "pueblo"].includes(biomeAt(z)) ? 0.9 : 0, () => { // cows crossing!
+      [["coffee_hills", "andes_highland", "pueblo"].includes(biomeAt(z)) ? 0.9 + d * 0.5 : 0, () => { // cows crossing!
         add("cow", z, lane(li) + (Math.random() - 0.5));
         if (Math.random() < 0.5) add("cow", z + 9, lane(li + 1));
         for (let i = 0; i < 3; i++) add("jar", z + 16 + i * 4, lane(li + 2));
@@ -212,7 +223,7 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
         add(solid(), z + 12, lane(li + 2));
         return 30;
       }],
-      [0.55, () => { // power-up
+      [0.55 - d2 * 0.2, () => { // power-up
         const p = Math.random();
         const hearts = run.hearts;
         const kind: PickupKind = hearts < run.maxHearts && p < 0.3 ? "heart" : p < 0.65 ? "nitro" : "shield";
@@ -230,7 +241,7 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
       if (pick <= 0) {
         const len = fn();
         // gaps shrink as the run goes on
-        return len + 26 - d * 14 + Math.random() * 8;
+        return len + 24 - d * 14 - d2 * 6 + Math.random() * 6;
       }
     }
     return 30;
@@ -343,8 +354,8 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
     /* --- speed (car stats apply) --- */
     // endless: the rally shifts up a gear every kilometre (announced on screen)
     const gear = circ ? 0 : speedGear(run.z);
-    const top = ((circ ? 182 : 175 + gear * 10) / 3.6) * car.top;
-    const cruise = circ ? top * 0.93 : ((122 + gear * 12) / 3.6) * car.top;
+    const top = ((circ ? 182 : 178 + gear * 12) / 3.6) * car.top;
+    const cruise = circ ? top * 0.93 : ((124 + gear * 14) / 3.6) * car.top;
     let target = input.up ? top : cruise;
     // brake + steer = drift (Mario Kart style): you keep rolling, turn tighter and charge a mini-turbo
     const braking = input.down || input.touchBrake;
