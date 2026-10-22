@@ -98,6 +98,7 @@ export function GameOverScreen() {
         ["Distance", `${summary.distance.toLocaleString()} m`],
         ["Arequipe jars", summary.jars],
         ["Near misses", summary.nearMisses],
+        ["Comparendos 📸", summary.fines],
         ["Best combo", summary.bestCombo],
         ["Jumps", summary.jumps],
         ["Top speed", `${summary.maxSpeed} km/h`],

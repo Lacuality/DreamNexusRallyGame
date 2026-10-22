@@ -21,6 +21,12 @@ export interface RunState {
   z: number; // progress along the track (projected)
   lat: number; // lateral offset from road centre (projected)
   busted: number; // seconds left stopped by the police
+  wanted: boolean; // ran a red light: the police come now
+  redAhead: boolean; // a red light is close: the brake can stop you completely
+  washing: number; // seconds left while the window washer does your windshield
+  camFlash: number; // white flash from a speed camera
+  fines: number; // comparendos this run
+  cleanCams: number; // speed cameras passed under the limit
   lostTime: number; // seconds spent way off the track
   latVel: number;
   speed: number; // m/s
@@ -81,6 +87,12 @@ export function freshRun(): RunState {
     z: 0,
     lat: 0,
     busted: 0,
+    wanted: false,
+    redAhead: false,
+    washing: 0,
+    camFlash: 0,
+    fines: 0,
+    cleanCams: 0,
     lostTime: 0,
     latVel: 0,
     speed: 0,

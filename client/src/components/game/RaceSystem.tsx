@@ -25,7 +25,7 @@ import { audioManager } from "@/lib/audio";
 
 const CAR_HALF_W = 0.9;
 const CAR_HALF_L = 1.9;
-const SOLID: ObstacleKind[] = ["cone", "rock", "sacks", "barrier", "cow"];
+const SOLID: ObstacleKind[] = ["cone", "rock", "sacks", "barrier", "cow", "transito", "hueco"];
 const SMALL: ObstacleKind[] = ["cone", "sacks"];
 
 interface Entity {
@@ -43,6 +43,8 @@ interface Entity {
   obj: THREE.Object3D;
   seed: number;
   walk: number; // cows: sideways walking speed (m/s)
+  state: number; // semáforo: 0 red, 1 washing, 2 green; fotomulta: 1 once it has flashed
+  timer: number;
 }
 
 const COLORS = {
@@ -73,6 +75,8 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
   const rowCount = useRef(0);
   const hudTimer = useRef(0);
   const gravelMsg = useRef(-99);
+  const nextLight = useRef(1400);
+  const nextCam = useRef(1000);
   const prevSpeed = useRef(0);
   const lastDt = useRef(1 / 60);
   const driftSpark = useRef(0);
@@ -123,8 +127,8 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
     if (mark) mark.visible = true;
     obj.scale.setScalar(1);
     group.current?.add(obj);
-    const walk = kind === "cow" ? (Math.random() < 0.5 ? -1 : 1) * (0.8 + Math.random() * 0.8) : 0;
-    ents.current.push({ kind, pickup, z, lat, h, passed: false, done: false, fly: 0, vx: 0, vy: 0, spin: 0, obj, seed: Math.random() * 10, walk });
+    const walk = kind === "cow" ? (Math.random() < 0.5 ? -1 : 1) * (0.8 + Math.random() * 0.8) : kind === "transito" ? (Math.random() < 0.5 ? -1 : 1) * 0.7 : 0;
+    ents.current.push({ kind, pickup, z, lat, h, passed: false, done: false, fly: 0, vx: 0, vy: 0, spin: 0, obj, seed: Math.random() * 10, walk, state: 0, timer: 0 });
   };
 
   const lane = (i: number) => LANES[((i % 3) + 3) % 3];
@@ -161,7 +165,35 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
       return "barrier";
     };
 
+    // a red light every ~2.5 km (endless mode only): a breather, with the window washer
+    if (session.mode === "endless" && z > nextLight.current) {
+      nextLight.current = z + 2300 + Math.random() * 600;
+      add("semaforo", z + 30, 0);
+      for (let i = 0; i < 4; i++) add("jar", z + i * 4, lane(li));
+      return 70;
+    }
+    // speed cameras: 100 km/h limit, from the second kilometre on
+    if (z > nextCam.current) {
+      nextCam.current = z + 650 + Math.random() * 500;
+      add("fotomulta", z + 20, 0);
+      for (let i = 0; i < 3; i++) add("jar", z + 34 + i * 4, lane(li));
+      return 56;
+    }
+
     const patterns: [number, () => number][] = [
+      [0.8 + d * 1.6, () => { // huecos: potholes you weave around
+        add("hueco", z, lane(li));
+        add("hueco", z + 9, lane(li + 1));
+        if (d > 0.4) add("hueco", z + 18, lane(li + 2));
+        add("jar", z + 5, lane(li + 2));
+        add("jar", z + 14, lane(li));
+        return 30;
+      }],
+      [["pueblo", "comuna_13", "cali", "cartagena"].includes(biomeAt(z)) ? 0.7 + d * 0.6 : 0, () => { // el de tránsito
+        add("transito", z, lane(li) + (Math.random() - 0.5));
+        for (let i = 0; i < 3; i++) add("jar", z + 10 + i * 4, lane(li + 1));
+        return 30;
+      }],
       [3, () => { // jar line
         for (let i = 0; i < 6; i++) add("jar", z + i * 4, lane(li));
         if (Math.random() < 0.55 + d * 0.4) add(solid(), z + 10, lane(li + 1 + Math.floor(Math.random() * 2)));
@@ -308,6 +340,7 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
     const phase = rally.getState().phase;
     const dt = Math.min(delta, 1 / 20);
     lastDt.current = dt;
+    (window as any).__ents = ents.current; // debug
 
     // countdown 3-2-1-GO
     if (phase === "countdown") {
@@ -389,7 +422,7 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
       }
       run.drift = 0;
       driftStage.current = 0;
-      if (braking) target = 40 / 3.6;
+      if (braking) target = run.redAhead ? 0 : 40 / 3.6; // you can only come to a full stop at a red light
     }
 
     // nitro
@@ -435,11 +468,15 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
       run.busted -= dt;
       target = 0;
     }
+    if (run.washing > 0) {
+      run.washing -= dt;
+      target = 0;
+    }
     const rate = target > run.speed ? (run.nitroTime > 0 ? 2.5 : 0.75 * car.accel) : 2.2;
     run.speed += (target - run.speed) * Math.min(1, rate * dt);
 
     /* --- steering (arcade): you slide across the track, bends push you wide --- */
-    const s = run.spin > 0 || run.busted > 0 ? 0 : steerInput();
+    const s = run.spin > 0 || run.busted > 0 || run.washing > 0 ? 0 : steerInput();
     run.steer += (s - run.steer) * Math.min(1, dt * 10);
     const drifting = run.drift > 0;
     const latMax = (7 + run.speed * 0.13) * car.handling * (drifting ? 1.45 : 1);
@@ -594,9 +631,18 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
     });
 
     /* --- collisions --- */
+    run.redAhead = false; // set again below by any red light close ahead (read by next frame's braking)
     for (const e of ents.current) {
       if (e.done) continue;
       const dzE = e.z - run.z;
+      if (e.kind === "semaforo") {
+        semaforo(e, dzE, dt);
+        continue;
+      }
+      if (e.kind === "fotomulta") {
+        if (!e.passed && dzE < -CAR_HALF_L - 0.5) handlePass(e);
+        continue;
+      }
       if (dzE > 6 || dzE < -4) {
         if (!e.passed && dzE < -CAR_HALF_L - 0.5) handlePass(e);
         continue;
@@ -609,6 +655,31 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
       }
       const [hw, hl] = OBSTACLE_SIZE[e.kind as ObstacleKind];
       if (Math.abs(dzE) < CAR_HALF_L + hl && dLat < CAR_HALF_W + hw) {
+        if (e.kind === "hueco") {
+          if (run.airborne) continue; // jumped it
+          e.done = true;
+          run.speed *= 0.6;
+          run.combo = 0;
+          run.shake = Math.max(run.shake, 0.8);
+          run.vy = 3; // a jolt
+          run.airborne = true;
+          run.y = 0.05;
+          audioManager.playSmash();
+          if (navigator.vibrate) navigator.vibrate(60);
+          rally.getState().popup("🕳️ ¡HUECO!", COLORS.orange, true);
+          continue;
+        }
+        if (e.kind === "transito" && run.nitroTime <= 0) {
+          if (run.busted > 0 || run.invulnerable > 0) continue;
+          e.done = true;
+          e.obj.visible = false;
+          run.busted = 2.2;
+          run.combo = 0;
+          run.shake = Math.max(run.shake, 0.5);
+          audioManager.playWhistle();
+          rally.getState().popup("👮 ¡TE COGIÓ EL DE TRÁNSITO! «Pare ahí»", COLORS.red, true);
+          continue;
+        }
         if (e.kind === "ramp") {
           if (!run.airborne) {
             run.airborne = true;
@@ -701,8 +772,72 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
     }
   }
 
+  /** Red light: stop before it and the window washer does your windshield; run it and the police come. */
+  function semaforo(e: Entity, dz: number, dt: number) {
+    const gs = rally.getState();
+    const setLight = (name: "red" | "amber" | "green") => {
+      for (const n of ["red", "amber", "green"] as const) {
+        const l = e.obj.getObjectByName(n) as THREE.Mesh | undefined;
+        if (l) (l.material as THREE.MeshStandardMaterial).emissiveIntensity = n === name ? 2.5 : 0.08;
+      }
+    };
+    if (e.state === 0) {
+      if (dz < 60 && dz > -1) run.redAhead = true;
+      if (dz < 60 && dz > -1 && run.speed < 1.5 && !run.airborne) {
+        // stopped at the light: here comes the mono with the squeegee
+        e.state = 1;
+        e.timer = 2.6;
+        run.washing = 2.6;
+        gs.popup("🧽 «¡Le limpio el vidrio, jefe!»", COLORS.cyan, true);
+        audioManager.playSplash();
+      } else if (dz < -2) {
+        // ran the red
+        e.state = 2;
+        setLight("green");
+        run.wanted = true;
+        run.combo = 0;
+        run.shake = Math.max(run.shake, 0.4);
+        gs.popup("🚨 ¡TE PASASTE EL ROJO!", COLORS.red, true);
+        audioManager.playCrash();
+      }
+    } else if (e.state === 1) {
+      e.timer -= dt;
+      if (e.timer <= 0) {
+        e.state = 2;
+        setLight("green");
+        const tip = Math.min(run.jars, 5);
+        run.jars -= tip;
+        const pts = award(250);
+        gs.popup(`🟢 ¡VERDE! +${pts} · el mono: −${tip} 🍯`, COLORS.gold, true);
+        audioManager.playSuccess();
+      }
+    }
+  }
+
   function handlePass(e: Entity) {
     e.passed = true;
+    if (e.kind === "fotomulta") {
+      const kmh = run.speed * 3.6;
+      const gs = rally.getState();
+      const flash = e.obj.getObjectByName("flash") as THREE.Mesh | undefined;
+      if (flash) (flash.material as THREE.MeshStandardMaterial).emissiveIntensity = 6;
+      run.camFlash = 1;
+      if (kmh > 100 || run.nitroTime > 0) {
+        run.fines++;
+        const fine = Math.min(run.jars, 120);
+        run.jars -= fine;
+        run.score = Math.max(0, run.score - 300);
+        run.combo = 0;
+        audioManager.playShieldBreak();
+        gs.popup(`📸 ¡FOTOMULTA! COMPARENDO −${fine} 🍯`, COLORS.red, true);
+      } else {
+        run.cleanCams++;
+        const pts = award(150);
+        audioManager.playMilestone();
+        gs.popup(`📸 ¡LIMPIO! +${pts}`, COLORS.gold, true);
+      }
+      return;
+    }
     if (e.done || e.pickup || !SOLID.includes(e.kind as ObstacleKind)) return;
     const [hw] = OBSTACLE_SIZE[e.kind as ObstacleKind];
     const gap = Math.abs(e.lat - run.lat) - CAR_HALF_W - hw;
@@ -800,6 +935,10 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
         o.rotation.z += e.spin * 0.7 * dt;
         if (e.fly <= 0) o.visible = false;
       }
+      if (e.kind === "transito" && !e.done) {
+        const paddle = o.getObjectByName("paddle");
+        if (paddle) paddle.rotation.z = Math.sin(t * 6 + e.seed) * 0.5;
+      }
       if (e.walk && !e.done) {
         e.lat += e.walk * dt;
         if (Math.abs(e.lat) > ROAD_HALF - 0.5) {
@@ -824,6 +963,7 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
         o.rotation.y = headingAt(z);
       }
     }
+    run.camFlash = Math.max(0, run.camFlash - dt * 3);
     // feedback decay
     run.shake = Math.max(0, run.shake - dt * 2.2);
     run.flash = Math.max(0, run.flash - dt * 2.5);

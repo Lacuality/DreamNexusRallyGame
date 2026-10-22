@@ -96,6 +96,8 @@ export function GameHUD({ isFullscreen = false, onToggleFullscreen }: GameHUDPro
   const audio = useAudioSettings();
   const touch = isTouchDevice();
   const flashRef = useRef<HTMLDivElement>(null);
+  const camRef = useRef<HTMLDivElement>(null);
+  const washRef = useRef<HTMLDivElement>(null);
 
   // red hit flash + nitro tint driven straight from the live run state
   useEffect(() => {
@@ -104,6 +106,8 @@ export function GameHUD({ isFullscreen = false, onToggleFullscreen }: GameHUDPro
       if (flashRef.current) {
         flashRef.current.style.opacity = String(run.flash * 0.75);
       }
+      if (camRef.current) camRef.current.style.opacity = String(Math.min(1, run.camFlash * 0.9));
+      if (washRef.current) washRef.current.style.display = run.washing > 0 ? "block" : "none";
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
@@ -136,6 +140,19 @@ export function GameHUD({ isFullscreen = false, onToggleFullscreen }: GameHUDPro
           background: "radial-gradient(ellipse at center, rgba(255,0,0,0) 40%, rgba(255,30,30,0.9) 100%)",
         }}
       />
+      {/* speed camera flash */}
+      <div ref={camRef} style={{ position: "absolute", inset: 0, opacity: 0, background: "rgba(255,255,255,0.95)" }} />
+      {/* el mono que limpia los vidrios */}
+      <div ref={washRef} style={{ position: "absolute", inset: 0, display: "none", overflow: "hidden" }}>
+        <style>{`
+          @keyframes dnrFoam { 0% { opacity: 0; } 20% { opacity: 1; } 100% { opacity: 0.15; } }
+          @keyframes dnrSqueegee { 0% { left: -12%; } 100% { left: 100%; } }
+          @keyframes dnrWasherBob { 0%,100% { transform: translateX(-50%) translateY(0); } 50% { transform: translateX(-50%) translateY(-10px); } }
+        `}</style>
+        <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse at 50% 40%, rgba(200,235,255,0.55), rgba(180,220,255,0.35))", animation: "dnrFoam 2.6s linear forwards", backdropFilter: "blur(2px)" }} />
+        <div style={{ position: "absolute", top: 0, bottom: 0, width: "12%", background: "linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.75) 40%, rgba(20,20,20,0.9) 50%, rgba(255,255,255,0) 60%)", animation: "dnrSqueegee 0.9s ease-in-out infinite" }} />
+        <div style={{ position: "absolute", bottom: "22%", left: "50%", fontSize: "clamp(60px, 14vw, 120px)", animation: "dnrWasherBob 0.5s ease-in-out infinite", filter: "drop-shadow(0 6px 10px rgba(0,0,0,0.5))" }}>🧽🙋</div>
+      </div>
       {hud.nitroActive && (
         <div
           style={{

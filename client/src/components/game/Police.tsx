@@ -102,14 +102,15 @@ export function Police() {
 
     if (c.state === "idle") {
       rig.group.visible = false;
-      if (playing && run.z > c.nextAt && run.hearts > 0) {
+      if (playing && (run.z > c.nextAt || run.wanted) && run.hearts > 0 && !run.redAhead && run.washing <= 0) {
+        run.wanted = false;
         c.state = "chase";
         c.z = run.z - 48;
         c.lat = run.lat;
         c.speed = run.speed;
         c.timer = CHASE_TIME;
         audioManager.setSiren(true, 48);
-        gs.popup("👮 ¡UY, EL TOMBO! ¡PÍSALE!", COLORS.red, true);
+        gs.popup(Math.random() < 0.5 ? "👮 ¡UY, LOS AGUACATES! ¡PÍSALE!" : "👮 ¡UY, EL TOMBO! ¡PÍSALE!", COLORS.red, true);
         if (navigator.vibrate) navigator.vibrate([60, 40, 60]);
       }
       return;
@@ -117,7 +118,12 @@ export function Police() {
     rig.group.visible = true;
 
     if (playing) {
-      if (c.state === "chase") {
+      if (c.state === "chase" && (run.redAhead || run.washing > 0)) {
+        // even the tombos stop at a red light: they wait behind you
+        c.speed += (0 - c.speed) * Math.min(1, dt * 3);
+        c.z = Math.min(c.z + c.speed * dt, run.z - 7);
+        audioManager.setSiren(true, run.z - c.z);
+      } else if (c.state === "chase") {
         c.timer -= dt;
         const dz = run.z - c.z;
         // a bit quicker than you, and quicker still when far behind — but nitro leaves it for dead
@@ -141,7 +147,7 @@ export function Police() {
           c.state = "leaving";
           c.timer = 3;
           run.score += 400;
-          gs.popup("🏃 ¡ESCAPASTE DEL TOMBO! +400", COLORS.gold, true);
+          gs.popup("🏃 ¡ESCAPASTE DE LOS AGUACATES! +400", COLORS.gold, true);
           audioManager.playMilestone();
           audioManager.setSiren(false);
         }

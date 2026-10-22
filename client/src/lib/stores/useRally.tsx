@@ -61,6 +61,7 @@ export interface RunSummary {
   distance: number;
   jars: number;
   nearMisses: number;
+  fines: number;
   smashes: number;
   jumps: number;
   bestCombo: number;
@@ -239,6 +240,7 @@ function endRun(completed: boolean) {
     distance: Math.floor(run.z),
     jars: run.jars,
     nearMisses: run.nearMisses,
+    fines: run.fines,
     smashes: run.smashes,
     jumps: run.jumps,
     bestCombo: run.bestCombo,

@@ -32,7 +32,7 @@ function canvasTex(w: number, h: number, draw: (ctx: CanvasRenderingContext2D) =
 /* =========================================================
  * Obstacles
  * ======================================================= */
-export type ObstacleKind = "cone" | "rock" | "sacks" | "barrier" | "puddle" | "ramp" | "cow" | "boost";
+export type ObstacleKind = "cone" | "rock" | "sacks" | "barrier" | "puddle" | "ramp" | "cow" | "boost" | "hueco" | "fotomulta" | "transito" | "semaforo";
 export type PickupKind = "jar" | "nitro" | "shield" | "heart" | "tunjo";
 
 /** half sizes for collision: [halfWidth (lateral), halfLength (z)] */
@@ -45,7 +45,147 @@ export const OBSTACLE_SIZE: Record<ObstacleKind, [number, number]> = {
   ramp: [1.35, 1.8],
   cow: [1.1, 0.6],
   boost: [1.4, 1.6],
+  hueco: [1.0, 0.9],
+  fotomulta: [0, 0], // pass-through: it photographs the whole road
+  transito: [0.6, 0.5],
+  semaforo: [0, 0], // pass-through: the light logic lives in RaceSystem
 };
+
+function buildHueco() {
+  // a pothole: dark hole with a cracked, muddy rim
+  const g = new THREE.Group();
+  const rim = mesh(new THREE.CircleGeometry(1.25, 18), mat("#5a4a3a", { roughness: 1, polygonOffset: true, polygonOffsetFactor: -2 }), false);
+  rim.rotation.x = -Math.PI / 2;
+  rim.position.y = 0.03;
+  rim.scale.set(1, 0.85, 1);
+  const hole = mesh(new THREE.CircleGeometry(0.95, 16), mat("#17120e", { roughness: 1, polygonOffset: true, polygonOffsetFactor: -3 }), false);
+  hole.rotation.x = -Math.PI / 2;
+  hole.position.y = 0.04;
+  hole.scale.set(1, 0.85, 1);
+  for (let i = 0; i < 6; i++) {
+    const crack = mesh(new THREE.BoxGeometry(0.06, 0.01, 0.5 + (i % 3) * 0.2), mat("#2a211a"), false);
+    const a = (i / 6) * Math.PI * 2;
+    crack.position.set(Math.cos(a) * 1.3, 0.045, Math.sin(a) * 1.1);
+    crack.rotation.y = -a + Math.PI / 2;
+    g.add(crack);
+  }
+  g.add(rim, hole);
+  return g;
+}
+
+function buildFotomulta() {
+  // speed camera: grey pole over the road, camera box, warning sign
+  const g = new THREE.Group();
+  const grey = mat("#8e9399", { metalness: 0.5, roughness: 0.5 });
+  const pole = mesh(new THREE.CylinderGeometry(0.14, 0.16, 5.2, 10), grey);
+  pole.position.set(5.6, 2.6, 0);
+  const arm = mesh(new THREE.BoxGeometry(6.4, 0.18, 0.18), grey);
+  arm.position.set(2.6, 5.1, 0);
+  const cam = mesh(new THREE.BoxGeometry(0.6, 0.45, 0.7), mat("#2b2f36"));
+  cam.position.set(1.2, 4.75, 0);
+  const lens = mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.2, 10), mat("#111", { metalness: 0.8, roughness: 0.2 }), false);
+  lens.rotation.x = Math.PI / 2;
+  lens.position.set(1.2, 4.72, -0.42);
+  const flash = mesh(new THREE.BoxGeometry(0.3, 0.2, 0.1), mat("#ffffff", { emissive: "#ffffff", emissiveIntensity: 0.4 }), false);
+  flash.position.set(1.65, 4.8, -0.42);
+  flash.name = "flash";
+  const signTex = canvasTex(256, 192, (ctx) => {
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, 256, 192);
+    ctx.strokeStyle = "#CE1126";
+    ctx.lineWidth = 16;
+    ctx.beginPath();
+    ctx.arc(128, 84, 62, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = "#111";
+    ctx.font = "bold 64px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("100", 128, 86);
+    ctx.font = "bold 30px sans-serif";
+    ctx.fillText("FOTOMULTA 📸", 128, 168);
+  });
+  const sign = mesh(new THREE.PlaneGeometry(1.5, 1.12), new THREE.MeshStandardMaterial({ map: signTex, side: THREE.DoubleSide }), false);
+  sign.position.set(5.6, 3.1, -0.2);
+  sign.rotation.y = Math.PI;
+  g.add(pole, arm, cam, lens, flash, sign);
+  return g;
+}
+
+function buildTransito() {
+  // traffic cop in the road with a PARE paddle (walks across like the cows)
+  const g = new THREE.Group();
+  const green = mat("#1f8a3c");
+  const white = mat("#f2f4f5");
+  const skin = mat("#e2b690");
+  const legs = mesh(new THREE.BoxGeometry(0.5, 0.8, 0.3), green);
+  legs.position.y = 0.4;
+  const torso = mesh(new THREE.BoxGeometry(0.6, 0.7, 0.34), white);
+  torso.position.y = 1.15;
+  const vest = mesh(new THREE.BoxGeometry(0.62, 0.4, 0.36), mat("#ffd23f", { emissive: "#ffb000", emissiveIntensity: 0.4 }));
+  vest.position.y = 1.1;
+  const head = mesh(new THREE.SphereGeometry(0.22, 10, 8), skin);
+  head.position.y = 1.72;
+  const cap = mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.12, 10), green);
+  cap.position.y = 1.9;
+  const arm = mesh(new THREE.BoxGeometry(0.16, 0.7, 0.16), white);
+  arm.position.set(0.45, 1.5, 0);
+  arm.rotation.z = -0.5;
+  const stick = mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.9, 6), mat("#555"), false);
+  stick.position.set(0.72, 1.95, 0);
+  const paddleTex = canvasTex(128, 128, (ctx) => {
+    ctx.fillStyle = "#CE1126";
+    ctx.beginPath();
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2 + Math.PI / 8;
+      ctx.lineTo(64 + Math.cos(a) * 60, 64 + Math.sin(a) * 60);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 40px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("PARE", 64, 66);
+  });
+  const paddle = mesh(new THREE.PlaneGeometry(0.6, 0.6), new THREE.MeshStandardMaterial({ map: paddleTex, side: THREE.DoubleSide, transparent: true }), false);
+  paddle.position.set(0.72, 2.5, 0);
+  paddle.name = "paddle";
+  g.add(legs, torso, vest, head, cap, arm, stick, paddle);
+  // like the cows: faces across the road
+  g.rotation.y = Math.PI / 2;
+  const wrap = new THREE.Group();
+  wrap.add(g);
+  return wrap;
+}
+
+function buildSemaforo() {
+  // traffic light hanging over the road
+  const g = new THREE.Group();
+  const grey = mat("#555b63", { metalness: 0.5, roughness: 0.5 });
+  const pole = mesh(new THREE.CylinderGeometry(0.16, 0.18, 6.2, 10), grey);
+  pole.position.set(5.6, 3.1, 0);
+  const arm = mesh(new THREE.BoxGeometry(6.2, 0.2, 0.2), grey);
+  arm.position.set(2.5, 6.1, 0);
+  const box = mesh(new THREE.BoxGeometry(0.7, 1.9, 0.6), mat("#1e2328"));
+  box.position.set(0, 5.0, 0);
+  const lights = [
+    ["red", "#ff2a2a", 5.6],
+    ["amber", "#ffb000", 5.0],
+    ["green", "#2ecc40", 4.4],
+  ] as const;
+  for (const [name, color, y] of lights) {
+    const l = mesh(new THREE.SphereGeometry(0.2, 10, 8), mat(color, { emissive: color, emissiveIntensity: name === "red" ? 2.5 : 0.08 }), false);
+    l.position.set(0, y, -0.3);
+    l.name = name;
+    g.add(l);
+  }
+  const line = mesh(new THREE.PlaneGeometry(9, 0.5), mat("#ffffff", { polygonOffset: true, polygonOffsetFactor: -3 }), false);
+  line.rotation.x = -Math.PI / 2;
+  line.position.set(0, 0.03, -3);
+  g.add(pole, arm, box, line);
+  return g;
+}
 
 function buildCone() {
   const g = new THREE.Group();
@@ -1380,6 +1520,10 @@ function buildFruitStand() {
 type Builder = () => THREE.Object3D;
 
 const BUILDERS: Record<string, Builder> = {
+  hueco: buildHueco,
+  fotomulta: buildFotomulta,
+  transito: buildTransito,
+  semaforo: buildSemaforo,
   cone: buildCone,
   rock: buildRock,
   sacks: buildSacks,
@@ -1432,7 +1576,7 @@ for (let v = 0; v < 3; v++) BUILDERS[`neonSign${v}`] = () => buildNeonSign(v);
 for (let v = 0; v < 7; v++) BUILDERS[`colonial${v}`] = () => buildColonial(v);
 
 const templates = new Map<string, THREE.Object3D>();
-const SOLID_KINDS = ["cone", "rock", "sacks", "barrier", "cow"] as const;
+const SOLID_KINDS = ["cone", "rock", "sacks", "barrier", "cow", "transito", "hueco"] as const;
 
 /** Pool of cloned models per kind, so we never allocate during a race. */
 export class ModelPool {
