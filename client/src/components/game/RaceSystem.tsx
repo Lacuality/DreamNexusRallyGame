@@ -25,7 +25,7 @@ import { audioManager } from "@/lib/audio";
 
 const CAR_HALF_W = 0.9;
 const CAR_HALF_L = 1.9;
-const SOLID: ObstacleKind[] = ["cone", "rock", "sacks", "barrier", "cow", "transito", "hueco"];
+const SOLID: ObstacleKind[] = ["cone", "rock", "sacks", "barrier", "cow", "limpiavidrios", "hueco"];
 const SMALL: ObstacleKind[] = ["cone", "sacks"];
 
 interface Entity {
@@ -76,7 +76,7 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
   const hudTimer = useRef(0);
   const gravelMsg = useRef(-99);
   const nextLight = useRef(1400);
-  const nextCam = useRef(1000);
+  const nextCam = useRef(1200);
   const prevSpeed = useRef(0);
   const lastDt = useRef(1 / 60);
   const driftSpark = useRef(0);
@@ -127,7 +127,7 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
     if (mark) mark.visible = true;
     obj.scale.setScalar(1);
     group.current?.add(obj);
-    const walk = kind === "cow" ? (Math.random() < 0.5 ? -1 : 1) * (0.8 + Math.random() * 0.8) : kind === "transito" ? (Math.random() < 0.5 ? -1 : 1) * 0.7 : 0;
+    const walk = kind === "cow" ? (Math.random() < 0.5 ? -1 : 1) * (0.8 + Math.random() * 0.8) : kind === "limpiavidrios" ? (Math.random() < 0.5 ? -1 : 1) * 1.3 : 0;
     ents.current.push({ kind, pickup, z, lat, h, passed: false, done: false, fly: 0, vx: 0, vy: 0, spin: 0, obj, seed: Math.random() * 10, walk, state: 0, timer: 0 });
   };
 
@@ -165,16 +165,18 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
       return "barrier";
     };
 
-    // a red light every ~2.5 km (endless mode only): a breather, with the window washer
+    // a semáforo every ~2 km with the limpiavidrios working the lanes: dodge them
     if (session.mode === "endless" && z > nextLight.current) {
-      nextLight.current = z + 2300 + Math.random() * 600;
+      nextLight.current = z + 1700 + Math.random() * 700;
       add("semaforo", z + 30, 0);
-      for (let i = 0; i < 4; i++) add("jar", z + i * 4, lane(li));
-      return 70;
+      add("limpiavidrios", z + 14, lane(li) + (Math.random() - 0.5));
+      if (d > 0.35) add("limpiavidrios", z + 26, lane(li + 1) + (Math.random() - 0.5));
+      for (let i = 0; i < 3; i++) add("jar", z + 36 + i * 4, lane(li + 2));
+      return 64;
     }
-    // speed cameras: 100 km/h limit, from the second kilometre on
+    // speed cameras: 100 km/h limit
     if (z > nextCam.current) {
-      nextCam.current = z + 650 + Math.random() * 500;
+      nextCam.current = z + 1300 + Math.random() * 700;
       add("fotomulta", z + 20, 0);
       for (let i = 0; i < 3; i++) add("jar", z + 34 + i * 4, lane(li));
       return 56;
@@ -187,11 +189,6 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
         if (d > 0.4) add("hueco", z + 18, lane(li + 2));
         add("jar", z + 5, lane(li + 2));
         add("jar", z + 14, lane(li));
-        return 30;
-      }],
-      [["pueblo", "comuna_13", "cali", "cartagena"].includes(biomeAt(z)) ? 0.7 + d * 0.6 : 0, () => { // el de tránsito
-        add("transito", z, lane(li) + (Math.random() - 0.5));
-        for (let i = 0; i < 3; i++) add("jar", z + 10 + i * 4, lane(li + 1));
         return 30;
       }],
       [3, () => { // jar line
@@ -422,7 +419,7 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
       }
       run.drift = 0;
       driftStage.current = 0;
-      if (braking) target = run.redAhead ? 0 : 40 / 3.6; // you can only come to a full stop at a red light
+      if (braking) target = 40 / 3.6;
     }
 
     // nitro
@@ -463,6 +460,17 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
     if (run.spin > 0) {
       run.spin -= dt;
       target = 8;
+    }
+    if (run.pullOver) {
+      run.pullOver = false;
+      const hadShield = run.shield;
+      hurt();
+      if (run.hearts > 0) {
+        run.busted = 2.2;
+        run.combo = 0;
+        audioManager.playWhistle();
+        rally.getState().popup(hadShield ? "🚔 ¡TE PARARON! El escudo pagó el comparendo" : "🚔 ¡TE PARARON! Comparendo por exceso de velocidad −1 ❤️", COLORS.red, true);
+      }
     }
     if (run.busted > 0) {
       run.busted -= dt;
@@ -631,7 +639,6 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
     });
 
     /* --- collisions --- */
-    run.redAhead = false; // set again below by any red light close ahead (read by next frame's braking)
     for (const e of ents.current) {
       if (e.done) continue;
       const dzE = e.z - run.z;
@@ -669,15 +676,27 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
           rally.getState().popup("🕳️ ¡HUECO!", COLORS.orange, true);
           continue;
         }
-        if (e.kind === "transito" && run.nitroTime <= 0) {
-          if (run.busted > 0 || run.invulnerable > 0) continue;
+        if (e.kind === "limpiavidrios") {
+          if (run.nitroTime > 0) {
+            // on nitro he jumps out of the way
+            e.done = true;
+            e.obj.visible = false;
+            rally.getState().popup("🧽 ¡El mono se quitó!", COLORS.cyan);
+            continue;
+          }
+          if (run.busted > 0 || run.washing > 0 || run.invulnerable > 0) continue;
           e.done = true;
           e.obj.visible = false;
-          run.busted = 2.2;
-          run.combo = 0;
-          run.shake = Math.max(run.shake, 0.5);
-          audioManager.playWhistle();
-          rally.getState().popup("👮 ¡TE COGIÓ EL DE TRÁNSITO! «Pare ahí»", COLORS.red, true);
+          const hadShield = run.shield;
+          hurt();
+          if (!hadShield && run.hearts > 0) {
+            // agua, rasqueta y "una monedita": you're stuck for a moment
+            run.washing = 2.0;
+            const tip = Math.min(run.jars, 5);
+            run.jars -= tip;
+            audioManager.playSplash();
+            rally.getState().popup(`🧽 ¡EL MONO TE ECHÓ AGUA! −1 ❤️${tip ? ` −${tip} 🍯` : ""}`, COLORS.red, true);
+          }
           continue;
         }
         if (e.kind === "ramp") {
@@ -772,45 +791,14 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
     }
   }
 
-  /** Red light: stop before it and the window washer does your windshield; run it and the police come. */
-  function semaforo(e: Entity, dz: number, dt: number) {
-    const gs = rally.getState();
-    const setLight = (name: "red" | "amber" | "green") => {
-      for (const n of ["red", "amber", "green"] as const) {
-        const l = e.obj.getObjectByName(n) as THREE.Mesh | undefined;
-        if (l) (l.material as THREE.MeshStandardMaterial).emissiveIntensity = n === name ? 2.5 : 0.08;
-      }
-    };
-    if (e.state === 0) {
-      if (dz < 60 && dz > -1) run.redAhead = true;
-      if (dz < 60 && dz > -1 && run.speed < 1.5 && !run.airborne) {
-        // stopped at the light: here comes the mono with the squeegee
-        e.state = 1;
-        e.timer = 2.6;
-        run.washing = 2.6;
-        gs.popup("🧽 «¡Le limpio el vidrio, jefe!»", COLORS.cyan, true);
-        audioManager.playSplash();
-      } else if (dz < -2) {
-        // ran the red
-        e.state = 2;
-        setLight("green");
-        run.wanted = true;
-        run.combo = 0;
-        run.shake = Math.max(run.shake, 0.4);
-        gs.popup("🚨 ¡TE PASASTE EL ROJO!", COLORS.red, true);
-        audioManager.playCrash();
-      }
-    } else if (e.state === 1) {
-      e.timer -= dt;
-      if (e.timer <= 0) {
-        e.state = 2;
-        setLight("green");
-        const tip = Math.min(run.jars, 5);
-        run.jars -= tip;
-        const pts = award(250);
-        gs.popup(`🟢 ¡VERDE! +${pts} · el mono: −${tip} 🍯`, COLORS.gold, true);
-        audioManager.playSuccess();
-      }
+  /** The semáforo just cycles (red → green → amber); the limpiavidrios around it are the hazard. */
+  function semaforo(e: Entity, _dz: number, dt: number) {
+    e.timer += dt;
+    const phase = e.timer % 8;
+    const want = phase < 3 ? "red" : phase < 7 ? "green" : "amber";
+    for (const n of ["red", "amber", "green"] as const) {
+      const l = e.obj.getObjectByName(n) as THREE.Mesh | undefined;
+      if (l) (l.material as THREE.MeshStandardMaterial).emissiveIntensity = n === want ? 2.5 : 0.08;
     }
   }
 
@@ -935,9 +923,9 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
         o.rotation.z += e.spin * 0.7 * dt;
         if (e.fly <= 0) o.visible = false;
       }
-      if (e.kind === "transito" && !e.done) {
-        const paddle = o.getObjectByName("paddle");
-        if (paddle) paddle.rotation.z = Math.sin(t * 6 + e.seed) * 0.5;
+      if (e.kind === "limpiavidrios" && !e.done) {
+        const sq = o.getObjectByName("squeegee");
+        if (sq) sq.rotation.z = Math.sin(t * 7 + e.seed) * 0.35; // scrubbing the air, waiting for a windshield
       }
       if (e.walk && !e.done) {
         e.lat += e.walk * dt;

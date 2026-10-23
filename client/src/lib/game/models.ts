@@ -32,7 +32,7 @@ function canvasTex(w: number, h: number, draw: (ctx: CanvasRenderingContext2D) =
 /* =========================================================
  * Obstacles
  * ======================================================= */
-export type ObstacleKind = "cone" | "rock" | "sacks" | "barrier" | "puddle" | "ramp" | "cow" | "boost" | "hueco" | "fotomulta" | "transito" | "semaforo";
+export type ObstacleKind = "cone" | "rock" | "sacks" | "barrier" | "puddle" | "ramp" | "cow" | "boost" | "hueco" | "fotomulta" | "limpiavidrios" | "semaforo";
 export type PickupKind = "jar" | "nitro" | "shield" | "heart" | "tunjo";
 
 /** half sizes for collision: [halfWidth (lateral), halfLength (z)] */
@@ -47,7 +47,7 @@ export const OBSTACLE_SIZE: Record<ObstacleKind, [number, number]> = {
   boost: [1.4, 1.6],
   hueco: [1.0, 0.9],
   fotomulta: [0, 0], // pass-through: it photographs the whole road
-  transito: [0.6, 0.5],
+  limpiavidrios: [0.6, 0.5],
   semaforo: [0, 0], // pass-through: the light logic lives in RaceSystem
 };
 
@@ -112,47 +112,44 @@ function buildFotomulta() {
   return g;
 }
 
-function buildTransito() {
-  // traffic cop in the road with a PARE paddle (walks across like the cows)
+function buildLimpiavidrios() {
+  // el mono de los vidrios: squeegee in one hand, spray bottle in the other,
+  // walking up and down between the cars at the semáforo
   const g = new THREE.Group();
-  const green = mat("#1f8a3c");
-  const white = mat("#f2f4f5");
-  const skin = mat("#e2b690");
-  const legs = mesh(new THREE.BoxGeometry(0.5, 0.8, 0.3), green);
+  const jeans = mat("#2f3f6b");
+  const shirt = mat("#e8572a");
+  const skin = mat("#c98f63");
+  const legs = mesh(new THREE.BoxGeometry(0.5, 0.8, 0.3), jeans);
   legs.position.y = 0.4;
-  const torso = mesh(new THREE.BoxGeometry(0.6, 0.7, 0.34), white);
+  const torso = mesh(new THREE.BoxGeometry(0.58, 0.7, 0.32), shirt);
   torso.position.y = 1.15;
-  const vest = mesh(new THREE.BoxGeometry(0.62, 0.4, 0.36), mat("#ffd23f", { emissive: "#ffb000", emissiveIntensity: 0.4 }));
-  vest.position.y = 1.1;
   const head = mesh(new THREE.SphereGeometry(0.22, 10, 8), skin);
   head.position.y = 1.72;
-  const cap = mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.12, 10), green);
-  cap.position.y = 1.9;
-  const arm = mesh(new THREE.BoxGeometry(0.16, 0.7, 0.16), white);
-  arm.position.set(0.45, 1.5, 0);
-  arm.rotation.z = -0.5;
-  const stick = mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.9, 6), mat("#555"), false);
-  stick.position.set(0.72, 1.95, 0);
-  const paddleTex = canvasTex(128, 128, (ctx) => {
-    ctx.fillStyle = "#CE1126";
-    ctx.beginPath();
-    for (let i = 0; i < 8; i++) {
-      const a = (i / 8) * Math.PI * 2 + Math.PI / 8;
-      ctx.lineTo(64 + Math.cos(a) * 60, 64 + Math.sin(a) * 60);
-    }
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = "#fff";
-    ctx.font = "bold 40px sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText("PARE", 64, 66);
-  });
-  const paddle = mesh(new THREE.PlaneGeometry(0.6, 0.6), new THREE.MeshStandardMaterial({ map: paddleTex, side: THREE.DoubleSide, transparent: true }), false);
-  paddle.position.set(0.72, 2.5, 0);
-  paddle.name = "paddle";
-  g.add(legs, torso, vest, head, cap, arm, stick, paddle);
-  // like the cows: faces across the road
+  const hair = mesh(new THREE.SphereGeometry(0.23, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2), mat("#2a1a0e"), false);
+  hair.position.y = 1.76;
+  // right arm up with the squeegee (stick + rubber blade)
+  const armR = mesh(new THREE.BoxGeometry(0.15, 0.7, 0.15), shirt);
+  armR.position.set(0.45, 1.5, 0);
+  armR.rotation.z = -0.9;
+  const stick = mesh(new THREE.CylinderGeometry(0.025, 0.025, 1.0, 6), mat("#777"), false);
+  stick.position.set(0.95, 1.95, 0);
+  stick.rotation.z = -0.4;
+  const blade = mesh(new THREE.BoxGeometry(0.5, 0.06, 0.06), mat("#111"), false);
+  blade.position.set(1.15, 2.4, 0);
+  blade.rotation.z = 0.2;
+  const sq = new THREE.Group();
+  sq.add(stick, blade);
+  sq.name = "squeegee";
+  // left arm with the spray bottle
+  const armL = mesh(new THREE.BoxGeometry(0.15, 0.6, 0.15), shirt);
+  armL.position.set(-0.42, 1.25, 0.05);
+  armL.rotation.z = 0.5;
+  const bottle = mesh(new THREE.CylinderGeometry(0.08, 0.09, 0.32, 8), mat("#4fc3f7", { transparent: true, opacity: 0.85 }), false);
+  bottle.position.set(-0.6, 1.05, 0.12);
+  const nozzle = mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.1, 6), mat("#c62828"), false);
+  nozzle.position.set(-0.6, 1.26, 0.12);
+  g.add(legs, torso, head, hair, armR, sq, armL, bottle, nozzle);
+  // walks across the road, like the cows
   g.rotation.y = Math.PI / 2;
   const wrap = new THREE.Group();
   wrap.add(g);
@@ -1522,7 +1519,7 @@ type Builder = () => THREE.Object3D;
 const BUILDERS: Record<string, Builder> = {
   hueco: buildHueco,
   fotomulta: buildFotomulta,
-  transito: buildTransito,
+  limpiavidrios: buildLimpiavidrios,
   semaforo: buildSemaforo,
   cone: buildCone,
   rock: buildRock,
@@ -1576,7 +1573,7 @@ for (let v = 0; v < 3; v++) BUILDERS[`neonSign${v}`] = () => buildNeonSign(v);
 for (let v = 0; v < 7; v++) BUILDERS[`colonial${v}`] = () => buildColonial(v);
 
 const templates = new Map<string, THREE.Object3D>();
-const SOLID_KINDS = ["cone", "rock", "sacks", "barrier", "cow", "transito", "hueco"] as const;
+const SOLID_KINDS = ["cone", "rock", "sacks", "barrier", "cow", "limpiavidrios", "hueco"] as const;
 
 /** Pool of cloned models per kind, so we never allocate during a race. */
 export class ModelPool {

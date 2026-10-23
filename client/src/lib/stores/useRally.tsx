@@ -39,6 +39,9 @@ export interface HudSnapshot {
   item: string | null;
   battle: boolean;
   gear: number; // endless speed gear (1..7)
+  chaseGap: number; // -1 = no police chase
+  chaseGoal: number;
+  copAhead: number;
   // next sharp corner on a circuit: 0 = none, 1..3 = how tight (+ left, - right)
   corner: number;
   cornerDist: number;
@@ -130,6 +133,9 @@ const emptyHud: HudSnapshot = {
   item: null,
   battle: false,
   gear: 1,
+  chaseGap: -1,
+  chaseGoal: 100,
+  copAhead: -1,
   corner: 0,
   cornerDist: 0,
   lap: 1,
@@ -461,6 +467,9 @@ export const useRally = create<RallyState>()(
         item: run.item,
         battle: isBattle(),
         gear: speedGear(run.z) + 1,
+        chaseGap: run.chaseGap,
+        chaseGoal: run.chaseGoal,
+        copAhead: run.copAhead,
         lap: Math.min(race.laps, race.lap + 1),
         laps: race.active ? race.laps : 0,
         position: race.active ? playerPosition(run.z, null) : 1,

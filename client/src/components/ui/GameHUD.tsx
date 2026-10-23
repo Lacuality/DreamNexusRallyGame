@@ -266,6 +266,54 @@ export function GameHUD({ isFullscreen = false, onToggleFullscreen }: GameHUDPro
       )}
       {hud.laps > 0 && <MiniMap touch={touch} />}
 
+      {/* ---- parked patrol ahead: the rule, right where you need it ---- */}
+      {hud.copAhead >= 0 && hud.chaseGap < 0 && (
+        <div
+          style={{
+            position: "absolute",
+            top: touch ? "calc(max(12px, env(safe-area-inset-top)) + 128px)" : "calc(max(12px, env(safe-area-inset-top)) + 96px)",
+            left: touch ? "calc(50% - 30px)" : "50%",
+            transform: "translateX(-50%)",
+            padding: touch ? "4px 12px" : "6px 16px",
+            borderRadius: 14,
+            background: "rgba(14,27,36,0.78)",
+            border: `3px solid ${hud.nitroActive || hud.speed > 150 ? UI.red : "#1f8a3c"}`,
+            textAlign: "center",
+            whiteSpace: "nowrap",
+          }}
+        >
+          <div style={{ fontFamily: UI.display, fontSize: touch ? 14 : 17, color: hud.nitroActive || hud.speed > 150 ? UI.red : "#7bd389" }}>
+            👮 POLICÍA {Math.round(hud.copAhead / 10) * 10} m
+          </div>
+          <div style={{ fontWeight: 800, fontSize: touch ? 11 : 13 }}>{hud.nitroActive || hud.speed > 150 ? "¡BAJA LA VELOCIDAD! máx 150 · sin nitro" : "máx 150 km/h · sin nitro ✓"}</div>
+        </div>
+      )}
+
+      {/* ---- police chase: how far you are from getting away ---- */}
+      {hud.chaseGap >= 0 && (
+        <div
+          style={{
+            position: "absolute",
+            top: touch ? "calc(max(12px, env(safe-area-inset-top)) + 128px)" : "calc(max(12px, env(safe-area-inset-top)) + 96px)",
+            left: touch ? "calc(50% - 30px)" : "50%",
+            transform: "translateX(-50%)",
+            width: "min(360px, 70vw)",
+            padding: "6px 12px",
+            borderRadius: 14,
+            background: "rgba(14,27,36,0.78)",
+            border: `3px solid ${UI.red}`,
+            textAlign: "center",
+            animation: "dnrPulse 0.7s ease-in-out infinite",
+          }}
+        >
+          <div style={{ fontFamily: UI.display, fontSize: touch ? 14 : 17, color: UI.red }}>🚔 ¡TE PERSIGUEN! ALÉJATE {hud.chaseGoal} m</div>
+          <div style={{ height: 10, borderRadius: 6, background: "rgba(255,255,255,0.15)", overflow: "hidden", marginTop: 4 }}>
+            <div style={{ width: `${Math.max(0, Math.min(100, (hud.chaseGap / hud.chaseGoal) * 100))}%`, height: "100%", background: `linear-gradient(90deg, ${UI.red}, ${UI.gold})`, transition: "width 0.1s linear" }} />
+          </div>
+          <div style={{ fontWeight: 800, fontSize: 12, marginTop: 2 }}>{Math.max(0, Math.round(hud.chaseGap))} m — ¡nitro y acelera!</div>
+        </div>
+      )}
+
       {/* ---- next corner warning ---- */}
       {hud.laps > 0 && hud.corner !== 0 && (
         <div
