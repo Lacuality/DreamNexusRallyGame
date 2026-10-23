@@ -684,19 +684,23 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
             rally.getState().popup("🧽 ¡El mono se quitó!", COLORS.cyan);
             continue;
           }
-          if (run.busted > 0 || run.washing > 0 || run.invulnerable > 0) continue;
+          if (run.busted > 0 || run.washing > 0) continue;
           e.done = true;
           e.obj.visible = false;
-          const hadShield = run.shield;
-          hurt();
-          if (!hadShield && run.hearts > 0) {
-            // agua, rasqueta y "una monedita": you're stuck for a moment
-            run.washing = 2.0;
-            const tip = Math.min(run.jars, 5);
-            run.jars -= tip;
-            audioManager.playSplash();
-            rally.getState().popup(`🧽 ¡EL MONO TE ECHÓ AGUA! −1 ❤️${tip ? ` −${tip} 🍯` : ""}`, COLORS.red, true);
+          if (run.shield) {
+            // the shield keeps the water off
+            rally.getState().popup("🧽 El mono rebotó en el escudo", COLORS.cyan);
+            continue;
           }
+          // agua, rasqueta y "una monedita": you're stuck for a moment and it costs jars (not a life)
+          run.washing = 2.0;
+          run.combo = 0;
+          run.speed *= 0.3;
+          run.shake = Math.max(run.shake, 0.4);
+          const tip = Math.min(run.jars, 25);
+          run.jars -= tip;
+          audioManager.playSplash();
+          rally.getState().popup(`🧽 ¡EL MONO TE ECHÓ AGUA!${tip ? ` «Una monedita» −${tip} 🍯` : " «¿Y la monedita?»"}`, COLORS.orange, true);
           continue;
         }
         if (e.kind === "ramp") {
