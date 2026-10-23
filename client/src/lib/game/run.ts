@@ -17,7 +17,8 @@ export interface RunState {
   // car (world position + heading: the car drives freely, see physics.ts)
   wx: number;
   wz: number;
-  heading: number; // radians around Y, 0 = +z
+  heading: number; // radians around Y, 0 = +z (the road's direction under the car)
+  rel: number; // how far the car is turned relative to the road (+ = left), radians
   z: number; // progress along the track (projected)
   lat: number; // lateral offset from road centre (projected)
   busted: number; // seconds left stopped by the police
@@ -87,6 +88,7 @@ export function freshRun(): RunState {
     wx: 0,
     wz: 0,
     heading: 0,
+    rel: 0,
     z: 0,
     lat: 0,
     busted: 0,

@@ -483,22 +483,25 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
     const rate = target > run.speed ? (run.nitroTime > 0 ? 2.5 : 0.75 * car.accel) : 2.2;
     run.speed += (target - run.speed) * Math.min(1, rate * dt);
 
-    /* --- steering (arcade): you slide across the track, bends push you wide --- */
+    /* --- steering: the car turns relative to the road and moves sideways by its angle --- */
     const s = run.spin > 0 || run.busted > 0 || run.washing > 0 ? 0 : steerInput();
-    run.steer += (s - run.steer) * Math.min(1, dt * 10);
+    run.steer += (s - run.steer) * Math.min(1, dt * 8);
     const drifting = run.drift > 0;
-    const latMax = (7 + run.speed * 0.13) * car.handling * (drifting ? 1.45 : 1);
+    // how far the wheels can turn: nimble at low speed, calmer flat out; drifting lets you turn in harder
+    const maxRel = (0.46 - Math.min(0.24, run.speed * 0.0045)) * car.handling * (drifting ? 1.5 : 1);
     const air = run.airborne ? 0.35 : 1;
-    run.latVel += (run.steer * latMax - run.latVel) * Math.min(1, dt * 9 * air);
+    run.rel += (run.steer * maxRel - run.rel) * Math.min(1, dt * 6 * air); // turn in, and self-centre when you let go
+    run.latVel = run.speed * Math.sin(run.rel);
     // the faster you go, the harder a bend throws you outward; drifting holds the line
-    const push = -roadCurvature(run.z) * run.speed * run.speed * (circ ? 0.2 : 0.5) * (drifting ? 0.55 : 1);
+    const push = -roadCurvature(run.z) * run.speed * run.speed * (circ ? 0.16 : 0.35) * (drifting ? 0.6 : 1);
     run.lat += (run.latVel + push) * dt;
 
     const wall = ROAD_HALF + (circ ? 3.85 : 3.2);
     if (Math.abs(run.lat) > wall) {
       const hard = circ && Math.abs(run.latVel + push) > 6 && run.speed > 25;
       run.lat = Math.sign(run.lat) * wall;
-      run.latVel = circ ? -Math.sign(run.lat) * 1.5 : 0;
+      run.rel = -Math.sign(run.lat) * 0.06; // nudged back toward the road
+      run.latVel = 0;
       run.speed *= hard ? 0.8 : 0.985;
       if (hard) {
         run.shake = Math.max(run.shake, 0.45);

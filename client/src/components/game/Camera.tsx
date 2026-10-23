@@ -27,7 +27,8 @@ export function Camera() {
 
     car.current.set(run.wx, groundHeight() + run.y * 0.6, run.wz);
     // follow the car's own heading, with a little lag so corners feel like corners
-    let dh = run.heading - heading.current;
+    // the view turns into the corner with you (a bit less than the car does)
+    let dh = run.heading + run.rel * 0.45 - heading.current;
     while (dh > Math.PI) dh -= Math.PI * 2;
     while (dh < -Math.PI) dh += Math.PI * 2;
     heading.current += dh * Math.min(1, dt * 6);
@@ -41,7 +42,7 @@ export function Camera() {
     const back = 8.2 + sp * 1.6 + (portrait ? 3 : 0);
     const height = 3.4 + sp * 0.4 + (portrait ? 1.6 : 0);
     // behind the car along the road, leaning slightly into the steer / drift
-    const lean = (run.latVel * 0.06 + run.driftDir * 0.8 * Math.min(1, run.drift * 3)) * dir;
+    const lean = (run.rel * 1.2 + run.driftDir * 0.8 * Math.min(1, run.drift * 3)) * dir;
     tmp.current.set(car.current.x - tx * back * dir - f.nx * lean, 0, car.current.z - tz * back * dir - f.nz * lean);
     tmp.current.y = car.current.y + height;
     // snap when flipping to the rear view so it doesn't swing through the car

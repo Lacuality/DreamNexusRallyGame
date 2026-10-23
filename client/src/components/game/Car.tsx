@@ -34,7 +34,7 @@ export function Car() {
 
     // the car faces where it's going, plus the drift slide angle
     const slide = run.driftDir * 0.55 * Math.min(1, run.drift * 4);
-    rig.root.rotation.set(0, run.heading + slide + (run.spin > 0 ? (1 - run.spin) * Math.PI * 4 : 0), 0);
+    rig.root.rotation.set(0, run.heading + run.rel + slide + (run.spin > 0 ? (1 - run.spin) * Math.PI * 4 : 0), 0);
     // weight transfer: nose lifts when you accelerate / use nitro, dips when you brake or crash
     const a = anim.current;
     const accel = (run.speed - a.prevSpeed) / Math.max(delta, 1e-3);
