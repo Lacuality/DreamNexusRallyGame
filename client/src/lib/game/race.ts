@@ -66,6 +66,7 @@ export function playerPosition(playerZ: number, playerFinishedAt: number | null)
 }
 
 export interface Standing {
+  id: string; // "me" or the racer id
   name: string;
   time: number | null; // finish time, null = did not finish
   isPlayer: boolean;
@@ -76,14 +77,14 @@ export interface Standing {
 export function standings(playerName: string, playerDriver: string, playerTime: number, now: number): Standing[] {
   const total = race.laps * race.length;
   const rows: (Standing & { sortKey: number })[] = [
-    { name: playerName || "You", time: playerTime, isPlayer: true, driver: playerDriver, sortKey: playerTime },
+    { id: "me", name: playerName || "You", time: playerTime, isPlayer: true, driver: playerDriver, sortKey: playerTime },
   ];
   for (const r of race.racers) {
-    if (r.finishedAt !== null) rows.push({ name: r.name, time: r.finishedAt, isPlayer: false, driver: r.driver, sortKey: r.finishedAt });
+    if (r.finishedAt !== null) rows.push({ id: r.id, name: r.name, time: r.finishedAt, isPlayer: false, driver: r.driver, sortKey: r.finishedAt });
     else {
       const left = Math.max(0, total - r.z);
       const eta = now + left / Math.max(10, r.speed || 30);
-      rows.push({ name: r.name, time: r.remote ? null : eta, isPlayer: false, driver: r.driver, sortKey: r.remote ? 1e9 - r.z : eta });
+      rows.push({ id: r.id, name: r.name, time: r.remote ? null : eta, isPlayer: false, driver: r.driver, sortKey: r.remote ? 1e9 - r.z : eta });
     }
   }
   return rows.sort((a, b) => a.sortKey - b.sortKey).map(({ sortKey, ...s }) => s);

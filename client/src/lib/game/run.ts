@@ -23,6 +23,7 @@ export interface RunState {
   lat: number; // lateral offset from road centre (projected)
   busted: number; // seconds left stopped by the police
   wanted: boolean; // ran a red light: the police come now
+  hop: number; // seconds left of the little hop at the start of a drift
   pullOver: boolean; // the police caught you: RaceSystem applies the stop + lost life
   chaseGap: number; // metres between you and the chasing patrol (-1 = no chase)
   chaseGoal: number; // metres you need to get away
@@ -93,6 +94,7 @@ export function freshRun(): RunState {
     lat: 0,
     busted: 0,
     wanted: false,
+    hop: 0,
     pullOver: false,
     chaseGap: -1,
     chaseGoal: 100,

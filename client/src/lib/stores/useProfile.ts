@@ -27,6 +27,8 @@ export interface ProfileData {
   story: Record<string, number>; // chapter id -> stars (0..3)
   bestLaps: Record<string, number>; // circuit id -> seconds
   circuitWins: Record<string, number>;
+  trophies: Record<string, "gold" | "silver" | "bronze">; // `${cupId}:${cc}`
+  bestTimes: Record<string, number>; // circuit id -> full race seconds (time trial)
 }
 
 const KEY = "dreamNexusRallyProfile";
@@ -51,6 +53,8 @@ const fresh = (): ProfileData => ({
   story: {},
   bestLaps: {},
   circuitWins: {},
+  trophies: {},
+  bestTimes: {},
 });
 
 function load(): ProfileData {
@@ -87,6 +91,8 @@ interface ProfileState extends ProfileData {
   setStoryStars: (chapter: string, stars: number, isFinal: boolean) => void;
   recordLap: (circuit: string, seconds: number) => boolean; // true if new best
   recordWin: (circuit: string) => void;
+  recordTrophy: (key: string, trophy: "gold" | "silver" | "bronze") => void;
+  recordTime: (circuit: string, seconds: number) => boolean;
 }
 
 export const useProfile = create<ProfileState>((set, get) => {
@@ -103,6 +109,8 @@ export const useProfile = create<ProfileState>((set, get) => {
       story: s.story,
       bestLaps: s.bestLaps,
       circuitWins: s.circuitWins,
+      trophies: s.trophies,
+      bestTimes: s.bestTimes,
     };
     try {
       localStorage.setItem(KEY, JSON.stringify(data));
@@ -189,6 +197,24 @@ export const useProfile = create<ProfileState>((set, get) => {
       const prev = s.bestLaps[circuit];
       if (prev && prev <= seconds) return false;
       set({ bestLaps: { ...s.bestLaps, [circuit]: seconds } });
+      save();
+      return true;
+    },
+
+    recordTrophy: (key, trophy) => {
+      const s = get();
+      const rank = { gold: 3, silver: 2, bronze: 1 } as const;
+      const prev = s.trophies[key];
+      if (prev && rank[prev] >= rank[trophy]) return;
+      set({ trophies: { ...s.trophies, [key]: trophy } });
+      save();
+    },
+
+    recordTime: (circuit, seconds) => {
+      const s = get();
+      const prev = s.bestTimes[circuit];
+      if (prev && prev <= seconds) return false;
+      set({ bestTimes: { ...s.bestTimes, [circuit]: seconds } });
       save();
       return true;
     },

@@ -10,6 +10,8 @@ import { lapLength, roadCurvature, cornerSpeed } from "@/lib/track";
 import { applySession, car as carLoadout, session, sessionCircuit, isBattle, type Session } from "@/lib/game/session";
 import { race, resetRace, endRaceState, playerPosition, standings, type Standing } from "@/lib/game/race";
 import { chapterById, CHAPTERS } from "@/lib/game/story";
+import { cup, recordCupRace, cupPlayerRank, trophyFor, cupById, startCup, clearCup, cupCircuit, type EngineClass } from "@/lib/game/cup";
+import { RIVALS, circuitById } from "@/lib/game/circuits";
 import { useProfile } from "./useProfile";
 import { DRIVERS, PAINTS, isUnlocked } from "@/lib/game/garage";
 
@@ -39,6 +41,7 @@ export interface HudSnapshot {
   item: string | null;
   battle: boolean;
   gear: number; // endless speed gear (1..7)
+  cupLabel: string; // e.g. "COPA ANDINA · 2/3"
   chaseGap: number; // -1 = no police chase
   chaseGoal: number;
   copAhead: number;
@@ -82,6 +85,11 @@ export interface RunSummary {
   raceTime?: number;
   stars?: number;
   chapterId?: string;
+  // Grand Prix
+  cup?: { cupId: string; cc: number; round: number; rounds: number; finished: boolean; rank: number; trophy: string | null; table: { id: string; name: string; driver: string; points: number; lastPos: number }[] };
+  // time trial
+  newBestTime?: boolean;
+  bestTime?: number;
   reward: number; // jars added to the wallet
   newUnlocks: string[]; // drivers / paint jobs unlocked by this race
 }
@@ -133,6 +141,7 @@ const emptyHud: HudSnapshot = {
   item: null,
   battle: false,
   gear: 1,
+  cupLabel: "",
   chaseGap: -1,
   chaseGoal: 100,
   copAhead: -1,
@@ -203,6 +212,8 @@ interface RallyState {
   gameOver: () => void;
   restart: () => void;
   syncHud: () => void;
+  startCup: (cupId: string, cc: EngineClass) => void;
+  nextCupRound: () => void;
   popup: (text: string, color?: string, big?: boolean) => void;
   showBanner: (title: string, subtitle?: string) => void;
   loadHighScore: () => void;
@@ -272,9 +283,26 @@ function endRun(completed: boolean) {
       summary.bestLap = best;
       summary.newBestLap = profile.recordLap(c.id, best);
     }
-    if (completed && sess.mode !== "online") {
+    if (completed && sess.mode !== "online" && sess.mode !== "timetrial") {
       bonus += [0, 150, 100, 70, 50, 40, 30][Math.min(pos, 6)] ?? 30;
       if (pos === 1) profile.recordWin(c.id);
+    }
+    if (sess.mode === "timetrial" && completed) {
+      summary.newBestTime = profile.recordTime(c.id, run.time);
+      summary.bestTime = useProfile.getState().bestTimes[c.id];
+      bonus += 40;
+    }
+    // Grand Prix: add this round's points to the cup table
+    if (sess.mode === "gp" && cup) {
+      if (completed) recordCupRace(cup, summary.standings.map((s) => s.id));
+      else recordCupRace(cup, [...summary.standings.filter((s) => !s.isPlayer).map((s) => s.id), "me"]);
+      const rank = cupPlayerRank(cup);
+      const trophy = cup.finished ? trophyFor(rank) : null;
+      if (trophy) {
+        profile.recordTrophy(`${cup.cupId}:${cup.cc}`, trophy);
+        bonus += trophy === "gold" ? 400 : trophy === "silver" ? 250 : 150;
+      }
+      summary.cup = { cupId: cup.cupId, cc: cup.cc, round: cup.round, rounds: cupById(cup.cupId).circuits.length, finished: cup.finished, rank, trophy, table: cup.table.map((r) => ({ ...r })) };
     }
   }
 
@@ -411,6 +439,21 @@ export const useRally = create<RallyState>()(
       }));
     },
 
+    startCup: (cupId, cc) => {
+      const p = useProfile.getState();
+      const c = startCup(cupId, cc, { name: get().playerName || "You", driver: p.driver }, RIVALS.map((r, i) => ({ id: `ai${i}`, name: r.name, driver: r.driver })));
+      const def = cupCircuit(c)!;
+      get().start({ mode: "gp", circuitId: def.id, laps: def.laps, cc, cupId, round: 0 });
+    },
+
+    nextCupRound: () => {
+      if (!cup || cup.finished) return;
+      cup.round++;
+      const def = cupCircuit(cup);
+      if (!def) return;
+      get().start({ mode: "gp", circuitId: def.id, laps: def.laps, cc: cup.cc, cupId: cup.cupId, round: cup.round });
+    },
+
     beginRace: () => {
       if (get().phase === "countdown") set({ phase: "playing" });
     },
@@ -450,6 +493,7 @@ export const useRally = create<RallyState>()(
       audioManager.stopEngineSound();
       audioManager.duckMusic(1);
       audioManager.playBackgroundMusic();
+      clearCup();
       set({ phase: "menu", popups: [], banner: null });
     },
 
@@ -467,6 +511,7 @@ export const useRally = create<RallyState>()(
         item: run.item,
         battle: isBattle(),
         gear: speedGear(run.z) + 1,
+        cupLabel: session.mode === "gp" && cup ? `${cupById(cup.cupId).name.toUpperCase()} · ${cup.round + 1}/${cupById(cup.cupId).circuits.length} · ${cup.cc}cc` : session.mode === "timetrial" ? "CONTRARRELOJ" : "",
         chaseGap: run.chaseGap,
         chaseGoal: run.chaseGoal,
         copAhead: run.copAhead,

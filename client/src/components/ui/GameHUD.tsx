@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Pause, Volume2, VolumeX, Maximize, Minimize, Heart, Shield, Zap } from "lucide-react";
 import { useRally } from "@/lib/stores/useRally";
 import { MAX_HEARTS, run } from "@/lib/game/run";
@@ -97,6 +97,26 @@ export function GameHUD({ isFullscreen = false, onToggleFullscreen }: GameHUDPro
   const touch = isTouchDevice();
   const flashRef = useRef<HTMLDivElement>(null);
   const camRef = useRef<HTMLDivElement>(null);
+  // item roulette: when you grab a box the slot spins through the items before landing
+  const [spin, setSpin] = useState<string | null>(null);
+  const prevItem = useRef<string | null>(null);
+  useEffect(() => {
+    if (hud.item && !prevItem.current) {
+      const keys = Object.keys(ITEMS);
+      let i = 0;
+      const id = setInterval(() => setSpin(keys[i++ % keys.length]), 70);
+      const stop = setTimeout(() => {
+        clearInterval(id);
+        setSpin(null);
+      }, 900);
+      prevItem.current = hud.item;
+      return () => {
+        clearInterval(id);
+        clearTimeout(stop);
+      };
+    }
+    prevItem.current = hud.item;
+  }, [hud.item]);
   const washRef = useRef<HTMLDivElement>(null);
 
   // red hit flash + nitro tint driven straight from the live run state
@@ -262,6 +282,7 @@ export function GameHUD({ isFullscreen = false, onToggleFullscreen }: GameHUDPro
             </div>
             <div style={{ fontWeight: 800, fontSize: touch ? 13 : 15 }}>{formatTime(hud.lapTime)}</div>
           </div>
+          {hud.cupLabel && !touch && <div style={{ fontWeight: 900, fontSize: 11, color: UI.warm, letterSpacing: "0.08em" }}>{hud.cupLabel}</div>}
         </div>
       )}
       {hud.laps > 0 && <MiniMap touch={touch} />}
@@ -373,7 +394,7 @@ export function GameHUD({ isFullscreen = false, onToggleFullscreen }: GameHUDPro
               boxShadow: hud.item ? "0 0 24px rgba(255,210,63,0.7)" : "none",
             }}
           >
-            {hud.item ? ITEMS[hud.item as keyof typeof ITEMS].emoji : "❔"}
+            {spin ? ITEMS[spin as keyof typeof ITEMS].emoji : hud.item ? ITEMS[hud.item as keyof typeof ITEMS].emoji : "❔"}
           </div>
           {!touch && (
             <div style={{ fontWeight: 900, textShadow: "0 2px 4px #000" }}>

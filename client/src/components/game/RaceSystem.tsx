@@ -10,7 +10,7 @@ import { toWorld, headingAt, frameAt, roadCurvature, ROAD_HALF, LANES, hash, bio
 const tmpV = { x: 0, y: 0, z: 0 };
 import { ModelPool, OBSTACLE_SIZE, type ObstacleKind, type PickupKind, makeArch, makeFinishLine } from "@/lib/game/models";
 import { useRally, goalProgress } from "@/lib/stores/useRally";
-import { car, session } from "@/lib/game/session";
+import { car, session, classSpeed } from "@/lib/game/session";
 import { chapterById } from "@/lib/game/story";
 import { race } from "@/lib/game/race";
 import { room, myId } from "@/lib/game/net";
@@ -82,6 +82,7 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
   const driftSpark = useRef(0);
   const driftStage = useRef(0);
   const countdownTimer = useRef(0);
+  const holdStart = useRef(-1);
   const lastCount = useRef(4);
   const arches = useRef<THREE.Object3D[]>([]);
   const netTimer = useRef(0);
@@ -343,6 +344,10 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
     if (phase === "countdown") {
       placeOnTrack(run.z, run.lat); // sit on the grid facing down the track
       countdownTimer.current += dt;
+      // rocket start: hold ↑ just as it goes green; hold it too long before and the engine floods
+      if (input.up || input.touchNitro) {
+        if (holdStart.current < 0) holdStart.current = countdownTimer.current;
+      } else holdStart.current = -1;
       const left = 3 - Math.floor(countdownTimer.current / 0.8);
       if (left !== lastCount.current) {
         lastCount.current = left;
@@ -355,9 +360,21 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
           audioManager.playCountdown(true);
           audioManager.startEngineSound();
           rally.getState().beginRace();
-          rally.getState().popup("GO!", COLORS.gold, true);
+          const held = holdStart.current >= 0 ? countdownTimer.current - holdStart.current : -1;
+          if (held >= 0 && held < 0.55 && race.active) {
+            run.nitroTime = Math.max(run.nitroTime, 1.4);
+            run.speed = Math.max(run.speed, 12);
+            fxCar(FX.nitro, 24, 8, 3);
+            audioManager.playNitro();
+            rally.getState().popup("🚀 ¡ARRANCÓN PERFECTO!", COLORS.orange, true);
+          } else if (held >= 1.3 && race.active) {
+            run.busted = 1.1; // flooded engine: you sit there while they all go past
+            audioManager.playShieldBreak();
+            rally.getState().popup("💨 ¡SE AHOGÓ EL MOTOR! (muy temprano)", COLORS.red, true);
+          } else rally.getState().popup("GO!", COLORS.gold, true);
           countdownTimer.current = 0;
           lastCount.current = 4;
+          holdStart.current = -1;
         }
       }
       updateVisuals(dt, state.clock.elapsedTime);
@@ -384,7 +401,7 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
     /* --- speed (car stats apply) --- */
     // endless: the rally shifts up a gear every kilometre (announced on screen)
     const gear = circ ? 0 : speedGear(run.z);
-    const top = ((circ ? 182 : 178 + gear * 12) / 3.6) * car.top;
+    const top = ((circ ? 182 * classSpeed() : 178 + gear * 12) / 3.6) * car.top;
     const cruise = circ ? top * 0.93 : ((124 + gear * 14) / 3.6) * car.top;
     let target = input.up ? top : cruise;
     // brake + steer = drift (Mario Kart style): you keep rolling, turn tighter and charge a mini-turbo
@@ -392,7 +409,11 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
     const steerNow = steerInput();
     const canDrift = braking && steerNow !== 0 && run.speed > 14 && !run.airborne && run.spin <= 0;
     if (canDrift) {
-      if (run.drift === 0) run.driftDir = steerNow;
+      if (run.drift === 0) {
+        run.driftDir = steerNow;
+        run.hop = 0.28; // the little Mario Kart hop into the slide
+        audioManager.playClick();
+      }
       run.drift += dt;
       target = Math.max(run.speed * 0.985, cruise * 0.72);
       const stage = run.drift > 2 ? 2 : run.drift > 1 ? 1 : 0;
@@ -603,7 +624,7 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
           return;
         }
         audioManager.playMilestone();
-        rally.getState().popup(race.lap === race.laps - 1 ? "FINAL LAP!" : `LAP ${race.lap + 1}/${race.laps}`, COLORS.gold, true);
+        rally.getState().popup(race.lap === race.laps - 1 ? "🏁 ¡ÚLTIMA VUELTA!" : `VUELTA ${race.lap + 1}/${race.laps}`, COLORS.gold, true);
       }
       netTimer.current += dt;
       if (session.mode === "online" && netTimer.current > 0.1) {

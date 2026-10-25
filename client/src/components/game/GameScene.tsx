@@ -21,6 +21,7 @@ import { PauseMenu } from "../ui/PauseMenu";
 import { MobileControls } from "../ui/MobileControls";
 import { installKeyboard, isTouchDevice } from "@/lib/input";
 import { run } from "@/lib/game/run";
+import { race } from "@/lib/game/race";
 import { placeOnTrack } from "@/lib/game/physics";
 
 interface GameSceneProps {
@@ -135,5 +136,6 @@ export function GameScene({ isFullscreen = false, onToggleFullscreen }: GameScen
 // Handy for debugging in the browser console
 if (typeof window !== "undefined") {
   (window as any).__rally = run;
+  (window as any).__race = race;
   (window as any).__place = placeOnTrack;
 }

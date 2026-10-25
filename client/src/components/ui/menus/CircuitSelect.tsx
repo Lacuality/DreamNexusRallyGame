@@ -1,4 +1,6 @@
+import { useState } from "react";
 import { Play, Trophy, Timer } from "lucide-react";
+import { CLASSES, CLASS_INFO, type EngineClass } from "@/lib/game/cup";
 import { CIRCUITS, type Circuit } from "@/lib/game/circuits";
 import { useProfile } from "@/lib/stores/useProfile";
 import { formatTime } from "@/lib/game/race";
@@ -24,14 +26,42 @@ export function CircuitThumb({ c, size = 90 }: { c: Circuit; size?: number }) {
 }
 
 /** Pick a circuit to race against 5 AI rivals. */
-export function CircuitSelect({ onClose, onRace, title = "🏎️ Circuit Race", intro }: { onClose: () => void; onRace: (id: string) => void; title?: string; intro?: string }) {
+export function CircuitSelect({
+  onClose,
+  onRace,
+  title = "🏎️ VS Race",
+  intro,
+  classes = false,
+  timeTrial = false,
+}: {
+  onClose: () => void;
+  onRace: (id: string, cc: EngineClass) => void;
+  title?: string;
+  intro?: string;
+  classes?: boolean;
+  timeTrial?: boolean;
+}) {
   const bestLaps = useProfile((s) => s.bestLaps);
+  const bestTimes = useProfile((s) => s.bestTimes);
   const wins = useProfile((s) => s.circuitWins);
+  const [cc, setCc] = useState<EngineClass>(100);
   return (
     <MenuShell title={title} onClose={onClose}>
       <p style={{ fontWeight: 800, marginTop: 0, opacity: 0.85 }}>
-        {intro ?? "3 laps against 5 rivals. Brake + steer to drift round the corners and let go for a mini-turbo. Hit the blue boost pads and bump your way to the podium. 🏆 1st = 150 jars."}
+        {intro ?? (timeTrial
+          ? "Just you and the clock: 3 laps, no rivals, no items. Beat your best time."
+          : "One race, 7 rivals, items on. Brake + steer to drift round the corners and let go for a mini-turbo. 🏆 1st = 150 jars.")}
       </p>
+      {classes && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8, marginBottom: 12 }}>
+          {CLASSES.map((c) => (
+            <Card key={c} active={cc === c} onClick={() => setCc(c)} style={{ padding: 8, textAlign: "center" }}>
+              <div style={{ fontFamily: UI.display, fontSize: 18 }}>{CLASS_INFO[c].label}</div>
+              <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.85 }}>{CLASS_INFO[c].blurb}</div>
+            </Card>
+          ))}
+        </div>
+      )}
       <div style={{ display: "grid", gap: 10 }}>
         {CIRCUITS.map((c) => (
           <Card key={c.id}>
@@ -45,12 +75,18 @@ export function CircuitSelect({ onClose, onRace, title = "🏎️ Circuit Race",
                   <span style={{ display: "inline-flex", gap: 4, alignItems: "center" }}>
                     <Timer size={15} /> Best lap {bestLaps[c.id] ? formatTime(bestLaps[c.id]) : "—"}
                   </span>
-                  <span style={{ display: "inline-flex", gap: 4, alignItems: "center" }}>
-                    <Trophy size={15} color={UI.gold} /> {wins[c.id] ?? 0} wins
-                  </span>
+                  {timeTrial ? (
+                    <span style={{ display: "inline-flex", gap: 4, alignItems: "center" }}>
+                      <Trophy size={15} color={UI.gold} /> Best race {bestTimes[c.id] ? formatTime(bestTimes[c.id]) : "—"}
+                    </span>
+                  ) : (
+                    <span style={{ display: "inline-flex", gap: 4, alignItems: "center" }}>
+                      <Trophy size={15} color={UI.gold} /> {wins[c.id] ?? 0} wins
+                    </span>
+                  )}
                 </div>
               </div>
-              <BigButton onClick={() => onRace(c.id)} color={UI.gold} style={{ flex: "0 0 auto" }}>
+              <BigButton onClick={() => onRace(c.id, cc)} color={UI.gold} style={{ flex: "0 0 auto" }}>
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
                   <Play size={22} fill="currentColor" /> RACE
                 </span>

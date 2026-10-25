@@ -3,7 +3,7 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { race, type Racer } from "@/lib/game/race";
 import { run } from "@/lib/game/run";
-import { session } from "@/lib/game/session";
+import { session, hasRivals, classRivals, classSpeed } from "@/lib/game/session";
 import { RIVALS } from "@/lib/game/circuits";
 import { carById, type CarId, type DriverId, type PaintId } from "@/lib/game/garage";
 import { buildVehicle, type CarRig } from "@/lib/game/vehicles";
@@ -46,7 +46,7 @@ export function Rivals() {
 
   // create the grid
   useMemo(() => {
-    if (!race.active || online || race.racers.length) return;
+    if (!race.active || online || race.racers.length || !hasRivals()) return;
     RIVALS.forEach((r, i) => {
       race.racers.push({
         id: `ai${i}`,
@@ -211,7 +211,7 @@ export function Rivals() {
       return;
     }
     const c = carById(r.car).stats;
-    const base = (182 / 3.6) * c.top * r.skill;
+    const base = (182 / 3.6) * c.top * r.skill * classSpeed() * classRivals();
     // brake for corners like a real driver: look ahead, judge more distance the faster you go
     const look = 10 + r.speed * 1.1;
     const corner = Math.min(1, (cornerSpeed(bendAhead(r.z, 0, look)) * (1 + (r.skill - 1) * 2)) / base);

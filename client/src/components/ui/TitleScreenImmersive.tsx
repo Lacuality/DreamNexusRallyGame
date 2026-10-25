@@ -12,6 +12,7 @@ import { BigButton, IconButton, UI, panelStyle, useAudioSettings } from "./gameU
 import { Garage } from "./menus/Garage";
 import { ColombiaMap } from "./menus/ColombiaMap";
 import { CircuitSelect } from "./menus/CircuitSelect";
+import { CupSelect } from "./menus/CupSelect";
 import { OnlineLobby } from "./menus/OnlineLobby";
 import { StoryDialog } from "./menus/StoryDialog";
 import { CHAPTERS, chapterById } from "@/lib/game/story";
@@ -24,7 +25,7 @@ interface TitleScreenImmersiveProps {
   isFullscreenSupported: boolean;
 }
 
-type Screen = "home" | "garage" | "map" | "story" | "circuits" | "battle" | "online" | "achievements" | "leaderboard";
+type Screen = "home" | "garage" | "map" | "story" | "circuits" | "gp" | "timetrial" | "online" | "achievements" | "leaderboard";
 
 /** Phone in landscape (short) or portrait (narrow)? Updates on rotate/resize. */
 function useViewport() {
@@ -90,9 +91,9 @@ function PlayCard({ short, wide, best, onClick }: { short: boolean; wide: boolea
         <Play size={short ? 22 : 30} fill="currentColor" />
       </span>
       <span style={{ textAlign: "left", minWidth: 0 }}>
-        <span style={{ display: "block", fontSize: short ? 19 : 30, lineHeight: 1 }}>¡JUGAR!</span>
+        <span style={{ display: "block", fontSize: short ? 19 : 28, lineHeight: 1 }}>GRAND PRIX</span>
         <span style={{ display: short ? "none" : "block", fontFamily: UI.body, fontWeight: 900, fontSize: short ? 12 : 14 }}>
-          Rally Infinito{best > 0 ? ` · Best ${best.toLocaleString()}` : " · Enter ↵"}
+          Cups · 8 karts · items{best > 0 ? ` · 🏆 ${best}` : " · Enter ↵"}
         </span>
       </span>
     </button>
@@ -218,10 +219,13 @@ export function TitleScreenImmersive({ isFullscreen, onToggleFullscreen, isFulls
     audioManager.unlock();
     start({ mode: "endless" });
   };
+  const startCup = useRally((s) => s.startCup);
+  const trophies = useProfile((s) => s.trophies);
+  const trophyCount = Object.keys(trophies).length;
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Enter" && screen === "home" && !dialog && !editingName) startEndless();
+      if (e.key === "Enter" && screen === "home" && !dialog && !editingName) open("gp");
       if (e.key === "Escape" && screen !== "home") setScreen("home");
     };
     window.addEventListener("keydown", onKeyDown);
@@ -351,15 +355,16 @@ export function TitleScreenImmersive({ isFullscreen, onToggleFullscreen, isFulls
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: short ? "1.4fr repeat(4, minmax(0, 1fr))" : narrow ? "1fr 1fr" : "1.7fr 1fr 1fr 1fr 1fr",
+            gridTemplateColumns: short ? "1.4fr repeat(5, minmax(0, 1fr))" : narrow ? "1fr 1fr" : "1.6fr repeat(5, 1fr)",
             gap: short ? 6 : 8,
           }}
         >
-          <PlayCard short={short} wide={narrow && !short} best={highScore} onClick={startEndless} />
-          <ModeCard i={1} layout={short ? "tile" : narrow ? "row" : "full"} emoji="📖" title="HISTORIA" text={`${CHAPTERS.length} chapters across Colombia`} extra={`${chaptersDone}/${CHAPTERS.length} · ⭐ ${starCount}`} onClick={() => open("story")} color="#7bd389" />
-          <ModeCard i={2} layout={short ? "tile" : narrow ? "row" : "full"} emoji="🏎️" title="CIRCUITO" text="3 laps vs 5 rivals" extra="Real race tracks" onClick={() => open("circuits")} color={UI.cyanBright} />
-          <ModeCard i={3} layout={short ? "tile" : narrow ? "row" : "full"} emoji="🥑" title="RALLY LOCO" text="Power-ups & attacks" extra="Aguacates, voladores…" onClick={() => open("battle")} color={UI.orange} />
-          <ModeCard i={4} layout={short ? "tile" : narrow ? "row" : "full"} emoji="👥" title="AMIGOS" text="Race friends online" extra="Room code" onClick={() => open("online")} color="#ff4f9a" />
+          <PlayCard short={short} wide={narrow && !short} best={trophyCount} onClick={() => open("gp")} />
+          <ModeCard i={1} layout={short ? "tile" : narrow ? "row" : "full"} emoji="🏎️" title="CARRERA" text="One race, 7 rivals, items on" extra="Pick circuit & class" onClick={() => open("circuits")} color={UI.cyanBright} />
+          <ModeCard i={2} layout={short ? "tile" : narrow ? "row" : "full"} emoji="⏱️" title="CONTRARRELOJ" text="You vs the clock" extra="Best times" onClick={() => open("timetrial")} color={UI.orange} />
+          <ModeCard i={3} layout={short ? "tile" : narrow ? "row" : "full"} emoji="👥" title="AMIGOS" text="Race friends online" extra="Room code" onClick={() => open("online")} color="#ff4f9a" />
+          <ModeCard i={4} layout={short ? "tile" : narrow ? "row" : "full"} emoji="🏁" title="RALLY INFINITO" text="Arcade run across Colombia" extra={highScore > 0 ? `Best ${highScore.toLocaleString()}` : "Tombos, huecos, fotomultas"} onClick={startEndless} color={UI.gold} />
+          <ModeCard i={5} layout={short ? "tile" : narrow ? "row" : "full"} emoji="📖" title="HISTORIA" text={`${CHAPTERS.length} chapters across Colombia`} extra={`${chaptersDone}/${CHAPTERS.length} · ⭐ ${starCount}`} onClick={() => open("story")} color="#7bd389" />
         </div>
 
         <div className="dnr-in" style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", animationDelay: "0.45s" }}>
@@ -434,25 +439,36 @@ export function TitleScreenImmersive({ isFullscreen, onToggleFullscreen, isFulls
           }}
         />
       )}
-      {screen === "circuits" && (
-        <CircuitSelect
+      {screen === "gp" && (
+        <CupSelect
           onClose={() => setScreen("home")}
-          onRace={(id) => {
+          onStart={(cupId, cc) => {
+            saveName();
             audioManager.unlock();
-            const c = circuitById(id);
-            start({ mode: "circuit", circuitId: c.id, laps: c.laps });
+            startCup(cupId, cc);
           }}
         />
       )}
-      {screen === "battle" && (
+      {screen === "circuits" && (
         <CircuitSelect
-          title="🥑 Rally Loco"
-          intro="Grab the ? boxes (yellow, blue and red, like the flag) for Colombian power-ups: 🥑 throw an aguacate, 🍌 drop a plátano peel, ☕ tinto turbo, 🎆 volador hits the leader, 👒 sombrero vueltiao shield, 🌧️ aguacero slows everyone ahead. Use them with E (or the ITEM button)."
+          classes
+          onClose={() => setScreen("home")}
+          onRace={(id, cc) => {
+            audioManager.unlock();
+            const c = circuitById(id);
+            start({ mode: "circuit", circuitId: c.id, laps: c.laps, cc });
+          }}
+        />
+      )}
+      {screen === "timetrial" && (
+        <CircuitSelect
+          title="⏱️ Contrarreloj"
+          timeTrial
           onClose={() => setScreen("home")}
           onRace={(id) => {
             audioManager.unlock();
             const c = circuitById(id);
-            start({ mode: "battle", circuitId: c.id, laps: c.laps });
+            start({ mode: "timetrial", circuitId: c.id, laps: c.laps });
           }}
         />
       )}

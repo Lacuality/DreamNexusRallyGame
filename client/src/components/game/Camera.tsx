@@ -5,6 +5,7 @@ import { run } from "@/lib/game/run";
 import { groundHeight } from "@/lib/game/physics";
 import { input } from "@/lib/input";
 import { useSettings } from "@/lib/stores/useSettings";
+import { useRally } from "@/lib/stores/useRally";
 
 /**
  * Chase camera: sits behind the car along the road direction, widens its view
@@ -21,6 +22,26 @@ export function Camera() {
   useFrame((_, delta) => {
     const dt = Math.min(delta, 0.05);
     const z = run.z;
+    const phase = useRally.getState().phase;
+    if (phase === "countdown" && run.time === 0) {
+      // intro: swing round the car from the front to the chase position while the lights count down
+      intro.current = Math.min(2.4, intro.current + dt);
+      const k = intro.current / 2.4;
+      const e = k * k * (3 - 2 * k);
+      const a = Math.PI * (1 - e); // front → behind
+      const r = 15 - 7 * e;
+      const h = 7 - 3.6 * e;
+      car.current.set(run.wx, groundHeight(), run.wz);
+      const hx = Math.sin(run.heading + run.rel), hz = Math.cos(run.heading + run.rel);
+      const nx = Math.cos(run.heading), nz = -Math.sin(run.heading);
+      pos.current.set(car.current.x + hx * Math.cos(a) * r * -1 + nx * Math.sin(a) * r * 0.6, car.current.y + h, car.current.z + hz * Math.cos(a) * r * -1 + nz * Math.sin(a) * r * 0.6);
+      look.current.set(car.current.x + hx * 4 * e, car.current.y + 1.2, car.current.z + hz * 4 * e);
+      camera.position.copy(pos.current);
+      camera.lookAt(look.current);
+      heading.current = run.heading;
+      return;
+    }
+    if (phase !== "countdown") intro.current = 0;
     const sp = Math.min(1.3, run.speed / 50);
     const behind = input.lookBack || input.touchLook;
     const dir = behind ? -1 : 1;
@@ -70,5 +91,6 @@ export function Camera() {
 
   const lastBehind = useRef(false);
   const heading = useRef(0);
+  const intro = useRef(0);
   return null;
 }

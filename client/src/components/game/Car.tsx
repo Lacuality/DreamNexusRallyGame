@@ -50,12 +50,15 @@ export function Car() {
     a.squash = Math.max(0, a.squash - delta * 4);
     const sq = Math.sin(a.squash * Math.PI) * 0.16;
     rig.body.scale.set(1 + sq * 0.5, 1 - sq, 1 + sq * 0.3);
+    // hop into a drift (visual only)
+    if (run.hop > 0) run.hop = Math.max(0, run.hop - delta);
+    const hopY = run.hop > 0 ? Math.sin((1 - run.hop / 0.28) * Math.PI) * 0.45 : 0;
     rig.body.rotation.x = -roadPitch(z) + (run.airborne ? -run.vy * 0.025 : a.pitch);
     rig.body.rotation.z = THREE.MathUtils.lerp(rig.body.rotation.z, run.steer * 0.06, Math.min(1, delta * 8));
 
     // suspension bounce (more off-road)
     const bounce = run.airborne ? 0 : Math.sin(t * 22) * (run.offroad ? 0.06 : 0.012) * Math.min(1, run.speed / 20);
-    rig.body.position.y = bounce;
+    rig.body.position.y = bounce + hopY;
 
     const spin = (run.speed * delta) / 0.42;
     rig.wheels.forEach((w) => (w.rotation.x += spin));

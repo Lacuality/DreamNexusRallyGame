@@ -91,4 +91,6 @@ export const RIVALS = [
   { name: "El Flaco", driver: "condor", car: "cuatro", paint: "cafe", skill: 0.94 },
   { name: "Doña Rosa", driver: "oso", car: "willys", paint: "esmeralda", skill: 0.95 },
   { name: "Pibe", driver: "titi", car: "dn", paint: "rosaNeon", skill: 0.99 },
+  { name: "Nexi", driver: "nexi", car: "chiva", paint: "dn", skill: 0.96 },
+  { name: "Carmen", driver: "rana", car: "cuatro", paint: "tricolor", skill: 0.98 },
 ] as const;

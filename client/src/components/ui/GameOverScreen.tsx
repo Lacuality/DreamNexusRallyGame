@@ -14,6 +14,7 @@ import { formatTime, ordinal } from "@/lib/game/race";
 import { room } from "@/lib/game/net";
 import { session } from "@/lib/game/session";
 import { circuitById } from "@/lib/game/circuits";
+import { cupById, TROPHY_EMOJI, type Trophy as TrophyKind } from "@/lib/game/cup";
 
 function useCountUp(target: number, ms = 900) {
   const [v, setV] = useState(0);
@@ -51,7 +52,17 @@ export function GameOverScreen() {
   const chapter = summary?.chapterId ? chapterById(summary.chapterId) : null;
   const nextChapter = chapter && summary?.success ? CHAPTERS.find((c) => c.num === chapter.num + 1) : undefined;
 
+  const nextCupRound = useRally((s) => s.nextCupRound);
+  const gp = summary?.cup;
   const again = () => {
+    if (gp && !gp.finished) {
+      nextCupRound();
+      return;
+    }
+    if (gp) {
+      useRally.getState().startCup(gp.cupId, gp.cc as 50 | 100 | 150);
+      return;
+    }
     if (online) {
       if (!isHost || session.mode !== "online") return;
       const c = circuitById(session.circuitId);
@@ -85,6 +96,8 @@ export function GameOverScreen() {
 
   let headline = isNewBest ? "NEW RECORD!" : "RACE OVER";
   if (circuit) headline = summary.position === 1 ? "1ST PLACE! 🏆" : `${ordinal(summary.position!).toUpperCase()} PLACE`;
+  if (mode === "timetrial") headline = summary.newBestTime ? "¡NUEVO RÉCORD! ⏱️" : "TIME TRIAL";
+  if (gp?.finished) headline = gp.trophy ? `${TROPHY_EMOJI[gp.trophy as TrophyKind]} ${gp.trophy.toUpperCase()} TROPHY!` : `${ordinal(gp.rank).toUpperCase()} IN THE CUP`;
   if (chapter) headline = summary.success ? "CHAPTER COMPLETE!" : "SO CLOSE!";
 
   const stats: [string, string | number][] = circuit
@@ -137,7 +150,7 @@ export function GameOverScreen() {
         padding: "24px 16px",
       }}
     >
-      {(isNewBest || summary.position === 1 || (chapter && summary.success)) && <ConfettiRain />}
+      {(isNewBest || summary.position === 1 || (chapter && summary.success) || gp?.trophy || summary.newBestTime) && <ConfettiRain />}
       <div style={{ width: "min(540px, 100%)", textAlign: "center", animation: "dnrFadeIn 0.35s ease-out", margin: "auto 0", position: "relative" }}>
         {d.id === "pixel" ? (
           <img
@@ -191,7 +204,44 @@ export function GameOverScreen() {
             </>
           )}
 
-          {circuit && summary.standings && (
+          {gp && (
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ fontFamily: UI.display, fontSize: 15, color: UI.warm, marginBottom: 6 }}>
+                {cupById(gp.cupId).emoji} {cupById(gp.cupId).name.toUpperCase()} · {gp.cc}cc · {gp.finished ? "FINAL STANDINGS" : `AFTER RACE ${gp.round + 1}/${gp.rounds}`}
+              </div>
+              <div style={{ display: "grid", gap: 3 }}>
+                {gp.table.map((r, i) => (
+                  <div
+                    key={r.id}
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "34px 28px 1fr auto auto",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: "4px 10px",
+                      borderRadius: 10,
+                      background: r.id === "me" ? "rgba(255,210,63,0.2)" : "rgba(255,255,255,0.06)",
+                      border: r.id === "me" ? "2px solid rgba(255,210,63,0.7)" : "2px solid transparent",
+                      fontWeight: 900,
+                      fontSize: 14,
+                    }}
+                  >
+                    <span style={{ fontFamily: UI.display, color: i === 0 ? UI.gold : UI.white }}>{i + 1}</span>
+                    <span style={{ fontSize: 20 }}>{driverById(r.driver as any).emoji}</span>
+                    <span style={{ textAlign: "left", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</span>
+                    <span style={{ opacity: 0.7, fontSize: 12 }}>{r.lastPos ? ordinal(r.lastPos) : ""}</span>
+                    <span style={{ color: UI.gold }}>{r.points} pts</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {mode === "timetrial" && summary.bestTime !== undefined && (
+            <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 8 }}>
+              ⏱️ Race {formatTime(summary.raceTime ?? 0)} · Best {formatTime(summary.bestTime)} {summary.newBestTime && <span style={{ color: UI.gold }}>★ new!</span>}
+            </div>
+          )}
+          {circuit && summary.standings && !gp && mode !== "timetrial" && (
             <div style={{ display: "grid", gap: 4, marginBottom: 10 }}>
               {summary.standings.map((s, i) => (
                 <div
@@ -269,7 +319,8 @@ export function GameOverScreen() {
           ) : (
             <BigButton onClick={again} color={UI.gold} style={{ flex: "1 1 220px" }}>
               <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
-                <RotateCcw size={28} strokeWidth={3} /> {online ? "NEXT RACE" : chapter && !summary.success ? "TRY AGAIN" : "RACE AGAIN"}
+                {gp && !gp.finished ? <Play size={28} fill="currentColor" /> : <RotateCcw size={28} strokeWidth={3} />}{" "}
+                {gp && !gp.finished ? `NEXT: ${circuitById(cupById(gp.cupId).circuits[gp.round + 1]).name.split(" ").slice(-1)[0].toUpperCase()}` : gp ? "RACE CUP AGAIN" : online ? "NEXT RACE" : chapter && !summary.success ? "TRY AGAIN" : "RACE AGAIN"}
               </span>
             </BigButton>
           )}
