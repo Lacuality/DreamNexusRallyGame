@@ -437,6 +437,7 @@ export const useRally = create<RallyState>()(
         currentScore: 0,
         collectiblesCount: 0,
       }));
+      get().syncHud(); // so the right HUD shows from the first frame of the countdown
     },
 
     startCup: (cupId, cc) => {

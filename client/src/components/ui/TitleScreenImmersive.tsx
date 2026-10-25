@@ -361,7 +361,7 @@ export function TitleScreenImmersive({ isFullscreen, onToggleFullscreen, isFulls
         >
           <PlayCard short={short} wide={narrow && !short} best={trophyCount} onClick={() => open("gp")} />
           <ModeCard i={1} layout={short ? "tile" : narrow ? "row" : "full"} emoji="🏎️" title="CARRERA" text="One race, 7 rivals, items on" extra="Pick circuit & class" onClick={() => open("circuits")} color={UI.cyanBright} />
-          <ModeCard i={2} layout={short ? "tile" : narrow ? "row" : "full"} emoji="⏱️" title="CONTRARRELOJ" text="You vs the clock" extra="Best times" onClick={() => open("timetrial")} color={UI.orange} />
+          <ModeCard i={2} layout={short ? "tile" : narrow ? "row" : "full"} emoji="⏱️" title="CRONO" text="Time trial: you vs the clock" extra="Best times" onClick={() => open("timetrial")} color={UI.orange} />
           <ModeCard i={3} layout={short ? "tile" : narrow ? "row" : "full"} emoji="👥" title="AMIGOS" text="Race friends online" extra="Room code" onClick={() => open("online")} color="#ff4f9a" />
           <ModeCard i={4} layout={short ? "tile" : narrow ? "row" : "full"} emoji="🏁" title="RALLY INFINITO" text="Arcade run across Colombia" extra={highScore > 0 ? `Best ${highScore.toLocaleString()}` : "Tombos, huecos, fotomultas"} onClick={startEndless} color={UI.gold} />
           <ModeCard i={5} layout={short ? "tile" : narrow ? "row" : "full"} emoji="📖" title="HISTORIA" text={`${CHAPTERS.length} chapters across Colombia`} extra={`${chaptersDone}/${CHAPTERS.length} · ⭐ ${starCount}`} onClick={() => open("story")} color="#7bd389" />
