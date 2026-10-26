@@ -650,16 +650,25 @@ export function GameHUD({ isFullscreen = false, onToggleFullscreen }: GameHUDPro
           key={countdown}
           style={{
             position: "absolute",
-            top: "45%",
+            top: "42%",
             left: "50%",
+            width: "clamp(140px, 26vw, 230px)",
+            height: "clamp(140px, 26vw, 230px)",
+            borderRadius: "50%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
             fontFamily: UI.display,
-            fontSize: "clamp(90px, 22vw, 180px)",
-            color: countdown === 0 ? UI.gold : UI.white,
-            textShadow: "0 8px 0 rgba(0,0,0,0.4), 0 0 40px rgba(36,160,206,0.8)",
+            fontSize: "clamp(80px, 16vw, 140px)",
+            color: countdown === 0 ? "#0E1B24" : UI.white,
+            background: countdown === 3 ? "radial-gradient(circle, #ff5a5f, #a3161a)" : countdown === 0 ? "radial-gradient(circle, #7bd389, #1f8a3c)" : "radial-gradient(circle, #ffd23f, #c8772e)",
+            border: "6px solid rgba(255,255,255,0.85)",
+            boxShadow: `0 0 60px ${countdown === 3 ? "rgba(255,42,42,0.8)" : countdown === 0 ? "rgba(46,204,64,0.9)" : "rgba(255,176,0,0.8)"}, 0 10px 0 rgba(0,0,0,0.35)`,
+            textShadow: "0 6px 0 rgba(0,0,0,0.35)",
             animation: "dnrCount 0.8s ease-out forwards",
           }}
         >
-          {countdown === 0 ? "GO!" : countdown}
+          {countdown === 0 ? "GO" : countdown}
         </div>
       )}
     </div>

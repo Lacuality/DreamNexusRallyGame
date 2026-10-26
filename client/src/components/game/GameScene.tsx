@@ -9,6 +9,7 @@ import { Rivals } from "./Rivals";
 import { Battle } from "./Battle";
 import { Bursts } from "./Bursts";
 import { Police } from "./Police";
+import { StartLine } from "./StartLine";
 import { Effects } from "./Effects";
 import { session, isBattle } from "@/lib/game/session";
 import { NitroParticles, DustTrail, ExhaustSmoke } from "./ParticleEffects";
@@ -23,6 +24,7 @@ import { installKeyboard, isTouchDevice } from "@/lib/input";
 import { run } from "@/lib/game/run";
 import { race } from "@/lib/game/race";
 import { placeOnTrack } from "@/lib/game/physics";
+import { isCircuit } from "@/lib/track";
 
 interface GameSceneProps {
   isFullscreen?: boolean;
@@ -89,6 +91,7 @@ export function GameScene({ isFullscreen = false, onToggleFullscreen }: GameScen
             <Scenery />
             <Car />
             <Rivals />
+            {isCircuit() && <StartLine />}
             {isBattle() && <Battle />}
             {(session.mode === "endless" || session.mode === "story") && <Police />}
             <RaceSystem carPositionRef={carPositionRef} carSpeedRef={carSpeedRef} />

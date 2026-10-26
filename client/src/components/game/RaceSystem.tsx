@@ -345,6 +345,7 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
     if (phase === "countdown") {
       placeOnTrack(run.z, run.lat); // sit on the grid facing down the track
       countdownTimer.current += dt;
+      if (countdownTimer.current <= dt && race.active) audioManager.playCrowd("build");
       // rocket start: hold ↑ just as it goes green; hold it too long before and the engine floods
       if (input.up || input.touchNitro) {
         if (holdStart.current < 0) holdStart.current = countdownTimer.current;
@@ -361,6 +362,7 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
           audioManager.playCountdown(true);
           audioManager.startEngineSound();
           rally.getState().beginRace();
+          if (race.active) audioManager.playCrowd("roar");
           const held = holdStart.current >= 0 ? countdownTimer.current - holdStart.current : -1;
           if (held >= 0 && held < 0.55 && race.active) {
             run.nitroTime = Math.max(run.nitroTime, 1.4);
@@ -618,6 +620,7 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
         race.lap = lapIdx;
         race.lapStart = run.time;
         if (race.lap >= race.laps) {
+          audioManager.playCrowd("roar");
           race.finishedAt = run.time;
           if (session.mode === "online") room.send({ t: "finish", id: myId, time: run.time });
           rally.getState().syncHud();

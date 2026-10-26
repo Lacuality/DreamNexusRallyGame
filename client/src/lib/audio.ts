@@ -599,6 +599,65 @@ export class AudioManager {
     this.siren.gain.gain.setTargetAtTime(vol, ctx.currentTime, 0.1);
   }
 
+  private crowd: { src: AudioBufferSourceNode; gain: GainNode; lfo: OscillatorNode } | null = null;
+
+  /** Crowd noise: "build" swells during the countdown, "roar" cheers and fades, "stop" ends it. */
+  playCrowd(mode: "build" | "roar" | "stop") {
+    if (!this.ctx || !this.sfxGain || !this.noiseBuffer) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    if (!this.crowd && mode !== "stop") {
+      const src = ctx.createBufferSource();
+      src.buffer = this.noiseBuffer;
+      src.loop = true;
+      const bp = ctx.createBiquadFilter();
+      bp.type = "bandpass";
+      bp.frequency.value = 700;
+      bp.Q.value = 0.6;
+      const lp = ctx.createBiquadFilter();
+      lp.type = "lowpass";
+      lp.frequency.value = 2200;
+      const gain = ctx.createGain();
+      gain.gain.value = 0;
+      // slow wobble so it sounds like many voices, not a hiss
+      const lfo = ctx.createOscillator();
+      lfo.type = "sine";
+      lfo.frequency.value = 3.1;
+      const depth = ctx.createGain();
+      depth.gain.value = 250;
+      lfo.connect(depth).connect(bp.frequency);
+      src.connect(bp).connect(lp).connect(gain).connect(this.sfxGain);
+      src.start();
+      lfo.start();
+      this.crowd = { src, gain, lfo };
+    }
+    if (!this.crowd) return;
+    const g = this.crowd.gain.gain;
+    g.cancelScheduledValues(t);
+    if (mode === "build") {
+      g.setValueAtTime(g.value, t);
+      g.linearRampToValueAtTime(0.12, t + 2.4);
+    } else if (mode === "roar") {
+      g.setValueAtTime(Math.max(g.value, 0.1), t);
+      g.linearRampToValueAtTime(0.32, t + 0.25);
+      g.setTargetAtTime(0.0, t + 1.2, 1.4);
+      // a few whistles and air horns in the crowd
+      for (let i = 0; i < 4; i++) this.tone(1800 + Math.random() * 900, 0.25, { type: "sine", vol: 0.05, delay: 0.2 + Math.random() * 1.5, slideTo: 1400 });
+      this.tone(220, 0.9, { type: "sawtooth", vol: 0.05, delay: 0.3 });
+      this.tone(330, 0.9, { type: "sawtooth", vol: 0.04, delay: 0.35 });
+    } else {
+      g.setTargetAtTime(0, t, 0.3);
+      const c = this.crowd;
+      this.crowd = null;
+      setTimeout(() => {
+        try {
+          c.src.stop();
+          c.lfo.stop();
+        } catch {}
+      }, 1500);
+    }
+  }
+
   playWhistle() {
     this.tone(2200, 0.12, { type: "square", vol: 0.12, slideTo: 2600 });
     this.tone(2400, 0.25, { type: "square", vol: 0.12, delay: 0.14, slideTo: 1900 });
@@ -606,6 +665,7 @@ export class AudioManager {
 
   stopEngineSound() {
     this.setSiren(false);
+    this.playCrowd("stop");
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
     if (this.engine) {
@@ -772,8 +832,9 @@ export class AudioManager {
   }
 
   playCountdown(final = false) {
-    this.tone(final ? 880 : 440, final ? 0.5 : 0.18, { type: "square", vol: 0.15 });
-    if (final) this.tone(1320, 0.5, { type: "triangle", vol: 0.1 });
+    // the classic three low beeps and one long high one
+    this.tone(final ? 880 : 440, final ? 0.6 : 0.22, { type: "square", vol: 0.16 });
+    if (final) this.tone(1320, 0.6, { type: "triangle", vol: 0.1 });
   }
 
   playMilestone() {
