@@ -1,5 +1,5 @@
 import { run } from "./run";
-import { frameAt, toWorld, isCircuit, ROAD_HALF, roadY, currentLoop } from "../track";
+import { frameAt, toWorld, isCircuit, roadHalf, roadY, currentLoop } from "../track";
 
 /**
  * Free driving (Mario Kart style). The car has a real world position and
@@ -74,9 +74,10 @@ export function groundHeight() {
 /** Where the car is: asphalt, gravel/shoulder, grass, or lost. */
 export function surface(): "road" | "shoulder" | "grass" | "lost" {
   const a = Math.abs(run.lat);
-  if (a <= ROAD_HALF + 0.2) return "road";
-  if (!isCircuit()) return a > ROAD_HALF + 3.2 ? "lost" : "shoulder";
-  if (a <= ROAD_HALF + 3.9) return "shoulder";
+  const h = roadHalf();
+  if (a <= h + 0.2) return "road";
+  if (!isCircuit()) return a > h + 3.2 ? "lost" : "shoulder";
+  if (a <= h + 3.9) return "shoulder";
   if (a <= 40) return "grass";
   return "lost";
 }

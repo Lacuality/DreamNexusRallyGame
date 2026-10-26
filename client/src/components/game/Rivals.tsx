@@ -8,7 +8,7 @@ import { RIVALS } from "@/lib/game/circuits";
 import { carById, type CarId, type DriverId, type PaintId } from "@/lib/game/garage";
 import { buildVehicle, type CarRig } from "@/lib/game/vehicles";
 import { room, myId } from "@/lib/game/net";
-import { toWorld, headingAt, roadCurvature, ROAD_HALF, bendAhead, cornerSpeed } from "@/lib/track";
+import { toWorld, headingAt, roadCurvature, roadHalf, bendAhead, cornerSpeed } from "@/lib/track";
 import { useRally } from "@/lib/stores/useRally";
 import { audioManager } from "@/lib/audio";
 import { animateWobble } from "./Car";
@@ -55,7 +55,7 @@ export function Rivals() {
         driver: r.driver,
         paint: r.paint,
         z: 8 + Math.floor(i / 2) * 9,
-        lat: i % 2 ? 2 : -2,
+        lat: i % 2 ? 3 : -3,
         y: 0,
         speed: 0,
         skill: r.skill,
@@ -228,7 +228,8 @@ export function Rivals() {
     r.z += r.speed * dt;
 
     // racing line: hug the inside of bends, dodge whoever is ahead
-    let line = THREE.MathUtils.clamp(-roadCurvature(r.z + 25) * 450, -2.8, 2.8) + Math.sin(r.z * 0.01 + r.seed) * 0.6;
+    const edge = roadHalf() - 2.2;
+    let line = THREE.MathUtils.clamp(-roadCurvature(r.z + 25) * 450, -edge, edge) + Math.sin(r.z * 0.01 + r.seed) * 0.9;
     const others = [{ z: run.z, lat: run.lat }, ...race.racers.filter((o) => o !== r)];
     for (const o of others) {
       const dz = o.z - r.z;
@@ -238,7 +239,7 @@ export function Rivals() {
       }
     }
     r.lat += THREE.MathUtils.clamp(line - r.lat, -1, 1) * dt * 2.2 * c.handling;
-    r.lat = THREE.MathUtils.clamp(r.lat, -(ROAD_HALF - 0.8), ROAD_HALF - 0.8);
+    r.lat = THREE.MathUtils.clamp(r.lat, -(roadHalf() - 0.8), roadHalf() - 0.8);
     if (r.z >= total) r.finishedAt = run.time;
   }
 

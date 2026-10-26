@@ -3,6 +3,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { run } from "@/lib/game/run";
 import { groundHeight } from "@/lib/game/physics";
+import { isCircuit } from "@/lib/track";
 import { input } from "@/lib/input";
 import { useSettings } from "@/lib/stores/useSettings";
 import { useRally } from "@/lib/stores/useRally";
@@ -60,8 +61,9 @@ export function Camera() {
     void z;
 
     const portrait = size.width < size.height;
-    const back = 8.2 + sp * 1.6 + (portrait ? 3 : 0);
-    const height = 3.4 + sp * 0.4 + (portrait ? 1.6 : 0);
+    const kart = isCircuit(); // kart racing: low and close, the car big on screen
+    const back = (kart ? 6.6 : 8.2) + sp * 1.4 + (portrait ? 3 : 0);
+    const height = (kart ? 2.5 : 3.4) + sp * 0.35 + (portrait ? 1.6 : 0);
     // behind the car along the road, leaning slightly into the steer / drift
     const lean = (run.rel * 1.2 + run.driftDir * 0.8 * Math.min(1, run.drift * 3)) * dir;
     tmp.current.set(car.current.x - tx * back * dir - f.nx * lean, 0, car.current.z - tz * back * dir - f.nz * lean);
@@ -69,7 +71,7 @@ export function Camera() {
     // snap when flipping to the rear view so it doesn't swing through the car
     pos.current.lerp(tmp.current, behind !== lastBehind.current ? 1 : 1 - Math.exp(-dt * 7));
 
-    tmp.current.set(car.current.x + tx * 9 * dir, car.current.y + 1.2, car.current.z + tz * 9 * dir);
+    tmp.current.set(car.current.x + tx * 9 * dir, car.current.y + (kart ? 0.9 : 1.2), car.current.z + tz * 9 * dir);
     look.current.lerp(tmp.current, behind !== lastBehind.current ? 1 : 1 - Math.exp(-dt * 10));
     lastBehind.current = behind;
 
@@ -82,7 +84,7 @@ export function Camera() {
     camera.lookAt(look.current);
 
     const cam = camera as THREE.PerspectiveCamera;
-    const targetFov = 62 + sp * 10 + (run.nitroTime > 0 ? 6 : 0);
+    const targetFov = (kart ? 66 : 62) + sp * 10 + (run.nitroTime > 0 ? 6 : 0);
     if (Math.abs(cam.fov - targetFov) > 0.05) {
       cam.fov += (targetFov - cam.fov) * Math.min(1, dt * 4);
       cam.updateProjectionMatrix();

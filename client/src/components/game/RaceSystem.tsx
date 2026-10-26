@@ -5,7 +5,7 @@ import { burst, FX } from "@/lib/game/fx";
 import { placeOnTrack, groundHeight } from "@/lib/game/physics";
 import { run, multiplierFor, MAX_HEARTS, NITRO_DURATION, INVULNERABLE_TIME, speedGear } from "@/lib/game/run";
 import { input, steerInput } from "@/lib/input";
-import { toWorld, headingAt, frameAt, roadCurvature, ROAD_HALF, LANES, hash, biomeAt, lapLength, isCircuit } from "@/lib/track";
+import { toWorld, headingAt, frameAt, roadCurvature, roadHalf, lanes, hash, biomeAt, lapLength, isCircuit } from "@/lib/track";
 
 const tmpV = { x: 0, y: 0, z: 0 };
 import { ModelPool, OBSTACLE_SIZE, type ObstacleKind, type PickupKind, makeArch, makeFinishLine } from "@/lib/game/models";
@@ -87,6 +87,7 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
   const arches = useRef<THREE.Object3D[]>([]);
   const netTimer = useRef(0);
   const lapItems = useMemo(() => circuitLayout(), []);
+  if (typeof window !== "undefined") (window as any).__layout = lapItems; // debug
   const circuitNext = useRef({ lap: 0, idx: 0 });
 
   const rally = useRally;
@@ -132,7 +133,7 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
     ents.current.push({ kind, pickup, z, lat, h, passed: false, done: false, fly: 0, vx: 0, vy: 0, spin: 0, obj, seed: Math.random() * 10, walk, state: 0, timer: 0 });
   };
 
-  const lane = (i: number) => LANES[((i % 3) + 3) % 3];
+  const lane = (i: number) => lanes()[((i % 3) + 3) % 3];
 
   const spawnRow = (z: number) => {
     const d = Math.min(1, z / 2400); // difficulty 0..1 over the first 2.4 km
@@ -466,9 +467,9 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
     if (run.offroad && !run.airborne) {
       if (circ) {
         // circuits: grass costs a lot, the gravel trap nearly stops you
-        const deep = Math.abs(run.lat) > ROAD_HALF + 1.4;
+        const deep = Math.abs(run.lat) > roadHalf() + 1.4;
         target = deep ? Math.min(target, 9 + car.offroad * 6) : target * car.offroad * 0.75;
-        if (Math.abs(run.lat) > ROAD_HALF + 3.9) target = Math.min(target, 12 + car.offroad * 8); // grass
+        if (Math.abs(run.lat) > roadHalf() + 3.9) target = Math.min(target, 12 + car.offroad * 8); // grass
         if (deep && run.speed > 14) {
           run.shake = Math.max(run.shake, 0.3);
           if (run.time - gravelMsg.current > 4) {
@@ -517,7 +518,7 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
     const push = -roadCurvature(run.z) * run.speed * run.speed * (circ ? 0.16 : 0.35) * (drifting ? 0.6 : 1);
     run.lat += (run.latVel + push) * dt;
 
-    const wall = ROAD_HALF + (circ ? 3.85 : 3.2);
+    const wall = roadHalf() + (circ ? 3.85 : 3.2);
     if (Math.abs(run.lat) > wall) {
       const hard = circ && Math.abs(run.latVel + push) > 6 && run.speed > 25;
       run.lat = Math.sign(run.lat) * wall;
@@ -541,7 +542,7 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
       run.wz = f.z + f.nz * run.lat;
       run.heading = f.heading;
     }
-    run.offroad = Math.abs(run.lat) > ROAD_HALF + 0.2;
+    run.offroad = Math.abs(run.lat) > roadHalf() + 0.2;
 
     /* --- jump physics --- */
     if (run.airborne) {
@@ -810,7 +811,16 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
       const z = n.lap * L + item.off;
       if (z > run.z + 210) return;
       if (item.kind === "jars") for (let i = 0; i < 5; i++) add("jar", z + i * 4, item.lat);
-      else add(item.kind as Entity["kind"], z, item.lat);
+      else if (item.kind === "ramp") {
+        add("ramp", z, item.lat);
+        for (let i = 0; i < 5; i++) add("jar", z + 8 + i * 4.5, item.lat, 1.6 + Math.sin((i / 4) * Math.PI) * 1.4);
+      } else if (item.kind === "chicane") {
+        add("cone", z, item.lat);
+        add("cone", z + 12, -item.lat || 4.5);
+      } else if (item.kind === "cow") {
+        add("cow", z, item.lat);
+        if (hash(z) > 0.5) add("cow", z + 9, -item.lat);
+      } else add(item.kind as Entity["kind"], z, item.lat);
       n.idx++;
       if (n.idx >= lapItems.length) {
         n.idx = 0;
@@ -957,8 +967,8 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
       }
       if (e.walk && !e.done) {
         e.lat += e.walk * dt;
-        if (Math.abs(e.lat) > ROAD_HALF - 0.5) {
-          e.lat = Math.sign(e.lat) * (ROAD_HALF - 0.5);
+        if (Math.abs(e.lat) > roadHalf() - 0.5) {
+          e.lat = Math.sign(e.lat) * (roadHalf() - 0.5);
           e.walk = -e.walk;
         }
         o.rotation.y = headingAt(e.z) + (e.walk > 0 ? 0 : Math.PI);
@@ -1005,10 +1015,15 @@ function circuitLayout() {
   const L = lapLength();
   const items: { off: number; kind: string; lat: number }[] = [];
   let i = 0;
+  const biome = biomeAt(0);
+  const hazard = biome === "tatacoa" ? "rock" : biome === "cartagena" || biome === "cali" ? "puddle" : biome === "comuna_13" ? "chicane" : "cow";
   for (let off = 90; off < L - 60; off += 55 + hash(i * 3.7) * 30) {
-    const r = hash(i * 9.1 + 4);
-    const lat = LANES[Math.floor(hash(i * 5.3 + 1) * 3)];
-    items.push({ off, kind: r < 0.35 ? "boost" : r < 0.42 ? "nitro" : "jars", lat });
+    const r = hash(i * 2.17 + 9.3);
+    const lat = lanes()[Math.floor(hash(i * 5.3 + 1) * 3)];
+    // a jump at roughly a third and two thirds of the lap; hazards sprinkled in between
+    const frac = off / L;
+    const jumpSpot = (frac > 0.3 && frac < 0.36) || (frac > 0.62 && frac < 0.68);
+    items.push({ off, kind: jumpSpot ? "ramp" : r < 0.26 ? "boost" : r < 0.32 ? "nitro" : r < 0.6 ? hazard : "jars", lat });
     i++;
   }
   return items;
@@ -1052,14 +1067,14 @@ export function Scenery() {
       if (circ) {
         for (const side of [-1, 1]) {
           const away = heading + (side > 0 ? 0 : Math.PI);
-          if (nearStart) place("grandstand", z, side * (ROAD_HALF + 4.5), 1, away);
-          else if (i % 3 === 1) place("tireWall", z, side * (ROAD_HALF + 4.3), 1, heading);
+          if (nearStart) place("grandstand", z, side * (roadHalf() + 4.5), 1, away);
+          else if (i % 3 === 1) place("tireWall", z, side * (roadHalf() + 4.3), 1, heading);
         }
       }
 
       for (const side of [-1, 1]) {
         if (nearStart) break;
-        const near = side * (ROAD_HALF + 3 + r1 * 3);
+        const near = side * (roadHalf() + 3 + r1 * 3);
         const far = side * (16 + r2 * 22);
         const face = heading + (side > 0 ? Math.PI : 0); // doors look at the road
         if (biome === "coffee_hills") {
@@ -1073,57 +1088,57 @@ export function Scenery() {
         } else if (biome === "comuna_13") {
           // night barrio: graffiti walls and neon by the road, houses up the hills
           const away = heading + (side > 0 ? 0 : Math.PI);
-          if (r1 < 0.5) place(`graffiti${Math.floor(r3 * 8)}`, z, side * (ROAD_HALF + 3), 1, heading);
-          else if (r1 < 0.75) place("neonPalm", z, side * (ROAD_HALF + 3 + r2 * 2), 0.9 + r3 * 0.3, r2 * 6);
-          else place("lamp", z, side * (ROAD_HALF + 2.2), 1, heading + (side > 0 ? 0 : Math.PI));
-          place(`barrio${Math.floor(r2 * 5)}`, z + 4, side * (ROAD_HALF + 9 + r3 * 6), 1, away);
-          if (i % 7 === 3) place("escalator", z + 8, side * (ROAD_HALF + 5), 1, away);
-          if (i % 6 === 2) place(`neonSign${Math.floor(r3 * 3)}`, z, side * (ROAD_HALF + 3.6), 1, heading + side * 0.3);
+          if (r1 < 0.5) place(`graffiti${Math.floor(r3 * 8)}`, z, side * (roadHalf() + 3), 1, heading);
+          else if (r1 < 0.75) place("neonPalm", z, side * (roadHalf() + 3 + r2 * 2), 0.9 + r3 * 0.3, r2 * 6);
+          else place("lamp", z, side * (roadHalf() + 2.2), 1, heading + (side > 0 ? 0 : Math.PI));
+          place(`barrio${Math.floor(r2 * 5)}`, z + 4, side * (roadHalf() + 9 + r3 * 6), 1, away);
+          if (i % 7 === 3) place("escalator", z + 8, side * (roadHalf() + 5), 1, away);
+          if (i % 6 === 2) place(`neonSign${Math.floor(r3 * 3)}`, z, side * (roadHalf() + 3.6), 1, heading + side * 0.3);
         } else if (biome === "tatacoa") {
           // red canyons, cacti and the observatory
           const away = heading + (side > 0 ? 0 : Math.PI);
           place("cactus", z + side * 2, near, 0.8 + r3 * 0.6, r2 * 6);
           if (r1 < 0.7) place("redRock", z + 4, far, 1 + r3 * 0.8, r2 * 6);
-          if (i % 19 === 7 && side > 0) place("observatory", z, side * (ROAD_HALF + 16), 1, away);
+          if (i % 19 === 7 && side > 0) place("observatory", z, side * (roadHalf() + 16), 1, away);
         } else if (biome === "cali") {
           // sugar cane fields, fruit stands, salsa clubs, the cat by the river, Cristo Rey on the hill
           const away = heading + (side > 0 ? 0 : Math.PI);
-          if (r1 < 0.45) place("sugarcane", z, side * (ROAD_HALF + 7 + r2 * 4), 1, r3 * 6);
-          else if (r1 < 0.6) place("fruitStand", z, side * (ROAD_HALF + 3), 1, away);
-          else place("coconutPalm", z, side * (ROAD_HALF + 3 + r2 * 2), 0.9 + r3 * 0.3, r2 * 6);
+          if (r1 < 0.45) place("sugarcane", z, side * (roadHalf() + 7 + r2 * 4), 1, r3 * 6);
+          else if (r1 < 0.6) place("fruitStand", z, side * (roadHalf() + 3), 1, away);
+          else place("coconutPalm", z, side * (roadHalf() + 3 + r2 * 2), 0.9 + r3 * 0.3, r2 * 6);
           if (r2 > 0.55) place("sugarcane", z + 4, far, 1.2, r1 * 6);
-          else if (r2 < 0.2) place(`barrio${Math.floor(r3 * 5)}`, z + 4, side * (ROAD_HALF + 14 + r3 * 6), 1, away);
-          if (i % 11 === 5 && side < 0) place("gato", z, side * (ROAD_HALF + 4), 1, away + Math.PI);
-          if (i % 9 === 1 && side > 0) place("salsaSign", z, side * (ROAD_HALF + 3.6), 1, heading + 0.3);
+          else if (r2 < 0.2) place(`barrio${Math.floor(r3 * 5)}`, z + 4, side * (roadHalf() + 14 + r3 * 6), 1, away);
+          if (i % 11 === 5 && side < 0) place("gato", z, side * (roadHalf() + 4), 1, away + Math.PI);
+          if (i % 9 === 1 && side > 0) place("salsaSign", z, side * (roadHalf() + 3.6), 1, heading + 0.3);
           if (i % 40 === 20 && side < 0) place("cristoRey", z + 60, side * 75, 1, 0);
         } else if (biome === "cartagena") {
           // sea on the left, walls + colonial balconies on the right
           const away = heading + (side > 0 ? 0 : Math.PI);
           if (side < 0) {
-            if (i % 2 === 0) place("sea", z, -(ROAD_HALF + 4), 1, away);
-            if (r1 < 0.6) place("coconutPalm", z + 3, -(ROAD_HALF + 3 + r2 * 3), 0.9 + r3 * 0.3, r2 * 6);
+            if (i % 2 === 0) place("sea", z, -(roadHalf() + 4), 1, away);
+            if (r1 < 0.6) place("coconutPalm", z + 3, -(roadHalf() + 3 + r2 * 3), 0.9 + r3 * 0.3, r2 * 6);
           } else {
-            if (r1 < 0.45) place("cityWall", z, ROAD_HALF + 4, 1, heading);
-            else place(`colonial${Math.floor(r3 * 7)}`, z, ROAD_HALF + 4, 1, away);
-            if (i % 23 === 11) place("clockTower", z + 4, ROAD_HALF + 12, 1, away);
+            if (r1 < 0.45) place("cityWall", z, roadHalf() + 4, 1, heading);
+            else place(`colonial${Math.floor(r3 * 7)}`, z, roadHalf() + 4, 1, away);
+            if (i % 23 === 11) place("clockTower", z + 4, roadHalf() + 12, 1, away);
           }
         } else if (biome === "ciudad_perdida") {
           // dense jungle: ferns at the road, terraces, huts and giant ceibas behind
           place("fern", z + side * 2, near - side * 0.8, 0.9 + r3 * 0.6, r2 * 6);
-          if (r1 < 0.3) place("hut", z + 3, side * (ROAD_HALF + 10 + r2 * 4), 1, face);
-          else if (r1 < 0.55) place("terrace", z + 3, side * (ROAD_HALF + 11 + r2 * 3), 1, r3 * 6);
-          else if (r1 < 0.65) place("stairs", z, side * (ROAD_HALF + 4.5), 1, heading + (side > 0 ? 0 : Math.PI)); // climbs away from the road
+          if (r1 < 0.3) place("hut", z + 3, side * (roadHalf() + 10 + r2 * 4), 1, face);
+          else if (r1 < 0.55) place("terrace", z + 3, side * (roadHalf() + 11 + r2 * 3), 1, r3 * 6);
+          else if (r1 < 0.65) place("stairs", z, side * (roadHalf() + 4.5), 1, heading + (side > 0 ? 0 : Math.PI)); // climbs away from the road
           place("ceiba", z + 6, far * 1.1, 0.8 + r3 * 0.5, r1 * 6);
         } else {
-          if (r1 < 0.7) place(`house${Math.floor(r3 * 7)}`, z, side * (ROAD_HALF + 7 + r2 * 2), 1, face);
-          else place("lamp", z, side * (ROAD_HALF + 2.2), 1, heading + (side > 0 ? 0 : Math.PI));
+          if (r1 < 0.7) place(`house${Math.floor(r3 * 7)}`, z, side * (roadHalf() + 7 + r2 * 2), 1, face);
+          else place("lamp", z, side * (roadHalf() + 2.2), 1, heading + (side > 0 ? 0 : Math.PI));
           if (r2 > 0.5) place(`house${Math.floor(r1 * 7)}`, z + 5, far, 1, face);
         }
       }
       // sponsor boards and bunting
       if (i % 9 === 4) {
         const side = i % 2 ? 1 : -1;
-        place("banner", z, side * (ROAD_HALF + 2.6), 1, heading + side * 0.35);
+        place("banner", z, side * (roadHalf() + 2.6), 1, heading + side * 0.35);
       }
       if (biome === "pueblo" && i % 3 === 0) place("bunting", z + 3, 0, 1, heading);
 

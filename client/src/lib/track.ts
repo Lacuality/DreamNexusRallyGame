@@ -10,8 +10,17 @@ import { GAME_CONFIG } from "./constants";
  *  - circuit: a closed loop of `length` metres raced for N laps (the shape repeats every lap)
  */
 
-export const ROAD_HALF = GAME_CONFIG.LANE_WIDTH / 2; // 4.5m
+export const ROAD_HALF = GAME_CONFIG.LANE_WIDTH / 2; // 4.5m: the endless rally road
 export const LANES = [-3, 0, 3] as const;
+/** Circuits are kart-track wide (Mario Kart style): 14 m, five or six karts side by side. */
+export const CIRCUIT_HALF = 7;
+export function roadHalf() {
+  return loop ? CIRCUIT_HALF : ROAD_HALF;
+}
+/** Lane centres for items / layouts on the current track. */
+export function lanes(): readonly number[] {
+  return loop ? [-4.5, 0, 4.5] : LANES;
+}
 
 /* ---------------- Biomes ---------------- */
 export type BiomeType =

@@ -4,7 +4,7 @@ import * as THREE from "three";
 import { race, playerPosition, type Racer } from "@/lib/game/race";
 import { run } from "@/lib/game/run";
 import { input } from "@/lib/input";
-import { toWorld, LANES, lapLength } from "@/lib/track";
+import { toWorld, lanes, lapLength } from "@/lib/track";
 
 const tmpV = { x: 0, y: 0, z: 0 };
 const burstAt = (z: number, lat: number, h: number, colors: string[], count: number, speed: number, up: number) => {
@@ -368,7 +368,7 @@ export function Battle() {
           const b = boxes[bi++];
           if (!b) continue;
           const z = lap * L + rows[ri];
-          const lat = LANES[li];
+          const lat = lanes()[li];
           const key = `${lap}:${ri}:${li}`;
           const back = taken.current.get(key) ?? -1;
           const visible = z < total && z > run.z - 30 && z < run.z + 260 && back < now;

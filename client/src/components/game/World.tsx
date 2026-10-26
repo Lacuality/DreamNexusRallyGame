@@ -1,7 +1,7 @@
 import { useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
-import { roadX, roadY, toWorld, roadCurvature, currentLoop, ROAD_HALF, hash, isCircuit } from "@/lib/track";
+import { roadX, roadY, toWorld, roadCurvature, currentLoop, ROAD_HALF, roadHalf, hash, isCircuit } from "@/lib/track";
 import { blendedBiome, useBiome } from "@/lib/stores/useBiome";
 import { run } from "@/lib/game/run";
 
@@ -17,7 +17,7 @@ const AHEAD = 270;
 const ROWS = Math.ceil((BEHIND + AHEAD) / STEP) + 1;
 const REBUILD_EVERY = 6;
 
-const ROAD_W = ROAD_HALF + 0.3;
+const ROAD_W = ROAD_HALF + 0.3; // endless road (circuits read roadHalf() at mount)
 
 // lateral columns for the terrain (metres from road centre) and their base height
 const TERRAIN_COLS: [number, number][] = [
@@ -281,19 +281,20 @@ function Atmosphere() {
 
 /* ---------------- Road + terrain ---------------- */
 // circuit terrain: a narrow shoulder strip; the big flat ground plane is underneath
-const CIRCUIT_COLS: [number, number][] = [
-  [-34, 0],
-  [-20, 0.5],
-  [-ROAD_W - 4, -0.05],
-  [ROAD_W + 4, -0.05],
-  [20, 0.5],
-  [34, 0],
+const circuitCols = (rw: number): [number, number][] => [
+  [-40, 0],
+  [-26, 0.5],
+  [-rw - 4, -0.05],
+  [rw + 4, -0.05],
+  [26, 0.5],
+  [40, 0],
 ];
 
 function RoadAndTerrain() {
   const lastBuild = useRef(-9999);
   const circuit = isCircuit();
   const loop = currentLoop();
+  const RW = roadHalf() + 0.3; // half road width (+ kerb) for this track
   const L = loop ? loop.length : 0;
   const rows = circuit ? Math.ceil(L / STEP) + 1 : ROWS;
   const groundY = loop ? loop.minY - 0.45 : 0;
@@ -312,7 +313,7 @@ function RoadAndTerrain() {
   const rightRail = useMemo(() => makeStrip(2, rows), [rows]);
   const railTex = useMemo(() => makeStripeTexture(["#ffffff", "#ffffff", "#e23b3b", "#e23b3b"]), []);
   const rightGravel = useMemo(() => makeStrip(2, rows), [rows]);
-  const cols = circuit ? CIRCUIT_COLS : TERRAIN_COLS;
+  const cols = useMemo(() => (circuit ? circuitCols(RW) : TERRAIN_COLS), [circuit, RW]);
   const terrainGeo = useMemo(() => {
     const g = makeStrip(cols.length, rows);
     g.setAttribute("color", new THREE.BufferAttribute(new Float32Array(rows * cols.length * 3), 3));
@@ -324,17 +325,17 @@ function RoadAndTerrain() {
   const tmpB = useMemo(() => new THREE.Color(), []);
 
   const rebuild = (z0: number) => {
-    fillStrip(roadGeo, z0, [-ROAD_W, ROAD_W], 0, 10, rows);
-    fillStrip(leftRumble, z0, [-ROAD_W - 0.35, -ROAD_W + 0.35], 0.02, 4, rows);
-    fillStrip(rightRumble, z0, [ROAD_W - 0.35, ROAD_W + 0.35], 0.02, 4, rows);
+    fillStrip(roadGeo, z0, [-RW, RW], 0, 10, rows);
+    fillStrip(leftRumble, z0, [-RW - 0.35, -RW + 0.35], 0.02, 4, rows);
+    fillStrip(rightRumble, z0, [RW - 0.35, RW + 0.35], 0.02, 4, rows);
     fillStrip(dashGeo, z0, [-0.12, 0.12], 0.015, 12, rows);
     if (circuit) {
       // gravel traps: leave the track and you bog down
-      fillStrip(leftGravel, z0, [-ROAD_W - 3.6, -ROAD_W - 0.3], 0.01, 6, rows);
-      fillStrip(rightGravel, z0, [ROAD_W + 0.3, ROAD_W + 3.6], 0.01, 6, rows);
+      fillStrip(leftGravel, z0, [-RW - 3.6, -RW - 0.3], 0.01, 6, rows);
+      fillStrip(rightGravel, z0, [RW + 0.3, RW + 3.6], 0.01, 6, rows);
       // guard rails: the edge of the track you can't drive through
-      fillWall(leftRail, z0, -ROAD_W - 3.75, 0, 0.75, 6, rows);
-      fillWall(rightRail, z0, ROAD_W + 3.75, 0, 0.75, 6, rows);
+      fillWall(leftRail, z0, -RW - 3.75, 0, 0.75, 6, rows);
+      fillWall(rightRail, z0, RW + 3.75, 0, 0.75, 6, rows);
     }
 
     // terrain: valley that rises away from the road, with bumpy hills
@@ -360,7 +361,7 @@ function RoadAndTerrain() {
           : far * (Math.sin(z * 0.021 + lat * 0.07) * 4 + Math.sin(z * 0.053 + lat * 0.13 + 1.7) * 2 + hash(Math.floor(z / STEP) * 13 + c) * 1.5);
         toWorld(z, lat, base + bumps, tmpP);
         pos[i * 3] = tmpP.x;
-        pos[i * 3 + 1] = circuit && Math.abs(cols[c][0]) >= 34 ? groundY : tmpP.y;
+        pos[i * 3 + 1] = circuit && Math.abs(cols[c][0]) >= 40 ? groundY : tmpP.y;
         pos[i * 3 + 2] = tmpP.z;
         uv[i * 2] = lat / 8;
         uv[i * 2 + 1] = z / 8;
