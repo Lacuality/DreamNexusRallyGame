@@ -399,7 +399,7 @@ export function GameHUD({ isFullscreen = false, onToggleFullscreen }: GameHUDPro
           {!touch && (
             <div style={{ fontWeight: 900, textShadow: "0 2px 4px #000" }}>
               <div style={{ fontFamily: UI.display, color: hud.item ? UI.gold : "rgba(255,255,255,0.7)" }}>
-                {hud.item ? ITEMS[hud.item as keyof typeof ITEMS].name : "Drive through a ? box"}
+                {spin ? "..." : hud.item ? ITEMS[hud.item as keyof typeof ITEMS].name : "Drive through a ? box"}
               </div>
               <div style={{ fontSize: 13 }}>{hud.item ? `${ITEMS[hud.item as keyof typeof ITEMS].hint} — press E` : "to get a power-up"}</div>
             </div>

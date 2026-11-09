@@ -131,7 +131,8 @@ export function Garage({ onClose }: { onClose: () => void }) {
           {CARS.map((c) => {
             const owned = profile.ownedCars.includes(c.id);
             const active = profile.car === c.id;
-            const canBuy = profile.wallet >= c.price;
+            const trophyOk = isUnlocked(c.unlock ?? null, profile.progressNow());
+            const canBuy = profile.wallet >= c.price && trophyOk;
             return (
               <Card key={c.id} active={active} locked={!owned} onClick={() => setPeek({ car: c.id })}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -171,7 +172,7 @@ export function Garage({ onClose }: { onClose: () => void }) {
                       color={UI.gold}
                       style={{ width: "100%", fontSize: 16, minHeight: 44, padding: "8px 12px" }}
                     >
-                      BUY · 🍯 {c.price.toLocaleString()}
+                      {trophyOk ? `BUY · 🍯 ${c.price.toLocaleString()}` : `🔒 ${c.unlock!.label}`}
                     </BigButton>
                   )}
                 </div>

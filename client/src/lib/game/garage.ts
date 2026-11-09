@@ -9,7 +9,7 @@ import type { BiomeType } from "../track";
 
 export type DriverId = "pixel" | "chiguiro" | "tucan" | "rana" | "oso" | "jaguar" | "condor" | "titi" | "nexi";
 export type CarId = "rally7" | "cuatro" | "willys" | "taxi" | "chiva" | "dn";
-export type PaintId = "dn" | "cafe" | "tricolor" | "esmeralda" | "oro" | "rosaNeon" | "desierto" | "caribe";
+export type PaintId = "dn" | "cafe" | "tricolor" | "esmeralda" | "oro" | "rosaNeon" | "desierto" | "caribe" | "campeon" | "plata";
 
 /** What the player has done so far (stored on the device, see useProfile). */
 export interface Progress {
@@ -22,6 +22,16 @@ export interface Progress {
   storyComplete: boolean;
   regions: BiomeType[];
   onlineAchievements: string[]; // achievement names unlocked in the online database
+  trophies: Record<string, string>; // `${cupId}:${cc}` -> gold | silver | bronze
+}
+
+/** Does the player hold a trophy of at least `min` on this cup/class (any cup when cupId is "*")? */
+export function hasTrophy(p: Pick<Progress, "trophies">, cupId: string, cc: number | "*", min: "gold" | "silver" | "bronze" = "bronze") {
+  const rank = { gold: 3, silver: 2, bronze: 1 } as const;
+  return Object.entries(p.trophies || {}).some(([key, t]) => {
+    const [c, k] = key.split(":");
+    return (cupId === "*" || c === cupId) && (cc === "*" || Number(k) === cc) && rank[t as keyof typeof rank] >= rank[min];
+  });
 }
 
 export interface Unlock {
@@ -128,6 +138,7 @@ export interface Car {
   price: number; // arequipe jars
   stats: CarStats;
   defaultPaint: PaintId;
+  unlock?: Unlock; // besides the price: a trophy you need first
 }
 
 export const CARS: Car[] = [
@@ -165,6 +176,7 @@ export const CARS: Car[] = [
   },
   {
     id: "chiva",
+    unlock: { label: "Win any trophy in the Copa Tropical", test: (p) => hasTrophy(p, "tropical", "*") },
     name: "La Chiva Rumbera",
     desc: "The party bus! Slow, but 5 hearts and it ploughs through cones and sacks.",
     price: 1500,
@@ -173,6 +185,7 @@ export const CARS: Car[] = [
   },
   {
     id: "dn",
+    unlock: { label: "Gold in the Copa Dream Nexus (any class)", test: (p) => hasTrophy(p, "nexus", "*", "gold") },
     name: "DN Prototype",
     desc: "Dream Nexus' neon hypercar. Fastest car in Colombia, longer nitro.",
     price: 3000,
@@ -201,6 +214,8 @@ export const PAINTS: Paint[] = [
   { id: "rosaNeon", name: "Neón Comuna", main: "#ff4f9a", accent: "#5fd8ff", trim: "#1a0b2e", unlock: visited("comuna_13", "Comuna 13") },
   { id: "desierto", name: "Tatacoa", main: "#c1572f", accent: "#f2c48d", trim: "#4a2a1a", unlock: visited("tatacoa", "the Tatacoa Desert") },
   { id: "caribe", name: "Caribe", main: "#1fb5c9", accent: "#ffffff", trim: "#f7b32b", unlock: visited("cartagena", "Cartagena") },
+  { id: "campeon", name: "Campeón 150cc", main: "#ffd23f", accent: "#0E1B24", trim: "#c8772e", unlock: { label: "Gold trophy in any 150cc cup", test: (p) => hasTrophy(p, "*", 150, "gold") } },
+  { id: "plata", name: "Plata Andina", main: "#d9dde3", accent: "#24A0CE", trim: "#5b6470", unlock: { label: "Any trophy in the Copa Andina", test: (p) => hasTrophy(p, "andina", "*") } },
 ];
 
 export function isUnlocked(u: Unlock | null, p: Progress) {

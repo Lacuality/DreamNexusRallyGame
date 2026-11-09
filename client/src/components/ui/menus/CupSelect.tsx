@@ -3,6 +3,7 @@ import { Play } from "lucide-react";
 import { CUPS, CLASSES, CLASS_INFO, TROPHY_EMOJI, type EngineClass } from "@/lib/game/cup";
 import { circuitById } from "@/lib/game/circuits";
 import { useProfile } from "@/lib/stores/useProfile";
+import { hasTrophy } from "@/lib/game/garage";
 import { MenuShell, Card } from "./MenuShell";
 import { CircuitThumb } from "./CircuitSelect";
 import { BigButton, UI } from "../gameUi";
@@ -10,6 +11,7 @@ import { BigButton, UI } from "../gameUi";
 /** Grand Prix: pick a cup and an engine class. */
 export function CupSelect({ onClose, onStart }: { onClose: () => void; onStart: (cupId: string, cc: EngineClass) => void }) {
   const trophies = useProfile((s) => s.trophies);
+  const locked150 = !hasTrophy({ trophies }, "*", 100, "gold"); // selecting a fresh object here would re-render forever
   const [cc, setCc] = useState<EngineClass>(100);
   return (
     <MenuShell title="🏆 Grand Prix" onClose={onClose}>
@@ -17,12 +19,15 @@ export function CupSelect({ onClose, onStart }: { onClose: () => void; onStart: 
         A cup is a series of races against 7 rivals with items on. Points per race: 9 · 6 · 3 · 1. Most points at the end takes the trophy.
       </p>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8, marginBottom: 12 }}>
-        {CLASSES.map((c) => (
-          <Card key={c} active={cc === c} onClick={() => setCc(c)} style={{ padding: 10, textAlign: "center" }}>
-            <div style={{ fontFamily: UI.display, fontSize: 20 }}>{CLASS_INFO[c].label}</div>
-            <div style={{ fontSize: 12, fontWeight: 700, opacity: 0.85 }}>{CLASS_INFO[c].blurb}</div>
-          </Card>
-        ))}
+        {CLASSES.map((c) => {
+          const locked = c === 150 && locked150;
+          return (
+            <Card key={c} active={cc === c} locked={locked} onClick={() => !locked && setCc(c)} style={{ padding: 10, textAlign: "center" }}>
+              <div style={{ fontFamily: UI.display, fontSize: 20 }}>{locked ? "🔒 " : ""}{CLASS_INFO[c].label}</div>
+              <div style={{ fontSize: 12, fontWeight: 700, opacity: 0.85 }}>{locked ? "Win a gold trophy at 100cc to unlock" : CLASS_INFO[c].blurb}</div>
+            </Card>
+          );
+        })}
       </div>
       <div style={{ display: "grid", gap: 10 }}>
         {CUPS.map((cup) => {

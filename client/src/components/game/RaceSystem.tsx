@@ -5,12 +5,13 @@ import { burst, FX } from "@/lib/game/fx";
 import { placeOnTrack, groundHeight } from "@/lib/game/physics";
 import { run, multiplierFor, MAX_HEARTS, NITRO_DURATION, INVULNERABLE_TIME, speedGear } from "@/lib/game/run";
 import { input, steerInput } from "@/lib/input";
-import { toWorld, headingAt, frameAt, roadCurvature, roadHalf, lanes, hash, biomeAt, lapLength, isCircuit } from "@/lib/track";
+import { toWorld, headingAt, frameAt, roadCurvature, roadHalf, lanes, hash, biomeAt, lapLength, isCircuit, roadY } from "@/lib/track";
 
 const tmpV = { x: 0, y: 0, z: 0 };
 import { ModelPool, OBSTACLE_SIZE, type ObstacleKind, type PickupKind, makeArch, makeFinishLine } from "@/lib/game/models";
 import { useRally, goalProgress } from "@/lib/stores/useRally";
-import { car, session, classSpeed } from "@/lib/game/session";
+import { car, session, classSpeed, sessionCircuit } from "@/lib/game/session";
+import { circuitById } from "@/lib/game/circuits";
 import { chapterById } from "@/lib/game/story";
 import { race, playerPosition } from "@/lib/game/race";
 import { room, myId } from "@/lib/game/net";
@@ -856,6 +857,13 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
       else if (item.kind === "ramp") {
         add("ramp", z, item.lat);
         for (let i = 0; i < 5; i++) add("jar", z + 8 + i * 4.5, item.lat, 1.6 + Math.sin((i / 4) * Math.PI) * 1.4);
+      } else if (item.kind === "bigJump") {
+        // the whole track is a ramp: three side by side, a boost line before them, air jars after
+        for (const lat of lanes()) add("ramp", z, lat);
+        for (const lat of lanes()) add("boost", z - 24, lat);
+        for (let i = 0; i < 7; i++) add("jar", z + 10 + i * 5, 0, 2.2 + Math.sin((i / 6) * Math.PI) * 2.4);
+      } else if (item.kind === "boostLine") {
+        for (const lat of lanes()) add("boost", z, lat);
       } else if (item.kind === "chicane") {
         add("cone", z, item.lat);
         add("cone", z + 12, -item.lat || 4.5);
@@ -1051,6 +1059,23 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
   return <group ref={group} />;
 }
 
+const r2 = (k: number) => hash(k * 0.73 + 2.1);
+function circuitDef() {
+  const c = sessionCircuit();
+  return c ? circuitById(c.id) : null;
+}
+/** The set piece (if any) covering this offset along the lap. */
+function setPieceAt(off: number) {
+  const def = circuitDef();
+  if (!def?.setPieces) return null;
+  const L = lapLength();
+  for (const sp of def.setPieces) {
+    const start = sp.at * L;
+    if (off >= start && off < start + sp.length) return sp;
+  }
+  return null;
+}
+
 /** The same jars + boost pads every lap (deterministic, so online races match). */
 function circuitLayout() {
   if (!isCircuit()) return [{ off: 0, kind: "jars", lat: 0 }];
@@ -1064,10 +1089,24 @@ function circuitLayout() {
     const lat = lanes()[Math.floor(hash(i * 5.3 + 1) * 3)];
     // a jump at roughly a third and two thirds of the lap; hazards sprinkled in between
     const frac = off / L;
+    if (setPieceAt(off)) {
+      i++;
+      continue; // set pieces bring their own content
+    }
     const jumpSpot = (frac > 0.3 && frac < 0.36) || (frac > 0.62 && frac < 0.68);
     items.push({ off, kind: jumpSpot ? "ramp" : r < 0.26 ? "boost" : r < 0.32 ? "nitro" : r < 0.6 ? hazard : "jars", lat });
     i++;
   }
+  for (const sp of circuitDef()?.setPieces ?? []) {
+    const start = Math.round(sp.at * L);
+    if (sp.kind === "boostStrip") for (let k = 0; k < sp.length; k += 12) items.push({ off: start + k, kind: "boostLine", lat: 0 });
+    if (sp.kind === "bigJump") {
+      items.push({ off: start, kind: "bigJump", lat: 0 });
+    }
+    if (sp.kind === "tunnel") for (let k = 20; k < sp.length - 10; k += 30) items.push({ off: start + k, kind: "jars", lat: lanes()[k % 3] });
+    if (sp.kind === "bridge") for (let k = 15; k < sp.length - 10; k += 35) items.push({ off: start + k, kind: r2(k) < 0.5 ? "boost" : "jars", lat: lanes()[(k / 35) % 3 | 0] });
+  }
+  items.sort((a, b) => a.off - b.off);
   return items;
 }
 
@@ -1083,7 +1122,8 @@ export function Scenery() {
 
   const place = (kind: string, z: number, lat: number, scale = 1, rotY = 0) => {
     const o = pool.acquire(kind);
-    toWorld(z, lat, Math.abs(lat) > 12 ? 0.2 : -0.1, o.position);
+    // water sits just above the infield ground, whatever height the bridge deck is at
+    toWorld(z, lat, kind === "water" ? 0.3 - roadY(z) : kind === "mound" ? -2 : Math.abs(lat) > 12 ? 0.2 : -0.1, o.position);
     o.rotation.set(0, rotY, 0);
     o.scale.setScalar(scale);
     group.current?.add(o);
@@ -1106,6 +1146,22 @@ export function Scenery() {
       const circ = isCircuit();
       const off = circ ? ((z % lapLength()) + lapLength()) % lapLength() : 0;
       const nearStart = circ && (off < 150 || off > lapLength() - 60);
+      // signature set pieces (tunnel, bridge...) take over their stretch of the lap
+      const piece = circ ? setPieceAt(off) : null;
+      if (piece) {
+        if (piece.kind === "tunnel") {
+          place(circuitDef()?.night ? "tunnelNeon" : "tunnelSeg", z, 0, 1, heading);
+          if (!circuitDef()?.night) for (const side of [-1, 1]) place("mound", z, side * (roadHalf() + 22), 1, 0);
+        } else if (piece.kind === "bridge") {
+          place("bridgeRail", z, 0, 1, heading);
+          for (const side of [-1, 1]) {
+            place("water", z, side * (roadHalf() + 18), 1, heading);
+            place("water", z, side * (roadHalf() + 52), 1.4, heading);
+          }
+        }
+        nextZ.current += 12;
+        continue;
+      }
       if (circ) {
         for (const side of [-1, 1]) {
           const away = heading + (side > 0 ? 0 : Math.PI);

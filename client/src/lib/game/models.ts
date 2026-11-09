@@ -1525,7 +1525,103 @@ const real = (name: ModelName, size: number, axis: "x" | "y" | "z" | "max", fall
   return g;
 };
 
+function buildTunnelSeg(neon = false) {
+  // one 12 m section of a tunnel over the full track width
+  const g = new THREE.Group();
+  const w = 7 + 4.5; // half width: track + gravel
+  const h = 6.5;
+  const wall = mat(neon ? "#1a0b2e" : "#6e6a62", { roughness: 1 });
+  const geo = new THREE.BoxGeometry(1, h, 12);
+  [-1, 1].forEach((s) => {
+    const m = mesh(geo, wall);
+    m.position.set(s * w, h / 2, 0);
+    g.add(m);
+  });
+  // vaulted roof as a half cylinder
+  const roof = mesh(new THREE.CylinderGeometry(w + 0.5, w + 0.5, 12, 24, 1, true, 0, Math.PI), wall);
+  roof.rotation.z = Math.PI / 2;
+  roof.rotation.y = Math.PI / 2;
+  roof.position.y = h;
+  (roof.material as THREE.MeshStandardMaterial).side = THREE.DoubleSide;
+  g.add(roof);
+  // lights along the ceiling
+  const lampMat = mat(neon ? "#ff4f9a" : "#fff6c8", { emissive: neon ? "#ff4f9a" : "#fff6c8", emissiveIntensity: neon ? 2.5 : 1.6 });
+  for (const z of [-4, 4]) {
+    const l = mesh(new THREE.BoxGeometry(neon ? 0.25 : 1.2, 0.15, neon ? 10 : 0.6), lampMat, false);
+    l.position.set(neon ? (z < 0 ? -w + 0.6 : w - 0.6) : 0, neon ? h * 0.9 : h + w * 0.95 - 0.2, neon ? 0 : z);
+    g.add(l);
+  }
+  if (neon) {
+    const strip = mat("#5fd8ff", { emissive: "#5fd8ff", emissiveIntensity: 2 });
+    [-1, 1].forEach((s) => {
+      const st = mesh(new THREE.BoxGeometry(0.12, 0.12, 12), strip, false);
+      st.position.set(s * (w - 0.5), 1.2, 0);
+      g.add(st);
+    });
+  }
+  return g;
+}
+
+function buildBridgeRail() {
+  // 12 m of bridge: deck edge beams, railing posts, cables
+  const g = new THREE.Group();
+  const steel = mat("#c9ced4", { metalness: 0.6, roughness: 0.4 });
+  const w = 7 + 4.2;
+  [-1, 1].forEach((s) => {
+    const beam = mesh(new THREE.BoxGeometry(0.5, 1.2, 12), mat("#8a6a4a", { roughness: 1 }));
+    beam.position.set(s * w, -0.6, 0);
+    g.add(beam);
+    for (let i = 0; i < 4; i++) {
+      const post = mesh(new THREE.CylinderGeometry(0.08, 0.08, 1.4, 6), steel, false);
+      post.position.set(s * w, 0.7, -4.5 + i * 3);
+      g.add(post);
+    }
+    const rail = mesh(new THREE.BoxGeometry(0.1, 0.1, 12), steel, false);
+    rail.position.set(s * w, 1.4, 0);
+    g.add(rail);
+  });
+  return g;
+}
+
+function buildWater() {
+  const g = new THREE.Group();
+  const sea = mesh(
+    new THREE.PlaneGeometry(40, 14),
+    new THREE.MeshStandardMaterial({ color: "#1fb5c9", roughness: 0.15, metalness: 0.3, transparent: true, opacity: 0.9 }),
+    false,
+  );
+  sea.rotation.x = -Math.PI / 2;
+  g.add(sea);
+  return g;
+}
+
+function buildMound() {
+  // grassy hill the tunnel goes through
+  const g = new THREE.Group();
+  const m = mesh(new THREE.SphereGeometry(16, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2), mat("#4f8a3a", { roughness: 1, flatShading: true }));
+  m.scale.set(1.6, 0.9, 1.2);
+  g.add(m);
+  return g;
+}
+
+function buildBoostLine() {
+  // a long chevron strip across two lanes
+  const g = new THREE.Group();
+  for (let i = 0; i < 3; i++) {
+    const b = buildBoost();
+    b.position.set((i - 1) * 4.5, 0, 0);
+    g.add(b);
+  }
+  return g;
+}
+
 const BUILDERS: Record<string, Builder> = {
+  tunnelSeg: () => buildTunnelSeg(false),
+  tunnelNeon: () => buildTunnelSeg(true),
+  bridgeRail: buildBridgeRail,
+  water: buildWater,
+  mound: buildMound,
+  boostLine: buildBoostLine,
   // nature + props from Kenney's kits
   coconutPalm: real("tree_palm", 5.5, "y", buildCoconutPalm),
   pine: real("tree_pine", 4.2, "y", buildPine),

@@ -23,7 +23,7 @@ export interface ProfileData {
   car: CarId;
   driver: DriverId;
   paint: PaintId;
-  progress: Omit<Progress, "onlineAchievements">;
+  progress: Omit<Progress, "onlineAchievements" | "trophies">;
   story: Record<string, number>; // chapter id -> stars (0..3)
   bestLaps: Record<string, number>; // circuit id -> seconds
   circuitWins: Record<string, number>;
@@ -125,7 +125,7 @@ export const useProfile = create<ProfileState>((set, get) => {
 
     setOnlineAchievements: (names) => set({ onlineAchievements: names }),
 
-    progressNow: () => ({ ...get().progress, onlineAchievements: get().onlineAchievements }),
+    progressNow: () => ({ ...get().progress, onlineAchievements: get().onlineAchievements, trophies: get().trophies }),
 
     recordRun: (r) => {
       const s = get();
