@@ -7,6 +7,7 @@ import { toWorld, headingAt, ROAD_HALF } from "@/lib/track";
 import { useRally } from "@/lib/stores/useRally";
 import { audioManager } from "@/lib/audio";
 import { burst } from "@/lib/game/fx";
+import { cloneModel, tintModel } from "@/lib/game/assets";
 
 /**
  * Los tombos. A patrol car waits on the roadside (you get a warning when it's
@@ -43,6 +44,7 @@ function buildCop() {
   const g = new THREE.Group();
   const white = m("#f2f4f5");
   const green = m("#1f8a3c");
+  const realCar = cloneModel("police_car", 4.4, "z");
   const body = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.8, 4.2), white);
   body.position.y = 0.75;
   body.castShadow = true;
@@ -51,12 +53,13 @@ function buildCop() {
   const glass = new THREE.Mesh(new THREE.BoxGeometry(1.72, 0.4, 2.02), m("#9fd8f0", { metalness: 0.3, roughness: 0.2 }));
   glass.position.set(0, 1.5, -0.2);
   const tex = label();
-  [-1.02, 1.02].forEach((x) => {
-    const d = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 0.5), new THREE.MeshStandardMaterial({ map: tex }));
-    d.position.set(x, 0.85, 0);
-    d.rotation.y = x > 0 ? Math.PI / 2 : -Math.PI / 2;
-    g.add(d);
-  });
+  if (!realCar)
+    [-1.02, 1.02].forEach((x) => {
+      const d = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 0.5), new THREE.MeshStandardMaterial({ map: tex }));
+      d.position.set(x, 0.85, 0);
+      d.rotation.y = x > 0 ? Math.PI / 2 : -Math.PI / 2;
+      g.add(d);
+    });
   const bar = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.18, 0.4), m("#222"));
   bar.position.set(0, 1.9, -0.2);
   const red = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.22, 0.42), m("#ff2a2a", { emissive: "#ff2a2a", emissiveIntensity: 0.2 }));
@@ -102,16 +105,42 @@ function buildCop() {
   const post = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.8, 6), m("#888"));
   post.position.set(0, 0.9, -3.2);
   post.name = "post";
-  g.add(body, cabin, glass, bar, red, blue, head, cap, sign, post);
-  const wheels: THREE.Mesh[] = [];
-  const tyre = m("#1b1b1f", { roughness: 0.9 });
-  [[-0.95, 1.3], [0.95, 1.3], [-0.95, -1.3], [0.95, -1.3]].forEach(([x, z]) => {
-    const w = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.3, 14), tyre);
-    w.rotation.z = Math.PI / 2;
-    w.position.set(x, 0.42, z);
-    g.add(w);
-    wheels.push(w);
-  });
+  const wheels: THREE.Object3D[] = [];
+  if (realCar) {
+    // Kenney's police car in Colombian green and white, with our flashing lights on top
+    tintModel(realCar, "#1f8a3c", (o) => {
+      let x: THREE.Object3D | null = o;
+      while (x) {
+        const n = (x.name || "").toLowerCase();
+        if (n.startsWith("wheel") || n.includes("glass") || n.includes("light") || n === "grill") return true;
+        x = x.parent;
+      }
+      return false;
+    });
+    realCar.traverse((o) => {
+      if ((o.name || "").toLowerCase().startsWith("wheel")) wheels.push(o);
+    });
+    const top = new THREE.Box3().setFromObject(realCar).max.y;
+    bar.position.y = top + 0.08;
+    red.position.y = blue.position.y = top + 0.1;
+    g.add(realCar, bar, red, blue, sign, post);
+    [-1.02, 1.02].forEach((x) => {
+      const d = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 0.42), new THREE.MeshStandardMaterial({ map: tex, transparent: true }));
+      d.position.set(x, 0.95, 0);
+      d.rotation.y = x > 0 ? Math.PI / 2 : -Math.PI / 2;
+      g.add(d);
+    });
+  } else {
+    g.add(body, cabin, glass, bar, red, blue, head, cap, sign, post);
+    const tyre = m("#1b1b1f", { roughness: 0.9 });
+    [[-0.95, 1.3], [0.95, 1.3], [-0.95, -1.3], [0.95, -1.3]].forEach(([x, z]) => {
+      const w = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.3, 14), tyre);
+      w.rotation.z = Math.PI / 2;
+      w.position.set(x, 0.42, z);
+      g.add(w);
+      wheels.push(w);
+    });
+  }
   return { group: g, wheels, red, blue, sign, post };
 }
 

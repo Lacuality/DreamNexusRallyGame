@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { cloneModel, tintModel, type ModelName } from "./assets";
 import { paintById, type CarId, type DriverId, type PaintId } from "./garage";
 
 /**
@@ -89,6 +90,76 @@ interface BodyResult {
   wheels: [number, number][]; // x,z of each wheel (first two = front)
   wheelR: number;
   length: number;
+  // real model: its own wheel nodes (spun / steered directly) instead of procedural cylinders
+  wheelNodes?: { pivot: THREE.Object3D; spin: THREE.Object3D; front: boolean }[];
+}
+
+/** Which CC0 model each car uses, and how long it should be in metres. */
+const CAR_MODELS: Record<CarId, { model: ModelName; length: number; tintBody: boolean }> = {
+  rally7: { model: "kart_a", length: 3.6, tintBody: true },
+  cuatro: { model: "hatchback_sports", length: 3.7, tintBody: true },
+  willys: { model: "suv", length: 4.0, tintBody: true },
+  taxi: { model: "taxi", length: 4.0, tintBody: false },
+  chiva: { model: "truck", length: 5.2, tintBody: true },
+  dn: { model: "race_car_future", length: 4.2, tintBody: true },
+};
+
+/** Build a body from a real model; null when the model isn't loaded (then the procedural body is used). */
+function bodyFromModel(carId: CarId, paintId: PaintId): BodyResult | null {
+  const spec = CAR_MODELS[carId];
+  const g = cloneModel(spec.model, spec.length, "z");
+  if (!g) return null;
+  const p = paintById(paintId);
+  const wheelNodes: BodyResult["wheelNodes"] = [];
+  const toRemove: THREE.Object3D[] = [];
+  g.traverse((o) => {
+    const n = (o.name || "").toLowerCase();
+    if (n === "character") toRemove.push(o); // Kenney's placeholder driver: ours sits there instead
+  });
+  toRemove.forEach((o) => o.parent?.remove(o));
+  g.traverse((o) => {
+    const n = (o.name || "").toLowerCase();
+    if (n.startsWith("wheel")) {
+      // steer the whole node, spin a child group so both work at once
+      const spin = new THREE.Group();
+      while (o.children.length) spin.add(o.children[0]);
+      // a wheel node may itself be a mesh: move its geometry into the spin group
+      const m = o as THREE.Mesh;
+      if (m.isMesh) {
+        const copy = new THREE.Mesh(m.geometry, m.material);
+        copy.castShadow = true;
+        spin.add(copy);
+        m.geometry = new THREE.BufferGeometry();
+      }
+      o.add(spin);
+      wheelNodes.push({ pivot: o, spin, front: n.includes("front") });
+    }
+  });
+  if (spec.tintBody) {
+    // paint the body, keep wheels / glass / lights as they are
+    tintModel(g, p.main, (o) => {
+      let x: THREE.Object3D | null = o;
+      while (x) {
+        const n = (x.name || "").toLowerCase();
+        if (n.startsWith("wheel") || n.includes("glass") || n.includes("window") || n.includes("light")) return true;
+        x = x.parent;
+      }
+      return false;
+    });
+  }
+  const box = new THREE.Box3().setFromObject(g);
+  const top = box.max.y;
+  const width = box.max.x - box.min.x;
+  // the driver sits down in the seat: open karts low, closed cars on the roofline
+  const open = spec.model.startsWith("kart") || spec.model.startsWith("race_car");
+  return {
+    group: g,
+    mount: new THREE.Vector3(0, open ? top * 0.55 : top - 0.35, carId === "chiva" ? 0.9 : carId === "dn" ? -0.3 : open ? -0.35 : -0.25),
+    wheels: [[width / 2, spec.length * 0.32], [-width / 2, spec.length * 0.32], [width / 2, -spec.length * 0.32], [-width / 2, -spec.length * 0.32]],
+    wheelR: 0.38,
+    length: spec.length,
+    wheelNodes,
+  };
 }
 
 /* ---------------- car bodies ---------------- */
@@ -641,7 +712,7 @@ export function buildVehicle(carId: CarId = "rally7", paintId: PaintId = "dn", d
   const body = new THREE.Group();
   root.add(body);
   const c = palette(paintId);
-  const b = (BODIES[carId] ?? bodyRally7)(c);
+  const b = bodyFromModel(carId, paintId) ?? (BODIES[carId] ?? bodyRally7)(c);
   body.add(b.group);
 
   const d = (DRIVER_BUILDERS[driverId] ?? driverPixel)();
@@ -656,7 +727,13 @@ export function buildVehicle(carId: CarId = "rally7", paintId: PaintId = "dn", d
   const rimGeo = new THREE.CylinderGeometry(b.wheelR * 0.57, b.wheelR * 0.57, 0.36, 8);
   const wheels: THREE.Object3D[] = [];
   const frontWheels: THREE.Object3D[] = [];
-  b.wheels.forEach(([x, z], i) => {
+  if (b.wheelNodes) {
+    for (const w of b.wheelNodes) {
+      wheels.push(w.spin);
+      if (w.front) frontWheels.push(w.pivot);
+    }
+  }
+  if (!b.wheelNodes) b.wheels.forEach(([x, z], i) => {
     const pivot = new THREE.Group();
     pivot.position.set(x, b.wheelR, z);
     const spin = new THREE.Group();

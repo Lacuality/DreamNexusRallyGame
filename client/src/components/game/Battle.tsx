@@ -15,6 +15,7 @@ import { useRally } from "@/lib/stores/useRally";
 import { audioManager } from "@/lib/audio";
 import { room, myId } from "@/lib/game/net";
 import { burst, FX } from "@/lib/game/fx";
+import { cloneModel } from "@/lib/game/assets";
 import { session } from "@/lib/game/session";
 
 /**
@@ -134,6 +135,11 @@ function makeAguacate() {
 }
 
 function makePlatano() {
+  const real = cloneModel("banana", 1.3, "max");
+  if (real) {
+    real.rotation.y = Math.random() * 6;
+    return real;
+  }
   const g = new THREE.Group();
   const peel = new THREE.Mesh(new THREE.TorusGeometry(0.6, 0.16, 8, 14, Math.PI * 1.1), m("#ffd23f", { emissive: "#664c00", emissiveIntensity: 0.3 }));
   peel.rotation.x = -Math.PI / 2;

@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { cloneModel, type ModelName } from "./assets";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
 /**
@@ -1516,14 +1517,30 @@ function buildFruitStand() {
  * ======================================================= */
 type Builder = () => THREE.Object3D;
 
+/** Use the real CC0 model when it's loaded, else the procedural one. */
+const real = (name: ModelName, size: number, axis: "x" | "y" | "z" | "max", fallback: Builder, finish?: (g: THREE.Group) => void): Builder => () => {
+  const g = cloneModel(name, size, axis);
+  if (!g) return fallback();
+  finish?.(g);
+  return g;
+};
+
 const BUILDERS: Record<string, Builder> = {
+  // nature + props from Kenney's kits
+  coconutPalm: real("tree_palm", 5.5, "y", buildCoconutPalm),
+  pine: real("tree_pine", 4.2, "y", buildPine),
+  boulder: real("rock_large", 2.6, "max", buildBoulder),
+  redRock: real("rock_tall", 4.5, "y", buildRedRock),
+  cactus: real("cactus", 2.6, "y", buildCactus),
+  coffeeBush: real("bush", 1.3, "y", buildCoffeeBush),
+  fence: real("fence", 3.2, "max", buildFence),
+  rock: real("rock_small", 1.9, "max", buildRock),
+  sacks: real("crate", 1.7, "max", buildSacks),
   hueco: buildHueco,
   fotomulta: buildFotomulta,
   limpiavidrios: buildLimpiavidrios,
   semaforo: buildSemaforo,
   cone: buildCone,
-  rock: buildRock,
-  sacks: buildSacks,
   barrier: buildBarrier,
   puddle: buildPuddle,
   ramp: buildRamp,
@@ -1531,13 +1548,9 @@ const BUILDERS: Record<string, Builder> = {
   nitro: buildNitro,
   shield: buildShield,
   heart: buildHeart,
-  coffeeBush: buildCoffeeBush,
   waxPalm: buildWaxPalm,
   banana: buildBanana,
-  fence: buildFence,
   frailejon: buildFrailejon,
-  boulder: buildBoulder,
-  pine: buildPine,
   lamp: buildLamp,
   banner: buildBanner,
   ceiba: buildCeiba,
@@ -1551,11 +1564,8 @@ const BUILDERS: Record<string, Builder> = {
   boost: buildBoost,
   grandstand: buildGrandstand,
   tireWall: buildTireWall,
-  redRock: buildRedRock,
-  cactus: buildCactus,
   observatory: buildObservatory,
   cityWall: buildCityWall,
-  coconutPalm: buildCoconutPalm,
   clockTower: buildClockTower,
   sea: buildSea,
   sugarcane: buildSugarcane,

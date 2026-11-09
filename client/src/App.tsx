@@ -1,4 +1,6 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { preloadAssets } from "./lib/game/assets";
+import { asset } from "./lib/env";
 import { useRally } from "./lib/stores/useRally";
 import { useAchievements } from "./lib/stores/useAchievements";
 import { TitleScreenImmersive } from "./components/ui/TitleScreenImmersive";
@@ -36,6 +38,21 @@ function App() {
     if (playerName) loadPlayerStats(playerName);
   }, [playerName, loadPlayerStats]);
 
+  // real 3D models load once up front (a few seconds); if they fail we fall back to procedural ones
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    let done = false;
+    const finish = () => {
+      if (!done) {
+        done = true;
+        setReady(true);
+      }
+    };
+    preloadAssets().then(finish, finish);
+    const t = setTimeout(finish, 12000);
+    return () => clearTimeout(t);
+  }, []);
+
   // online rooms: when the host starts a race, everyone starts it
   useEffect(
     () =>
@@ -51,7 +68,13 @@ function App() {
   return (
     <div ref={elementRef} style={{ width: "100vw", height: "100dvh", position: "relative", overflow: "hidden", background: "#0E1B24" }}>
       <GameStyles />
-      {phase === "menu" ? (
+      {!ready ? (
+        <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 18, color: "#fff", fontFamily: "'Nunito', system-ui, sans-serif" }}>
+          <img src={asset("/dream-nexus-logo.png")} alt="Dream Nexus" style={{ width: 160, filter: "drop-shadow(0 0 12px rgba(255,255,255,0.8))", animation: "dnrFloat 2s ease-in-out infinite" }} />
+          <div style={{ fontFamily: "'Bungee', sans-serif", fontSize: 28, color: "#5fd8ff", animation: "dnrPulse 1s ease-in-out infinite" }}>CARGANDO LA PISTA…</div>
+          <div style={{ fontWeight: 800, opacity: 0.8 }}>Preparando los karts 🏁</div>
+        </div>
+      ) : phase === "menu" ? (
         <TitleScreenImmersive isFullscreen={isFullscreen} onToggleFullscreen={toggle} isFullscreenSupported={isSupported} />
       ) : (
         <GameScene isFullscreen={isFullscreen} onToggleFullscreen={isSupported ? toggle : undefined} />
