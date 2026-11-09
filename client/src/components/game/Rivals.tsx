@@ -136,7 +136,7 @@ export function Rivals() {
 
   useFrame((state, delta) => {
     if (!race.active) return;
-    const dt = Math.min(delta, 1 / 20);
+    const dt = Math.min(delta, 1 / 20) * run.timeScale;
     const phase = useRally.getState().phase;
     const t = state.clock.elapsedTime;
     const total = race.laps * race.length;
@@ -270,15 +270,15 @@ export function Rivals() {
       return;
     }
     const c = carById(r.car).stats;
-    const base = (182 / 3.6) * c.top * r.skill * classSpeed() * classRivals();
+    const base = (208 / 3.6) * c.top * r.skill * classSpeed() * classRivals();
     // brake for corners like a real driver: look ahead, judge more distance the faster you go
     const look = 10 + r.speed * 1.1;
     const corner = Math.min(1, (cornerSpeed(bendAhead(r.z, 0, look)) * (1 + (r.skill - 1) * 2)) / base);
     const diff = r.z - run.z;
-    // rubber band so races stay close and exciting
-    const band = diff > 80 ? 0.9 : diff > 35 ? 0.96 : diff < -80 ? 1.1 : diff < -35 ? 1.04 : 1;
+    // rubber band: a leader far ahead eases off so you can catch up; a chaser gets a bit extra
+    const band = diff > 90 ? 0.88 : diff > 40 ? 0.95 : diff < -90 ? 1.08 : diff < -40 ? 1.03 : 1;
     if (r.nitro > 0) r.nitro -= dt;
-    else if (r.z > race.length * 0.2 && Math.random() < dt * 0.03) r.nitro = 1.8;
+    else if (r.z > race.length * 0.15 && Math.random() < dt * 0.04) r.nitro = 1.6;
     if (r.spin > 0) r.spin -= dt;
     if (r.slow > 0) r.slow -= dt;
     const hurt = r.spin > 0 ? 0.25 : r.slow > 0 ? 0.6 : 1;
@@ -297,7 +297,12 @@ export function Rivals() {
         break;
       }
     }
-    r.lat += THREE.MathUtils.clamp(line - r.lat, -1, 1) * dt * 2.2 * c.handling;
+    // the rival just ahead of you defends: it drifts over to block your line (sharper drivers block more)
+    const playerBehind = run.z < r.z && r.z - run.z < 16 && run.z > r.z - 16;
+    if (playerBehind && r.skill >= 0.96 && Math.abs(run.lat - r.lat) < 4.5) line = THREE.MathUtils.clamp(run.lat, -edge, edge);
+    // a rival alongside leans on you
+    if (Math.abs(r.z - run.z) < 3 && Math.abs(run.lat - r.lat) < 3.2 && Math.abs(run.lat - r.lat) > 1.6 && r.skill >= 0.97) line = run.lat;
+    r.lat += THREE.MathUtils.clamp(line - r.lat, -1, 1) * dt * 2.4 * c.handling;
     r.lat = THREE.MathUtils.clamp(r.lat, -(roadHalf() - 0.8), roadHalf() - 0.8);
     if (r.z >= total) r.finishedAt = run.time;
   }

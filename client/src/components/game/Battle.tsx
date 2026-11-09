@@ -194,16 +194,16 @@ function makeCloud() {
 export function Battle() {
   const group = useRef<THREE.Group>(null);
   const tex = useMemo(boxTexture, []);
-  const boxes = useMemo(() => Array.from({ length: 24 }, () => makeBox(tex)), [tex]);
+  const boxes = useMemo(() => Array.from({ length: 36 }, () => makeBox(tex)), [tex]);
   const projectiles = useRef<Projectile[]>([]);
   const traps = useRef<Trap[]>([]);
   const clouds = useRef<Cloud[]>([]);
   const taken = useRef(new Map<string, number>()); // box key -> time it comes back
 
-  // 4 rows of 3 boxes per lap
+  // 6 rows of 3 boxes per lap: you're never far from your next weapon
   const rows = useMemo(() => {
     const L = lapLength();
-    return [0.17, 0.42, 0.66, 0.88].map((f) => Math.round(L * f));
+    return [0.12, 0.28, 0.44, 0.6, 0.76, 0.92].map((f) => Math.round(L * f));
   }, []);
 
   useEffect(() => {
@@ -358,7 +358,7 @@ export function Battle() {
 
   useFrame((state, delta) => {
     if (!race.active) return;
-    const dt = Math.min(delta, 1 / 20);
+    const dt = Math.min(delta, 1 / 20) * run.timeScale;
     const t = state.clock.elapsedTime;
     const phase = useRally.getState().phase;
     const L = lapLength();
@@ -392,7 +392,7 @@ export function Battle() {
               const holder = c.id === "me" ? run.item : racerById(c.id)?.item;
               const ckey = c.id === "me" ? key : `${key}:${c.id}`;
               if ((taken.current.get(ckey) ?? -1) >= now) continue;
-              taken.current.set(ckey, now + 2.5);
+              taken.current.set(ckey, now + 1.5);
               if (c.id === "me") audioManager.playClick();
               burstAt(z, lat, 1.1, FX.box, 12, 5, 5);
               if (holder) continue;
@@ -406,7 +406,7 @@ export function Battle() {
                 const r = racerById(c.id);
                 if (r && !r.remote) {
                   r.item = item;
-                  r.itemCd = 0.8 + Math.random() * 2.5;
+                  r.itemCd = 0.4 + Math.random() * 1.4; // they don't sit on items
                 }
               }
               break;

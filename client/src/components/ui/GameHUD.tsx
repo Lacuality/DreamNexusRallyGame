@@ -271,7 +271,7 @@ export function GameHUD({ isFullscreen = false, onToggleFullscreen }: GameHUDPro
           }}
         >
           <div style={{ textAlign: "center" }}>
-            <div style={{ fontFamily: UI.display, fontSize: touch ? 26 : 38, lineHeight: 1, color: hud.position === 1 ? UI.gold : UI.white }}>
+            <div key={hud.position} style={{ fontFamily: UI.display, fontSize: touch ? 26 : 38, lineHeight: 1, color: hud.position === 1 ? UI.gold : UI.white, animation: "dnrPop 0.45s ease-out" }}>
               {ordinal(hud.position)}
             </div>
             <div style={{ fontSize: 12, fontWeight: 800, opacity: 0.8 }}>of {hud.racers}</div>

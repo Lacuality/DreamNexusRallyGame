@@ -156,7 +156,7 @@ export function Police() {
   }, []);
 
   useFrame((state, delta) => {
-    const dt = Math.min(delta, 1 / 20);
+    const dt = Math.min(delta, 1 / 20) * run.timeScale;
     const t = state.clock.elapsedTime;
     const gs = useRally.getState();
     const c = cop.current;

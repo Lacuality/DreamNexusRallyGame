@@ -38,7 +38,7 @@ export function SpeedLines({ carPositionRef, speedRef }: SpeedLinesProps) {
   useFrame((state, delta) => {
     if (!linesRef.current) return;
 
-    const speedFactor = Math.max(0, (speedRef.current - 80) / 120);
+    const speedFactor = Math.max(0, (speedRef.current - 110) / 90);
 
     if (speedFactor < 0.1) {
       linesRef.current.visible = false;
@@ -75,7 +75,7 @@ export function SpeedLines({ carPositionRef, speedRef }: SpeedLinesProps) {
     linesRef.current.position.copy(carPositionRef.current);
 
     const material = linesRef.current.material as THREE.LineBasicMaterial;
-    material.opacity = speedFactor * 0.4;
+    material.opacity = Math.min(0.7, speedFactor * 0.55);
   });
 
   return (

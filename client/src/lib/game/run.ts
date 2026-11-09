@@ -24,6 +24,10 @@ export interface RunState {
   busted: number; // seconds left stopped by the police
   wanted: boolean; // ran a red light: the police come now
   hop: number; // seconds left of the little hop at the start of a drift
+  timeScale: number; // 1 normally; <1 for the slow-motion photo finish
+  finishing: number; // seconds of slow-mo left after the flag (0 = racing)
+  lastPos: number; // position last frame, for overtake popups
+  lastLapWarned: boolean;
   pullOver: boolean; // the police caught you: RaceSystem applies the stop + lost life
   chaseGap: number; // metres between you and the chasing patrol (-1 = no chase)
   chaseGoal: number; // metres you need to get away
@@ -95,6 +99,10 @@ export function freshRun(): RunState {
     busted: 0,
     wanted: false,
     hop: 0,
+    timeScale: 1,
+    finishing: 0,
+    lastPos: 0,
+    lastLapWarned: false,
     pullOver: false,
     chaseGap: -1,
     chaseGoal: 100,

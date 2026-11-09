@@ -76,15 +76,18 @@ export function Camera() {
     lastBehind.current = behind;
 
     camera.position.copy(pos.current);
-    if (run.shake > 0 && !reducedMotion) {
-      const s = run.shake * 0.35;
+    // hit shake, plus a fine high-speed vibration so flat out never feels calm
+    const vib = !reducedMotion && run.speed > 45 ? Math.min(0.06, (run.speed - 45) * 0.004) + (run.nitroTime > 0 ? 0.05 : 0) : 0;
+    if ((run.shake > 0 || vib > 0) && !reducedMotion) {
+      const s = run.shake * 0.35 + vib;
       camera.position.x += (Math.random() - 0.5) * s;
       camera.position.y += (Math.random() - 0.5) * s;
     }
     camera.lookAt(look.current);
 
     const cam = camera as THREE.PerspectiveCamera;
-    const targetFov = (kart ? 66 : 62) + sp * 10 + (run.nitroTime > 0 ? 6 : 0);
+    // the view widens with speed and punches out on nitro / turbo: that's where the sense of speed comes from
+    const targetFov = (kart ? 64 : 62) + sp * 16 + (run.nitroTime > 0 ? 9 : 0) + (run.drift > 0 ? 3 : 0);
     if (Math.abs(cam.fov - targetFov) > 0.05) {
       cam.fov += (targetFov - cam.fov) * Math.min(1, dt * 4);
       cam.updateProjectionMatrix();

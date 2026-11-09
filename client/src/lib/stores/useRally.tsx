@@ -418,6 +418,7 @@ export const useRally = create<RallyState>()(
       if (c) resetRace(c.laps, lapLength());
       else endRaceState();
       audioManager.setMusicTheme("default");
+      audioManager.setMusicRate(1);
       useAchievements.getState().clearLastRun();
       audioManager.playBackgroundMusic();
       audioManager.duckMusic(1);
@@ -490,6 +491,8 @@ export const useRally = create<RallyState>()(
 
     restart: () => {
       endRaceState();
+      audioManager.setMusicRate(1);
+      run.timeScale = 1;
       audioManager.setMusicTheme("default");
       audioManager.stopEngineSound();
       audioManager.duckMusic(1);

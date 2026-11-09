@@ -183,6 +183,14 @@ export class AudioManager {
     this.music?.pause();
   }
 
+  /** Speed the music up a little (last lap!) or back to normal. */
+  setMusicRate(rate: number) {
+    if (this.music) {
+      this.music.playbackRate = rate;
+      (this.music as any).preservesPitch = false;
+    }
+  }
+
   /** Lower the music (pause menu, game over) without stopping it. */
   duckMusic(amount: number) {
     this.musicDuck = amount;

@@ -12,7 +12,7 @@ import { ModelPool, OBSTACLE_SIZE, type ObstacleKind, type PickupKind, makeArch,
 import { useRally, goalProgress } from "@/lib/stores/useRally";
 import { car, session, classSpeed } from "@/lib/game/session";
 import { chapterById } from "@/lib/game/story";
-import { race } from "@/lib/game/race";
+import { race, playerPosition } from "@/lib/game/race";
 import { room, myId } from "@/lib/game/net";
 import { useProfile } from "@/lib/stores/useProfile";
 import { useBiome, BIOME_CONFIGS } from "@/lib/stores/useBiome";
@@ -337,7 +337,8 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
   /* ---------------- main loop ---------------- */
   useFrame((state, delta) => {
     const phase = rally.getState().phase;
-    const dt = Math.min(delta, 1 / 20);
+    // slow-motion photo finish: everything in the race runs at run.timeScale
+    const dt = Math.min(delta, 1 / 20) * run.timeScale;
     lastDt.current = dt;
     (window as any).__ents = ents.current; // debug
 
@@ -404,8 +405,9 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
     /* --- speed (car stats apply) --- */
     // endless: the rally shifts up a gear every kilometre (announced on screen)
     const gear = circ ? 0 : speedGear(run.z);
-    const top = ((circ ? 182 * classSpeed() : 178 + gear * 12) / 3.6) * car.top;
-    const cruise = circ ? top * 0.93 : ((124 + gear * 14) / 3.6) * car.top;
+    // circuits: proper kart speed; lifting off costs you, so hold the throttle
+    const top = ((circ ? 208 * classSpeed() : 178 + gear * 12) / 3.6) * car.top;
+    const cruise = circ ? top * 0.8 : ((124 + gear * 14) / 3.6) * car.top;
     let target = input.up ? top : cruise;
     // brake + steer = drift (Mario Kart style): you keep rolling, turn tighter and charge a mini-turbo
     const braking = input.down || input.touchBrake;
@@ -418,8 +420,8 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
         audioManager.playClick();
       }
       run.drift += dt;
-      target = Math.max(run.speed * 0.985, cruise * 0.72);
-      const stage = run.drift > 2 ? 2 : run.drift > 1 ? 1 : 0;
+      target = Math.max(run.speed * 0.99, top * 0.74);
+      const stage = run.drift > 1.6 ? 2 : run.drift > 0.8 ? 1 : 0;
       driftSpark.current -= dt;
       if (driftSpark.current <= 0) {
         driftSpark.current = 0.07;
@@ -431,10 +433,10 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
         if (stage > 0) audioManager.playClick();
       }
     } else {
-      if (run.drift > 0.55 && run.spin <= 0) {
+      if (run.drift > 0.45 && run.spin <= 0) {
         // release = mini-turbo, bigger the longer you held it
-        const stage = run.drift > 2 ? 2 : run.drift > 1 ? 1 : 0;
-        run.nitroTime = Math.max(run.nitroTime, [0.55, 0.9, 1.4][stage]);
+        const stage = run.drift > 1.6 ? 2 : run.drift > 0.8 ? 1 : 0;
+        run.nitroTime = Math.max(run.nitroTime, [0.7, 1.1, 1.7][stage]);
         run.driftBoosts++;
         run.shake = Math.max(run.shake, 0.25);
         audioManager.playNitro();
@@ -512,12 +514,12 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
     run.steer += (s - run.steer) * Math.min(1, dt * 8);
     const drifting = run.drift > 0;
     // how far the wheels can turn: nimble at low speed, calmer flat out; drifting lets you turn in harder
-    const maxRel = (0.46 - Math.min(0.24, run.speed * 0.0045)) * car.handling * (drifting ? 1.5 : 1);
+    const maxRel = (0.46 - Math.min(0.24, run.speed * 0.0045)) * car.handling * (drifting ? 1.7 : 1);
     const air = run.airborne ? 0.35 : 1;
     run.rel += (run.steer * maxRel - run.rel) * Math.min(1, dt * 6 * air); // turn in, and self-centre when you let go
     run.latVel = run.speed * Math.sin(run.rel);
     // the faster you go, the harder a bend throws you outward; drifting holds the line
-    const push = -roadCurvature(run.z) * run.speed * run.speed * (circ ? 0.16 : 0.35) * (drifting ? 0.6 : 1);
+    const push = -roadCurvature(run.z) * run.speed * run.speed * (circ ? 0.26 : 0.35) * (drifting ? 0.42 : 1);
     run.lat += (run.latVel + push) * dt;
 
     const wall = roadHalf() + (circ ? 3.85 : 3.2);
@@ -629,14 +631,43 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
         race.lapStart = run.time;
         if (race.lap >= race.laps) {
           audioManager.playCrowd("roar");
+          audioManager.setMusicRate(1);
           race.finishedAt = run.time;
           if (session.mode === "online") room.send({ t: "finish", id: myId, time: run.time });
           rally.getState().syncHud();
-          rally.getState().finishRace();
+          // photo finish: 1.4 s of slow motion rolling past the flag before the results
+          run.finishing = 1.4;
+          run.timeScale = 0.3;
+          const pos = playerPosition(run.z, run.time);
+          rally.getState().popup(pos === 1 ? "🏁 ¡GANASTE!" : pos <= 3 ? "🏁 ¡PODIO!" : "🏁 META", COLORS.gold, true);
           return;
         }
         audioManager.playMilestone();
+        if (race.lap === race.laps - 1) audioManager.setMusicRate(1.12);
         rally.getState().popup(race.lap === race.laps - 1 ? "🏁 ¡ÚLTIMA VUELTA!" : `VUELTA ${race.lap + 1}/${race.laps}`, COLORS.gold, true);
+      }
+      if (run.finishing > 0) {
+        run.finishing -= dt / run.timeScale;
+        if (run.finishing <= 0) {
+          run.timeScale = 1;
+          rally.getState().finishRace();
+          return;
+        }
+      }
+      // overtakes: tell the player when positions change
+      if (race.finishedAt === null && race.racers.length) {
+        const pos = playerPosition(run.z, null);
+        if (run.lastPos && pos !== run.lastPos && run.time > 3) {
+          if (pos < run.lastPos) {
+            const passed = race.racers.filter((r) => r.z < run.z && r.z > run.z - 12).sort((a, b) => b.z - a.z)[0];
+            rally.getState().popup(passed ? `⬆️ ¡Pasaste a ${passed.name}!` : `⬆️ ${pos}º`, COLORS.gold);
+            if (pos === 1) audioManager.playMilestone();
+          } else {
+            const by = race.racers.filter((r) => r.z > run.z && r.z < run.z + 12).sort((a, b) => a.z - b.z)[0];
+            rally.getState().popup(by ? `⬇️ ¡${by.name} te pasó!` : `⬇️ ${pos}º`, COLORS.red);
+          }
+        }
+        run.lastPos = pos;
       }
       netTimer.current += dt;
       if (session.mode === "online" && netTimer.current > 0.1) {
