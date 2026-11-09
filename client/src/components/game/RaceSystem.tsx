@@ -522,19 +522,27 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
 
     const wall = roadHalf() + (circ ? 3.85 : 3.2);
     if (Math.abs(run.lat) > wall) {
-      const hard = circ && Math.abs(run.latVel + push) > 6 && run.speed > 25;
-      run.lat = Math.sign(run.lat) * wall;
-      run.rel = -Math.sign(run.lat) * 0.06; // nudged back toward the road
-      run.latVel = 0;
-      run.speed *= hard ? 0.8 : 0.985;
+      const side = Math.sign(run.lat);
+      const into = (run.latVel + push) * side; // how fast you went into the barrier
+      const hard = circ && into > 6 && run.speed > 25;
+      run.lat = side * wall;
+      // bounce: the sideways speed reflects (losing most of it), the car is kicked back toward the track
+      run.latVel = -side * Math.max(0, into) * 0.35;
+      run.rel = -side * Math.min(0.2, 0.04 + into * 0.012);
+      run.speed *= hard ? 0.78 : into > 2 ? 0.95 : 0.985;
       if (hard) {
-        run.shake = Math.max(run.shake, 0.45);
-        if (run.time - gravelMsg.current > 1.2) {
+        run.shake = Math.max(run.shake, 0.5);
+        if (run.time - gravelMsg.current > 0.8) {
           gravelMsg.current = run.time;
           audioManager.playSmash();
-          fxCar(FX.smash, 12, 6, 4);
+          toWorld(run.z, side * wall, 0.7, tmpV);
+          burst(tmpV.x, tmpV.y, tmpV.z, ["#ffd23f", "#ffffff", "#ff9f43"], 18, 7, 5, 0.12);
           rally.getState().popup("¡CONTRA LA BARRERA! 💥", COLORS.orange);
         }
+      } else if (into > 2 && circ) {
+        // scraping along the rail: sparks
+        toWorld(run.z, side * wall, 0.4, tmpV);
+        burst(tmpV.x, tmpV.y, tmpV.z, ["#ffd23f", "#ffffff"], 3, 3, 2, 0.08);
       }
     }
     // world position + heading follow the track (used by the car, camera, friends online)

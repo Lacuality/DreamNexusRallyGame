@@ -13,6 +13,12 @@ import { useRally } from "@/lib/stores/useRally";
 import { audioManager } from "@/lib/audio";
 import { animateWobble } from "./Car";
 import { shoveLat } from "@/lib/game/physics";
+import { burst } from "@/lib/game/fx";
+import { useProfile } from "@/lib/stores/useProfile";
+
+const tmpV = { x: 0, y: 0, z: 0 };
+/** Rough kart mass (relative): what wins a shoving match. */
+const massOf = (id: string) => (id === "chiva" ? 2.2 : id === "willys" ? 1.5 : id === "taxi" ? 1.3 : id === "cuatro" ? 0.9 : id === "dn" ? 1.1 : 1);
 
 function nameTag(text: string, color: string) {
   const c = document.createElement("canvas");
@@ -150,25 +156,78 @@ export function Rivals() {
         }
       } else if (phase === "playing" || phase === "gameover") {
         updateAI(r, dt, total);
-        // bump into the player
+        // kart-to-kart contact with the player: heavier car wins, speed difference decides the hit
         const dz = r.z - run.z;
         const dlat = run.lat - r.lat;
-        const reach = (carById(r.car).id === "chiva" ? 3 : 2.1) + 1.9;
-        if (phase === "playing" && Math.abs(dz) < reach && Math.abs(dlat) < 1.8 && run.y < 1) {
+        const rc = carById(r.car);
+        const reach = (rc.id === "chiva" ? 3 : 2.1) + 1.9;
+        if (phase === "playing" && Math.abs(dz) < reach && Math.abs(dlat) < 1.9 && run.y < 1) {
           const cd = bumpCd.current.get(r.id) ?? 0;
           const dir = Math.sign(dlat) || 1;
-          const push = 1.8 - Math.abs(dlat);
-          shoveLat(dir * push * 0.6);
-          r.lat -= dir * push * 0.4;
-          run.heading += dir * 0.03;
-          if (dz > 0) run.speed *= 0.985;
-          else r.speed *= 0.96;
+          const overlap = 1.9 - Math.abs(dlat);
+          const mR = massOf(rc.id), mP = massOf(useProfile.getState().car);
+          const total = mR + mP;
+          // separate in proportion to mass (light kart gets shoved more)
+          shoveLat(dir * overlap * (mR / total) * 1.2);
+          r.lat -= dir * overlap * (mP / total) * 1.2;
+          const closing = Math.abs(run.latVel) + Math.abs(dz) * 0.1;
+          const rearEnd = Math.abs(dlat) < 0.9 && Math.abs(dz) > 1.4;
+          if (rearEnd) {
+            // nose to tail: the car behind loses speed, the one in front gets a shove
+            if (dz > 0) {
+              run.speed *= 0.9;
+              r.speed = Math.min(r.speed + run.speed * 0.08, r.speed * 1.12);
+            } else {
+              r.speed *= 0.9;
+              run.speed = Math.min(run.speed + r.speed * 0.08, run.speed * 1.12);
+            }
+          } else {
+            run.heading += dir * 0.025 * (mR / total) * 2;
+            run.rel += dir * 0.04;
+            run.speed *= 0.985;
+            r.speed *= 0.975;
+          }
           if (t > cd) {
-            bumpCd.current.set(r.id, t + 0.6);
-            run.shake = Math.max(run.shake, 0.3);
+            bumpCd.current.set(r.id, t + 0.5);
+            const hard = closing > 7 || run.nitroTime > 0 || r.nitro > 0;
+            run.shake = Math.max(run.shake, hard ? 0.6 : 0.25);
             audioManager.playSmash();
+            toWorld(run.z, run.lat + dlat * 0.5, 0.8, tmpV);
+            burst(tmpV.x, tmpV.y, tmpV.z, ["#ffffff", "#ffd23f", "#aaaaaa"], hard ? 16 : 8, 5, 4, 0.14);
+            // a hard side hit from a heavier car (or with nitro) spins the lighter one out
+            if (hard && !rearEnd) {
+              if (mR > mP * 1.15 && run.spin <= 0 && !run.shield) {
+                run.spin = 0.8;
+                run.speed *= 0.6;
+                useRally.getState().popup(`💥 ¡${r.name} te mandó a volar!`, "#ff9f43", true);
+              } else if (mP >= mR && r.spin <= 0 && !r.shield) {
+                r.spin = 0.8;
+                r.speed *= 0.6;
+                run.hitsLanded++;
+                useRally.getState().popup(`💥 ¡Trompo a ${r.name}!`, "#ffd23f");
+              }
+            }
             if (run.nitroTime > 0) r.speed *= 0.7;
           }
+        }
+      }
+    }
+
+    // rivals bumping into each other (AI only, so online stays in sync)
+    for (let i = 0; i < race.racers.length; i++) {
+      const a = race.racers[i];
+      if (a.remote) continue;
+      for (let j = i + 1; j < race.racers.length; j++) {
+        const b = race.racers[j];
+        if (b.remote) continue;
+        const dz = a.z - b.z, dl = a.lat - b.lat;
+        if (Math.abs(dz) < 4 && Math.abs(dl) < 1.8) {
+          const dir = Math.sign(dl) || (a.seed > b.seed ? 1 : -1);
+          const overlap = 1.8 - Math.abs(dl);
+          a.lat += dir * overlap * 0.5;
+          b.lat -= dir * overlap * 0.5;
+          if (dz > 0) b.speed *= 0.985;
+          else a.speed *= 0.985;
         }
       }
     }
