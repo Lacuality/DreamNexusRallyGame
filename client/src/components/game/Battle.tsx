@@ -241,14 +241,16 @@ export function Battle() {
     const victim = carsNow().find((c) => c.id === targetId);
     if (victim) burstAt(victim.z, victim.lat, 1.2, FX.hit, 20, 7, 6);
     if (targetId === "me") {
+      if (run.invulnerable > 0 || run.spin > 0) return false; // just been hit: brief immunity
       if (run.shield) {
         run.shield = false;
         audioManager.playShieldBreak();
         gs.popup("👒 SOMBRERO SAVED YOU!", COLORS.cyan, true);
         return false;
       }
-      run.spin = 1.1;
-      run.speed *= 0.35;
+      run.spin = 1.0;
+      run.invulnerable = 2.6;
+      run.speed *= 0.4;
       run.shake = 1;
       run.flash = 0.6;
       audioManager.playCrash();
@@ -268,7 +270,9 @@ export function Battle() {
       if (by === "me") gs.popup(`${r.name} blocked it! 👒`, COLORS.cyan);
       return false;
     }
+    if (r.spin > 0 || (r.immune ?? 0) > 0) return false;
     r.spin = 1.1;
+    r.immune = 2.6;
     r.speed *= 0.35;
     if (by === "me") {
       run.hitsLanded++;

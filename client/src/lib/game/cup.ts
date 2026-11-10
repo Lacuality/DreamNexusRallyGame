@@ -9,9 +9,9 @@ import { circuitById } from "./circuits";
 export type EngineClass = 50 | 100 | 150;
 export const CLASSES: EngineClass[] = [50, 100, 150];
 export const CLASS_INFO: Record<EngineClass, { speed: number; rivals: number; label: string; blurb: string }> = {
-  50: { speed: 0.8, rivals: 0.9, label: "50cc", blurb: "Calm: slower karts, rivals take it easy" },
-  100: { speed: 0.9, rivals: 0.97, label: "100cc", blurb: "Normal: a proper race" },
-  150: { speed: 1.0, rivals: 1.04, label: "150cc", blurb: "Flat out: full speed, rivals go for it" },
+  50: { speed: 0.8, rivals: 0.95, label: "50cc", blurb: "Calm: slower karts, rivals take it easy" },
+  100: { speed: 0.9, rivals: 1.03, label: "100cc", blurb: "Normal: a proper race" },
+  150: { speed: 1.0, rivals: 1.08, label: "150cc", blurb: "Flat out: full speed, rivals go for it" },
 };
 
 export interface Cup {

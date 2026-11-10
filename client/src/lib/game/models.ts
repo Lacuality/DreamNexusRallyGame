@@ -1681,6 +1681,100 @@ for (let v = 0; v < 7; v++) BUILDERS[`colonial${v}`] = () => buildColonial(v);
 const templates = new Map<string, THREE.Object3D>();
 const SOLID_KINDS = ["cone", "rock", "sacks", "barrier", "cow", "limpiavidrios", "hueco"] as const;
 
+/** Kinds whose parts are animated by name (spinning jars, blinking lights...): never merged. */
+const NO_MERGE = new Set(["jar", "nitro", "shield", "heart", "tunjo", "fotomulta", "semaforo", "limpiavidrios"]);
+
+/**
+ * Bake a static model into one mesh per material. A grandstand goes from ~100
+ * draw calls to a handful, which is what keeps a whole circuit of scenery
+ * drawable on a phone. Falls back to the original if anything looks unusual.
+ */
+function mergeStatic(root: THREE.Object3D): THREE.Object3D {
+  let odd = false;
+  root.traverse((o: any) => {
+    if (o.isSprite || o.isLine || o.isPoints || o.isLight || o.isSkinnedMesh) odd = true;
+    if (o.isMesh && Array.isArray(o.material)) odd = true;
+  });
+  if (odd) return root;
+  root.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(root.matrixWorld).invert();
+  const rel = new THREE.Matrix4();
+  const groups = new Map<string, { mat: THREE.Material; geos: THREE.BufferGeometry[]; cast: boolean; recv: boolean }>();
+  let meshes = 0;
+  root.traverse((o) => {
+    const m = o as THREE.Mesh;
+    if (!m.isMesh || !m.geometry?.attributes?.position) return;
+    meshes++;
+    const mat = m.material as THREE.MeshStandardMaterial;
+    const key = [mat.type, mat.color?.getHexString(), mat.map?.uuid, mat.emissive?.getHexString(), mat.emissiveIntensity, mat.emissiveMap?.uuid, mat.transparent, mat.opacity, mat.side, mat.roughness, mat.metalness, mat.vertexColors, (mat as any).flatShading, mat.blending, mat.polygonOffsetFactor, mat.depthWrite].join("|");
+    // rebuild as plain float attributes (GLB models are quantized) with the transform baked in
+    const src = m.geometry.index ? m.geometry.toNonIndexed() : m.geometry;
+    const n = src.attributes.position.count;
+    const pos = new Float32Array(n * 3), uv = new Float32Array(n * 2);
+    const sp = src.attributes.position, su = src.attributes.uv, sn = src.attributes.normal, sc = src.attributes.color;
+    for (let i = 0; i < n; i++) {
+      pos[i * 3] = sp.getX(i);
+      pos[i * 3 + 1] = sp.getY(i);
+      pos[i * 3 + 2] = sp.getZ(i);
+      if (su) {
+        uv[i * 2] = su.getX(i);
+        uv[i * 2 + 1] = su.getY(i);
+      }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    g.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+    if (sn) {
+      const nor = new Float32Array(n * 3);
+      for (let i = 0; i < n; i++) {
+        nor[i * 3] = sn.getX(i);
+        nor[i * 3 + 1] = sn.getY(i);
+        nor[i * 3 + 2] = sn.getZ(i);
+      }
+      g.setAttribute("normal", new THREE.BufferAttribute(nor, 3));
+    }
+    if (mat.vertexColors) {
+      const col = new Float32Array(n * 3).fill(1);
+      if (sc) for (let i = 0; i < n; i++) {
+        col[i * 3] = sc.getX(i);
+        col[i * 3 + 1] = sc.getY(i);
+        col[i * 3 + 2] = sc.getZ(i);
+      }
+      g.setAttribute("color", new THREE.BufferAttribute(col, 3));
+    }
+    g.applyMatrix4(rel.multiplyMatrices(inv, m.matrixWorld));
+    if (!sn) g.computeVertexNormals();
+    else g.normalizeNormals();
+    let grp = groups.get(key);
+    if (!grp) groups.set(key, (grp = { mat, geos: [], cast: false, recv: false }));
+    grp.geos.push(g);
+    grp.cast ||= m.castShadow;
+    grp.recv ||= m.receiveShadow;
+  });
+  if (meshes <= groups.size) return root; // nothing to gain
+  const out = new THREE.Group();
+  out.position.copy(root.position);
+  out.quaternion.copy(root.quaternion);
+  out.scale.copy(root.scale);
+  out.userData = { ...root.userData };
+  for (const grp of Array.from(groups.values())) {
+    let merged: THREE.BufferGeometry | null = null;
+    try {
+      merged = grp.geos.length > 1 ? mergeGeometries(grp.geos, false) : grp.geos[0];
+    } catch {
+      merged = null;
+    }
+    const list = merged ? [merged] : grp.geos;
+    for (const geo of list) {
+      const me = new THREE.Mesh(geo, grp.mat);
+      me.castShadow = grp.cast;
+      me.receiveShadow = grp.recv;
+      out.add(me);
+    }
+  }
+  return out;
+}
+
 /** Pool of cloned models per kind, so we never allocate during a race. */
 export class ModelPool {
   private free = new Map<string, THREE.Object3D[]>();
@@ -1696,6 +1790,7 @@ export class ModelPool {
         const [hw, hl] = OBSTACLE_SIZE[kind as ObstacleKind];
         t.add(dangerMark(hw, hl));
       }
+      if (!NO_MERGE.has(kind)) t = mergeStatic(t);
       templates.set(kind, t);
     }
     const o = t.clone(true);

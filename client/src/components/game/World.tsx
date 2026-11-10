@@ -242,8 +242,10 @@ function Atmosphere() {
     updateTransition(dt);
     const b = blendedBiome();
     fog.color.set(b.fogColor);
-    fog.near = b.fogNear;
-    fog.far = b.fogFar;
+    // circuits: clearer air, so you can see the rest of the track (and the cars on it) across the infield
+    const clear = isCircuit() ? 1.6 : 1;
+    fog.near = b.fogNear * (clear > 1 ? 1.4 : 1);
+    fog.far = b.fogFar * clear;
     toWorld(run.z, run.lat, 0, tmpP);
     const x = tmpP.x, y = tmpP.y, zz = tmpP.z;
     if (sun.current) {

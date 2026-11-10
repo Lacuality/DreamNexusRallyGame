@@ -4,6 +4,7 @@ import { input, isTouchDevice } from "@/lib/input";
 import { useRally } from "@/lib/stores/useRally";
 import { audioManager } from "@/lib/audio";
 import { UI } from "./gameUi";
+import { ITEMS } from "../game/Battle";
 
 type Key = "touchLeft" | "touchRight" | "touchBrake" | "touchNitro" | "touchItem" | "touchLook";
 
@@ -158,24 +159,33 @@ export function MobileControls() {
           bottom: "max(18px, env(safe-area-inset-bottom))",
           display: "flex",
           flexDirection: "column",
-          alignItems: "center",
-          gap: 14,
+          alignItems: "flex-end",
+          gap: 12,
         }}
       >
         {battle && (
           <TouchButton
             k="touchItem"
-            size={big * 0.8}
+            size={big * 0.78}
             label="Use item"
             color={item ? "rgba(255,210,63,0.55)" : "rgba(14,27,36,0.5)"}
             border={item ? UI.gold : "rgba(255,255,255,0.4)"}
             glow={!!item}
           >
-            <span style={{ fontFamily: UI.display, fontSize: big * 0.16 }}>ITEM</span>
+            {item ? (
+              <span style={{ fontSize: big * 0.4, lineHeight: 1 }}>{ITEMS[item as keyof typeof ITEMS]?.emoji ?? "❔"}</span>
+            ) : (
+              <span style={{ fontFamily: UI.display, fontSize: big * 0.15, opacity: 0.7 }}>ITEM</span>
+            )}
           </TouchButton>
         )}
-        <TouchButton k="touchBrake" size={big * 0.72} label="Brake" color="rgba(14,27,36,0.6)" border="rgba(255,255,255,0.7)">
-          <ChevronsDown size={big * 0.4} strokeWidth={3} />
+        {/* landscape: brake beside nitro (short screen); portrait: stacked (narrow screen) */}
+        <div style={{ display: "flex", flexDirection: window.innerWidth > window.innerHeight ? "row" : "column", alignItems: window.innerWidth > window.innerHeight ? "flex-end" : "center", gap: 12 }}>
+        <TouchButton k="touchBrake" size={big * 0.72} label="Brake / drift" color="rgba(14,27,36,0.6)" border="rgba(255,255,255,0.7)">
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+            <ChevronsDown size={big * 0.3} strokeWidth={3} />
+            <span style={{ fontFamily: UI.display, fontSize: big * 0.1 }}>DRIFT</span>
+          </div>
         </TouchButton>
         <div style={{ position: "relative" }}>
           <TouchButton
@@ -208,6 +218,7 @@ export function MobileControls() {
               strokeDasharray={`${Math.PI * (big + 10) * (nitroActive ? 1 : nitro)} 9999`}
             />
           </svg>
+        </div>
         </div>
       </div>
     </div>

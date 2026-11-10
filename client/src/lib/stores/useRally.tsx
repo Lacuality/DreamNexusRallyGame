@@ -277,7 +277,7 @@ function endRun(completed: boolean) {
     summary.position = pos;
     summary.raceTime = run.time;
     summary.lapTimes = [...race.lapTimes];
-    summary.standings = standings(state.playerName, profile.driver, run.time, run.time);
+    summary.standings = standings(state.playerName, profile.driver, run.time, run.time, completed);
     if (race.lapTimes.length) {
       const best = Math.min(...race.lapTimes);
       summary.bestLap = best;

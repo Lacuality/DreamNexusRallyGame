@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { burst, FX } from "@/lib/game/fx";
 import { placeOnTrack, groundHeight } from "@/lib/game/physics";
@@ -313,6 +313,20 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
       run.shake = 0.6;
       audioManager.playShieldBreak();
       rally.getState().popup("SHIELD SAVED YOU!", COLORS.cyan, true);
+      return;
+    }
+    if (race.active) {
+      // kart racing: you spin, lose speed and get a moment of immunity; nobody is knocked out of a race
+      fxCar(FX.hit, 22, 8, 6);
+      run.spin = 0.85;
+      run.speed *= 0.45;
+      run.invulnerable = 2.4;
+      run.combo = 0;
+      run.shake = 1;
+      run.flash = 0.5;
+      audioManager.playCrash();
+      if (navigator.vibrate) navigator.vibrate(100);
+      rally.getState().popup("💫 ¡TROMPO!", COLORS.red, true);
       return;
     }
     run.hearts--;
@@ -1094,7 +1108,8 @@ function circuitLayout() {
       continue; // set pieces bring their own content
     }
     const jumpSpot = (frac > 0.3 && frac < 0.36) || (frac > 0.62 && frac < 0.68);
-    items.push({ off, kind: jumpSpot ? "ramp" : r < 0.26 ? "boost" : r < 0.32 ? "nitro" : r < 0.6 ? hazard : "jars", lat });
+    const clear = off < 230; // the grid and the first sprint stay clean
+    items.push({ off, kind: jumpSpot ? "ramp" : r < 0.26 ? "boost" : r < 0.32 ? "nitro" : r < 0.6 ? (clear ? "jars" : hazard) : "jars", lat });
     i++;
   }
   for (const sp of circuitDef()?.setPieces ?? []) {
@@ -1116,6 +1131,8 @@ export function Scenery() {
   const pool = useMemo(() => new ModelPool(), []);
   const placed = useRef<{ z: number; obj: THREE.Object3D }[]>([]);
   const nextZ = useRef(isCircuit() ? 0 : -30);
+  const cullTick = useRef(0);
+  const { scene } = useThree();
   const idx = useRef(0);
 
   useEffect(() => () => placed.current.forEach((p) => pool.release(p.obj)), [pool]);
@@ -1242,7 +1259,18 @@ export function Scenery() {
 
       nextZ.current += circuitAll ? 12 : biome === "pueblo" ? 13 : 9;
     }
-    if (circuitAll) return; // the whole circuit stays dressed for every lap
+    if (circuitAll) {
+      // the whole circuit stays dressed for every lap; only what's within sight (inside the fog) is drawn
+      if (cullTick.current++ % 6 === 0) {
+        const far = ((scene.fog as THREE.Fog | null)?.far ?? 300) + 30;
+        const far2 = far * far;
+        for (const p of placed.current) {
+          const dx = p.obj.position.x - run.wx, dz = p.obj.position.z - run.wz;
+          p.obj.visible = dx * dx + dz * dz < far2;
+        }
+      }
+      return;
+    }
     placed.current = placed.current.filter((p) => {
       if (p.z < run.z - 40) {
         pool.release(p.obj);

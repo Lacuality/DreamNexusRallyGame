@@ -25,6 +25,7 @@ export interface Racer {
   item: string | null;
   itemCd: number;
   heading?: number; // online friends: which way their car is pointing
+  immune?: number; // seconds of immunity after being hit
 }
 
 export const race = {
@@ -74,10 +75,11 @@ export interface Standing {
 }
 
 /** Final order. Cars still racing get a projected time. */
-export function standings(playerName: string, playerDriver: string, playerTime: number, now: number): Standing[] {
+export function standings(playerName: string, playerDriver: string, playerTime: number, now: number, playerFinished = true): Standing[] {
   const total = race.laps * race.length;
   const rows: (Standing & { sortKey: number })[] = [
-    { id: "me", name: playerName || "You", time: playerTime, isPlayer: true, driver: playerDriver, sortKey: playerTime },
+    // a player who didn't finish is classified last, with no time
+    { id: "me", name: playerName || "You", time: playerFinished ? playerTime : null, isPlayer: true, driver: playerDriver, sortKey: playerFinished ? playerTime : 1e12 },
   ];
   for (const r of race.racers) {
     if (r.finishedAt !== null) rows.push({ id: r.id, name: r.name, time: r.finishedAt, isPlayer: false, driver: r.driver, sortKey: r.finishedAt });

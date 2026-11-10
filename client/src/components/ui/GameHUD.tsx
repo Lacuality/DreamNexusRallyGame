@@ -12,7 +12,7 @@ import { ITEMS } from "../game/Battle";
 /** Small circuit map: a closed loop shaped by the circuit's curves, with every car on it. */
 function MiniMap({ touch }: { touch: boolean }) {
   const ref = useRef<SVGSVGElement>(null);
-  const size = touch ? 92 : 130;
+  const size = touch ? (window.innerWidth > window.innerHeight ? 76 : 92) : 130;
   const path = useMemo(() => {
     const t = getTrack();
     if (t.kind !== "circuit") return "";
@@ -60,7 +60,7 @@ function MiniMap({ touch }: { touch: boolean }) {
       style={{
         position: "absolute",
         right: 14,
-        ...(touch ? { top: "calc(max(12px, env(safe-area-inset-top)) + 140px)" } : { bottom: 22 }),
+        ...(touch ? { top: "calc(max(12px, env(safe-area-inset-top)) + 72px)" } : { bottom: 22 }),
         background: "rgba(14,27,36,0.65)",
         borderRadius: 16,
         border: "2px solid rgba(95,216,255,0.35)",
@@ -134,6 +134,10 @@ export function GameHUD({ isFullscreen = false, onToggleFullscreen }: GameHUDPro
     return () => cancelAnimationFrame(raf);
   }, []);
 
+  const landscape = typeof window !== "undefined" && window.innerWidth > window.innerHeight;
+  const racing = hud.laps > 0;
+  // where the centre-top warnings sit on touch screens (below the position panel)
+  const warnTop = landscape ? "calc(max(12px, env(safe-area-inset-top)) + 72px)" : "calc(max(12px, env(safe-area-inset-top)) + 142px)";
   const iconSize = touch ? 30 : 28;
   const btn = touch ? 58 : 60;
   const nitroReady = hud.nitro >= 1 && !hud.nitroActive;
@@ -183,10 +187,11 @@ export function GameHUD({ isFullscreen = false, onToggleFullscreen }: GameHUDPro
         />
       )}
 
-      {/* ---- top left: score ---- */}
+      {/* ---- top left: score (on phones a race shows the speed there instead) ---- */}
       <div
         style={{
           ...panelStyle,
+          display: touch && racing ? "none" : undefined,
           position: "absolute",
           top: "max(12px, env(safe-area-inset-top))",
           left: 12,
@@ -260,8 +265,8 @@ export function GameHUD({ isFullscreen = false, onToggleFullscreen }: GameHUDPro
           style={{
             ...panelStyle,
             position: "absolute",
-            top: touch ? "calc(max(12px, env(safe-area-inset-top)) + 66px)" : "max(12px, env(safe-area-inset-top))",
-            left: touch ? "calc(50% - 30px)" : "50%",
+            top: touch && !landscape ? "calc(max(12px, env(safe-area-inset-top)) + 72px)" : "max(12px, env(safe-area-inset-top))",
+            left: "50%",
             transform: "translateX(-50%)",
             padding: touch ? "4px 12px" : "6px 18px",
             display: "flex",
@@ -292,7 +297,7 @@ export function GameHUD({ isFullscreen = false, onToggleFullscreen }: GameHUDPro
         <div
           style={{
             position: "absolute",
-            top: touch ? "calc(max(12px, env(safe-area-inset-top)) + 128px)" : "calc(max(12px, env(safe-area-inset-top)) + 96px)",
+            top: touch ? warnTop : "calc(max(12px, env(safe-area-inset-top)) + 96px)",
             left: touch ? "calc(50% - 30px)" : "50%",
             transform: "translateX(-50%)",
             padding: touch ? "4px 12px" : "6px 16px",
@@ -315,7 +320,7 @@ export function GameHUD({ isFullscreen = false, onToggleFullscreen }: GameHUDPro
         <div
           style={{
             position: "absolute",
-            top: touch ? "calc(max(12px, env(safe-area-inset-top)) + 128px)" : "calc(max(12px, env(safe-area-inset-top)) + 96px)",
+            top: touch ? warnTop : "calc(max(12px, env(safe-area-inset-top)) + 96px)",
             left: touch ? "calc(50% - 30px)" : "50%",
             transform: "translateX(-50%)",
             width: "min(360px, 70vw)",
@@ -341,7 +346,7 @@ export function GameHUD({ isFullscreen = false, onToggleFullscreen }: GameHUDPro
           aria-live="polite"
           style={{
             position: "absolute",
-            top: touch ? "calc(max(12px, env(safe-area-inset-top)) + 128px)" : "calc(max(12px, env(safe-area-inset-top)) + 96px)",
+            top: touch ? warnTop : "calc(max(12px, env(safe-area-inset-top)) + 96px)",
             left: touch ? "calc(50% - 30px)" : "50%",
             transform: "translateX(-50%)",
             display: "flex",
@@ -368,7 +373,7 @@ export function GameHUD({ isFullscreen = false, onToggleFullscreen }: GameHUDPro
       )}
 
       {/* ---- Rally Loco item slot ---- */}
-      {hud.battle && (
+      {hud.battle && !touch && (
         <div
           style={{
             position: "absolute",
@@ -401,7 +406,7 @@ export function GameHUD({ isFullscreen = false, onToggleFullscreen }: GameHUDPro
               <div style={{ fontFamily: UI.display, color: hud.item ? UI.gold : "rgba(255,255,255,0.7)" }}>
                 {spin ? "..." : hud.item ? ITEMS[hud.item as keyof typeof ITEMS].name : "Drive through a ? box"}
               </div>
-              <div style={{ fontSize: 13 }}>{hud.item ? `${ITEMS[hud.item as keyof typeof ITEMS].hint} — press E` : "to get a power-up"}</div>
+              <div style={{ fontSize: 13 }}>{spin ? "" : hud.item ? `${ITEMS[hud.item as keyof typeof ITEMS].hint} — press E` : "to get a power-up"}</div>
             </div>
           )}
         </div>
@@ -461,12 +466,14 @@ export function GameHUD({ isFullscreen = false, onToggleFullscreen }: GameHUDPro
           ...panelStyle,
           position: "absolute",
           ...(touch
-            ? { top: "calc(max(12px, env(safe-area-inset-top)) + 70px)", right: 12, padding: "6px 12px" }
+            ? racing
+              ? { top: "max(12px, env(safe-area-inset-top))", left: 12, padding: "6px 12px" }
+              : { top: "calc(max(12px, env(safe-area-inset-top)) + 70px)", right: 12, padding: "6px 12px" }
             : { bottom: 20, left: 20, padding: "10px 20px" }),
-          textAlign: touch ? "right" : "left",
+          textAlign: touch && !racing ? "right" : "left",
         }}
       >
-        <div style={{ display: "flex", alignItems: "baseline", gap: 6, justifyContent: touch ? "flex-end" : "flex-start" }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 6, justifyContent: touch && !racing ? "flex-end" : "flex-start" }}>
           <span
             style={{
               fontFamily: UI.display,

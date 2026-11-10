@@ -196,12 +196,14 @@ export function Rivals() {
             burst(tmpV.x, tmpV.y, tmpV.z, ["#ffffff", "#ffd23f", "#aaaaaa"], hard ? 16 : 8, 5, 4, 0.14);
             // a hard side hit from a heavier car (or with nitro) spins the lighter one out
             if (hard && !rearEnd) {
-              if (mR > mP * 1.15 && run.spin <= 0 && !run.shield) {
+              if (mR > mP * 1.15 && run.spin <= 0 && run.invulnerable <= 0 && !run.shield) {
                 run.spin = 0.8;
+                run.invulnerable = 2.4;
                 run.speed *= 0.6;
                 useRally.getState().popup(`💥 ¡${r.name} te mandó a volar!`, "#ff9f43", true);
-              } else if (mP >= mR && r.spin <= 0 && !r.shield) {
+              } else if (mP >= mR && r.spin <= 0 && (r.immune ?? 0) <= 0 && !r.shield) {
                 r.spin = 0.8;
+                r.immune = 2.4;
                 r.speed *= 0.6;
                 run.hitsLanded++;
                 useRally.getState().popup(`💥 ¡Trompo a ${r.name}!`, "#ffd23f");
@@ -273,14 +275,16 @@ export function Rivals() {
     const base = (208 / 3.6) * c.top * r.skill * classSpeed() * classRivals();
     // brake for corners like a real driver: look ahead, judge more distance the faster you go
     const look = 10 + r.speed * 1.1;
-    const corner = Math.min(1, (cornerSpeed(bendAhead(r.z, 0, look)) * (1 + (r.skill - 1) * 2)) / base);
+    // rivals carry real speed through corners now (they 'drift' too): ~1.35x the plain cornering speed
+    const corner = Math.min(1, (cornerSpeed(bendAhead(r.z, 0, look)) * 1.35 * (1 + (r.skill - 1) * 2)) / base);
     const diff = r.z - run.z;
     // rubber band: a leader far ahead eases off so you can catch up; a chaser gets a bit extra
-    const band = diff > 90 ? 0.88 : diff > 40 ? 0.95 : diff < -90 ? 1.08 : diff < -40 ? 1.03 : 1;
+    const band = diff > 90 ? 0.9 : diff > 40 ? 0.96 : diff < -120 ? 1.14 : diff < -60 ? 1.09 : diff < -20 ? 1.04 : 1;
     if (r.nitro > 0) r.nitro -= dt;
     else if (r.z > race.length * 0.15 && Math.random() < dt * 0.04) r.nitro = 1.6;
     if (r.spin > 0) r.spin -= dt;
     if (r.slow > 0) r.slow -= dt;
+    if ((r.immune ?? 0) > 0) r.immune! -= dt;
     const hurt = r.spin > 0 ? 0.25 : r.slow > 0 ? 0.6 : 1;
     const target = base * corner * band * (r.nitro > 0 ? 1.18 : 1) * hurt;
     r.speed += (target - r.speed) * Math.min(1, dt * (target < r.speed ? 2.2 : 0.9 * c.accel));

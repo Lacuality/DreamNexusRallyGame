@@ -84,6 +84,7 @@ export function GameScene({ isFullscreen = false, onToggleFullscreen }: GameScen
         gl={{ antialias: !touch, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping }}
         shadows={{ type: THREE.PCFSoftShadowMap }}
         style={{ position: "fixed", inset: 0 }}
+        onCreated={({ gl }) => ((window as any).__gl = gl)}
       >
         <Suspense fallback={null}>
           <group key={runId}>
