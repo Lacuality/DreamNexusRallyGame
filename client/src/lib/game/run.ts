@@ -24,6 +24,15 @@ export interface RunState {
   busted: number; // seconds left stopped by the police
   wanted: boolean; // ran a red light: the police come now
   hop: number; // seconds left of the little hop at the start of a drift
+  // --- kart racing mechanics ---
+  coins: number; // jars carried in a race (0..10): each one adds top speed, a hit scatters three
+  draft: number; // slipstream charge 0..1 (tucked in behind a rival)
+  trick: number; // seconds left of the air-trick spin (visual)
+  tricked: boolean; // did a trick on this jump: boost on landing
+  star: number; // seconds of Panela Power left (invincible + fast)
+  bullet: number; // seconds of Chiva Express left (autopilot rocket)
+  itemCount: number; // uses left of the held item (triple aguacate)
+  hitStop: number; // real seconds of freeze-frame left after a big hit
   timeScale: number; // 1 normally; <1 for the slow-motion photo finish
   finishing: number; // seconds of slow-mo left after the flag (0 = racing)
   lastPos: number; // position last frame, for overtake popups
@@ -99,6 +108,14 @@ export function freshRun(): RunState {
     busted: 0,
     wanted: false,
     hop: 0,
+    coins: 0,
+    draft: 0,
+    trick: 0,
+    tricked: false,
+    star: 0,
+    bullet: 0,
+    itemCount: 0,
+    hitStop: 0,
     timeScale: 1,
     finishing: 0,
     lastPos: 0,
@@ -163,4 +180,16 @@ export function resetRun(hearts = MAX_HEARTS, shield = false) {
 /** Score multiplier from the current combo (x1 .. x5). */
 export function multiplierFor(combo: number) {
   return Math.min(5, 1 + Math.floor(combo / 5));
+}
+
+/** A hit in a race scatters up to three of your jars. Returns how many were lost. */
+export function loseCoins() {
+  const lost = Math.min(3, run.coins);
+  run.coins -= lost;
+  return lost;
+}
+
+/** Untouchable right now (Panela Power or Chiva Express)? */
+export function untouchable() {
+  return run.star > 0 || run.bullet > 0;
 }

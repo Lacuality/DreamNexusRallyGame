@@ -26,6 +26,7 @@ export interface Racer {
   itemCd: number;
   heading?: number; // online friends: which way their car is pointing
   immune?: number; // seconds of immunity after being hit
+  star?: number; // seconds of Panela Power / Chiva Express left (untouchable and fast)
 }
 
 export const race = {

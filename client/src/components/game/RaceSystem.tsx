@@ -3,7 +3,9 @@ import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { burst, FX } from "@/lib/game/fx";
 import { placeOnTrack, groundHeight } from "@/lib/game/physics";
-import { run, multiplierFor, MAX_HEARTS, NITRO_DURATION, INVULNERABLE_TIME, speedGear } from "@/lib/game/run";
+import { run, multiplierFor, MAX_HEARTS, NITRO_DURATION, INVULNERABLE_TIME, speedGear, loseCoins, untouchable } from "@/lib/game/run";
+import { taunt } from "@/lib/game/taunts";
+import { driverById } from "@/lib/game/garage";
 import { input, steerInput } from "@/lib/input";
 import { toWorld, headingAt, frameAt, roadCurvature, roadHalf, lanes, hash, biomeAt, lapLength, isCircuit, roadY } from "@/lib/track";
 
@@ -316,8 +318,11 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
       return;
     }
     if (race.active) {
+      if (untouchable()) return;
       // kart racing: you spin, lose speed and get a moment of immunity; nobody is knocked out of a race
       fxCar(FX.hit, 22, 8, 6);
+      if (loseCoins()) fxCar(FX.jar, 14, 7, 7);
+      run.hitStop = 0.07;
       run.spin = 0.85;
       run.speed *= 0.45;
       run.invulnerable = 2.4;
@@ -353,6 +358,11 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
   useFrame((state, delta) => {
     const phase = rally.getState().phase;
     // slow-motion photo finish: everything in the race runs at run.timeScale
+    // freeze-frame on big hits: a few hundredths of a second where everything nearly stops
+    if (run.hitStop > 0) {
+      run.hitStop -= delta;
+      run.timeScale = 0.06;
+    } else if (run.finishing <= 0) run.timeScale = 1;
     const dt = Math.min(delta, 1 / 20) * run.timeScale;
     lastDt.current = dt;
     (window as any).__ents = ents.current; // debug
@@ -421,7 +431,8 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
     // endless: the rally shifts up a gear every kilometre (announced on screen)
     const gear = circ ? 0 : speedGear(run.z);
     // circuits: proper kart speed; lifting off costs you, so hold the throttle
-    const top = ((circ ? 208 * classSpeed() : 178 + gear * 12) / 3.6) * car.top;
+    // in a race every jar you carry adds a little top speed (up to 10)
+    const top = ((circ ? 208 * classSpeed() * (1 + Math.min(10, run.coins) * 0.006) : 178 + gear * 12) / 3.6) * car.top;
     const cruise = circ ? top * 0.8 : ((124 + gear * 14) / 3.6) * car.top;
     let target = input.up ? top : cruise;
     // brake + steer = drift (Mario Kart style): you keep rolling, turn tighter and charge a mini-turbo
@@ -466,7 +477,13 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
     // nitro
     const wantNitro = input.nitro || input.touchNitro || input.nitroQueued;
     input.nitroQueued = false;
-    if (wantNitro && run.nitro >= 1 && run.nitroTime <= 0) {
+    if (wantNitro && circ && run.airborne && run.y > 0.5 && !run.tricked) {
+      // pirueta: NITRO in the air = a trick; you get a boost when you land it
+      run.tricked = true;
+      run.trick = 0.55;
+      audioManager.playJump();
+      fxCar(FX.nitro, 10, 5, 4);
+    } else if (wantNitro && run.nitro >= 1 && run.nitroTime <= 0 && !run.airborne) {
       run.nitroTime = NITRO_DURATION * car.nitroTime;
       run.nitro = 0;
       run.nitroUses++;
@@ -475,6 +492,17 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
       audioManager.playNitro();
       rally.getState().popup("NITRO! x2 POINTS", COLORS.orange, true);
     }
+    if (run.star > 0) {
+      // Panela Power: invincible and flat out
+      run.star -= dt;
+      run.nitroTime = Math.max(run.nitroTime, 0.12);
+      if (run.star <= 0) rally.getState().popup("🌟 Se acabó la panela", COLORS.cyan);
+    }
+    if (run.bullet > 0) {
+      run.bullet -= dt;
+      run.nitroTime = Math.max(run.nitroTime, 0.12);
+    }
+    if (run.trick > 0) run.trick -= dt;
     if (run.nitroTime > 0) {
       run.nitroTime -= dt;
       target = top + 40 / 3.6;
@@ -483,7 +511,7 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
       run.slowTime -= dt;
       target *= 0.55;
     }
-    if (run.offroad && !run.airborne) {
+    if (run.offroad && !run.airborne && !untouchable()) {
       if (circ) {
         // circuits: grass costs a lot, the gravel trap nearly stops you
         const deep = Math.abs(run.lat) > roadHalf() + 1.4;
@@ -525,7 +553,7 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
     run.speed += (target - run.speed) * Math.min(1, rate * dt);
 
     /* --- steering: the car turns relative to the road and moves sideways by its angle --- */
-    const s = run.spin > 0 || run.busted > 0 || run.washing > 0 ? 0 : steerInput();
+    const s = run.spin > 0 || run.busted > 0 || run.washing > 0 || run.bullet > 0 ? 0 : steerInput();
     run.steer += (s - run.steer) * Math.min(1, dt * 8);
     const drifting = run.drift > 0;
     // how far the wheels can turn: nimble at low speed, calmer flat out; drifting lets you turn in harder
@@ -535,7 +563,12 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
     run.latVel = run.speed * Math.sin(run.rel);
     // the faster you go, the harder a bend throws you outward; drifting holds the line
     const push = -roadCurvature(run.z) * run.speed * run.speed * (circ ? 0.26 : 0.35) * (drifting ? 0.42 : 1);
-    run.lat += (run.latVel + push) * dt;
+    if (run.bullet > 0) {
+      // Chiva Express: the chiva drives itself down the middle, much faster than anything else
+      run.rel += (0 - run.rel) * Math.min(1, dt * 8);
+      run.lat += (0 - run.lat) * Math.min(1, dt * 2.5);
+      run.speed += (top * 1.32 - run.speed) * Math.min(1, dt * 4);
+    } else run.lat += (run.latVel + push) * dt;
 
     const wall = roadHalf() + (circ ? 3.85 : 3.2);
     if (Math.abs(run.lat) > wall) {
@@ -581,6 +614,13 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
         run.airborne = false;
         audioManager.playLand();
         run.shake = Math.max(run.shake, 0.35);
+        if (run.tricked) {
+          run.tricked = false;
+          run.nitroTime = Math.max(run.nitroTime, 1.1);
+          audioManager.playNitro();
+          fxCar(FX.nitro, 18, 8, 3);
+          rally.getState().popup("🤸 ¡PIRUETA! TURBO", COLORS.orange, true);
+        }
         if (run.airTime > 0.4) {
           const pts = award(Math.round(run.airTime * 120 * car.airBonus));
           run.totalAir += run.airTime;
@@ -669,6 +709,22 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
           return;
         }
       }
+      // rebufo (slipstream): sit close behind a rival to charge a slingshot
+      if (race.finishedAt === null && !run.airborne && run.speed > 28 && run.nitroTime <= 0 && run.spin <= 0) {
+        const tow = race.racers.some((r) => r.z - run.z > 3 && r.z - run.z < 26 && Math.abs(r.lat - run.lat) < 1.8);
+        run.draft = Math.max(0, Math.min(1, run.draft + (tow ? dt / 1.4 : -dt * 1.2)));
+        if (tow && Math.random() < dt * 14) {
+          toWorld(run.z + 2, run.lat + (Math.random() - 0.5) * 2.4, 0.6 + Math.random(), tmpV);
+          burst(tmpV.x, tmpV.y, tmpV.z, ["#ffffff", "#bfe9ff"], 1, 1, 0.5, 0.07);
+        }
+        if (run.draft >= 1) {
+          run.draft = 0;
+          run.nitroTime = Math.max(run.nitroTime, 1.2);
+          run.shake = Math.max(run.shake, 0.25);
+          audioManager.playNitro();
+          rally.getState().popup("💨 ¡REBUFO!", COLORS.cyan, true);
+        }
+      } else run.draft = Math.max(0, run.draft - dt * 1.5);
       // overtakes: tell the player when positions change
       if (race.finishedAt === null && race.racers.length) {
         const pos = playerPosition(run.z, null);
@@ -679,7 +735,8 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
             if (pos === 1) audioManager.playMilestone();
           } else {
             const by = race.racers.filter((r) => r.z > run.z && r.z < run.z + 12).sort((a, b) => a.z - b.z)[0];
-            rally.getState().popup(by ? `⬇️ ¡${by.name} te pasó!` : `⬇️ ${pos}º`, COLORS.red);
+            const line = by && Math.random() < 0.6 ? taunt(by.name, "pass") : null;
+            rally.getState().popup(by ? (line ? `${driverById(by.driver).emoji} ${by.name}: «${line}»` : `⬇️ ¡${by.name} te pasó!`) : `⬇️ ${pos}º`, COLORS.red);
           }
         }
         run.lastPos = pos;
@@ -948,6 +1005,7 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
     switch (e.kind) {
       case "jar": {
         run.jars++;
+        if (race.active) run.coins = Math.min(10, run.coins + 1);
         bumpCombo();
         const pts = award(50);
         const wasReady = run.nitro >= 1;

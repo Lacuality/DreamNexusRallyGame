@@ -34,7 +34,8 @@ export function Car() {
 
     // the car faces where it's going, plus the drift slide angle
     const slide = run.driftDir * 0.55 * Math.min(1, run.drift * 4);
-    rig.root.rotation.set(0, run.heading + run.rel + slide + (run.spin > 0 ? (1 - run.spin) * Math.PI * 4 : 0), 0);
+    const trickSpin = run.trick > 0 ? (1 - run.trick / 0.55) * Math.PI * 2 : 0; // a full 360 in the air
+    rig.root.rotation.set(0, run.heading + run.rel + slide + trickSpin + (run.spin > 0 ? (1 - run.spin) * Math.PI * 4 : 0), 0);
     // weight transfer: nose lifts when you accelerate / use nitro, dips when you brake or crash
     const a = anim.current;
     const accel = (run.speed - a.prevSpeed) / Math.max(delta, 1e-3);
@@ -72,8 +73,10 @@ export function Car() {
     rig.flames.visible = run.nitroTime > 0;
     if (rig.flames.visible) rig.flames.scale.set(1, 1, 0.8 + Math.random() * 0.6);
 
-    rig.shield.visible = run.shield;
-    if (run.shield) {
+    rig.shield.visible = run.shield || run.star > 0 || run.bullet > 0;
+    (rig.shield.material as THREE.MeshStandardMaterial).color.set(run.star > 0 || run.bullet > 0 ? "#ffd23f" : "#5fd8ff");
+    (rig.shield.material as THREE.MeshStandardMaterial).emissive.set(run.star > 0 || run.bullet > 0 ? "#ff9f1c" : "#24A0CE");
+    if (rig.shield.visible) {
       const p = 1 + Math.sin(t * 5) * 0.04;
       rig.shield.scale.set(0.85 * p, 0.62 * p, (rig.length / 3.9) * 1.05 * p);
     }

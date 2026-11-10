@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Pause, Volume2, VolumeX, Maximize, Minimize, Heart, Shield, Zap } from "lucide-react";
 import { useRally } from "@/lib/stores/useRally";
+import { TIPS } from "@/lib/game/taunts";
 import { MAX_HEARTS, run } from "@/lib/game/run";
 import { audioManager } from "@/lib/audio";
 import { isTouchDevice } from "@/lib/input";
@@ -134,6 +135,8 @@ export function GameHUD({ isFullscreen = false, onToggleFullscreen }: GameHUDPro
     return () => cancelAnimationFrame(raf);
   }, []);
 
+  const runId = useRally((st) => st.runId);
+  const tip = useMemo(() => TIPS[Math.floor(Math.random() * TIPS.length)], [runId]);
   const landscape = typeof window !== "undefined" && window.innerWidth > window.innerHeight;
   const racing = hud.laps > 0;
   // where the centre-top warnings sit on touch screens (below the position panel)
@@ -201,7 +204,7 @@ export function GameHUD({ isFullscreen = false, onToggleFullscreen }: GameHUDPro
       >
         <div style={{ fontSize: touch ? 12 : 14, fontWeight: 800, color: UI.warm, letterSpacing: "0.12em" }}>{hud.laps > 0 ? "JARS" : "SCORE"}</div>
         <div style={{ fontFamily: UI.display, fontSize: touch ? 28 : 40, lineHeight: 1.05, color: UI.gold, textShadow: "0 3px 0 rgba(0,0,0,0.4)" }}>
-          {hud.laps > 0 ? `🍯 ${hud.jars}` : hud.score.toLocaleString()}
+          {hud.laps > 0 ? `🍯 ${hud.coins}/10` : hud.score.toLocaleString()}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
           <span
@@ -340,6 +343,22 @@ export function GameHUD({ isFullscreen = false, onToggleFullscreen }: GameHUDPro
         </div>
       )}
 
+      {/* ---- rebufo (slipstream) charge ---- */}
+      {racing && hud.draft > 0.08 && (
+        <div style={{ position: "absolute", left: "50%", top: "62%", transform: "translateX(-50%)", width: "min(220px, 46vw)", textAlign: "center", pointerEvents: "none" }}>
+          <div style={{ fontFamily: UI.display, fontSize: touch ? 13 : 15, color: UI.cyanBright, textShadow: "0 2px 4px #000" }}>💨 REBUFO</div>
+          <div style={{ height: 8, borderRadius: 5, background: "rgba(0,0,0,0.45)", overflow: "hidden", border: "1px solid rgba(255,255,255,0.5)" }}>
+            <div style={{ width: `${Math.round(hud.draft * 100)}%`, height: "100%", background: "linear-gradient(90deg,#5fd8ff,#ffffff)" }} />
+          </div>
+        </div>
+      )}
+      {/* ---- Panela Power / Chiva Express timer ---- */}
+      {hud.powered > 0 && (
+        <div style={{ position: "absolute", left: "50%", top: "24%", transform: "translateX(-50%)", fontFamily: UI.display, fontSize: touch ? 20 : 28, color: UI.gold, textShadow: "0 3px 0 rgba(0,0,0,0.5), 0 0 18px rgba(255,210,63,0.9)", animation: "dnrPulse 0.4s ease-in-out infinite", pointerEvents: "none", whiteSpace: "nowrap" }}>
+          🌟 {hud.powered.toFixed(1)}s
+        </div>
+      )}
+
       {/* ---- next corner warning ---- */}
       {hud.laps > 0 && hud.corner !== 0 && (
         <div
@@ -400,6 +419,9 @@ export function GameHUD({ isFullscreen = false, onToggleFullscreen }: GameHUDPro
             }}
           >
             {spin ? ITEMS[spin as keyof typeof ITEMS].emoji : hud.item ? ITEMS[hud.item as keyof typeof ITEMS].emoji : "❔"}
+            {!spin && hud.item && hud.itemCount > 1 && (
+              <span style={{ position: "absolute", marginLeft: 54, marginTop: 44, fontFamily: UI.display, fontSize: 18, color: UI.gold, textShadow: "0 2px 3px #000" }}>×{hud.itemCount}</span>
+            )}
           </div>
           {!touch && (
             <div style={{ fontWeight: 900, textShadow: "0 2px 4px #000" }}>
@@ -487,7 +509,7 @@ export function GameHUD({ isFullscreen = false, onToggleFullscreen }: GameHUDPro
           <span style={{ fontWeight: 800, fontSize: touch ? 12 : 16, color: UI.warm }}>km/h</span>
         </div>
         <div style={{ fontWeight: 800, fontSize: touch ? 13 : 17, color: UI.cyanBright }}>
-          {hud.distance.toLocaleString()} m
+          {racing ? `🍯 ${hud.coins}/10` : `${hud.distance.toLocaleString()} m`}
           {hud.mode === "endless" && (
             <span key={hud.gear} style={{ marginLeft: 8, color: UI.orange, display: "inline-block", animation: "dnrPop 0.5s ease-out" }}>
               ⚡{hud.gear}
@@ -523,7 +545,9 @@ export function GameHUD({ isFullscreen = false, onToggleFullscreen }: GameHUDPro
             }}
           >
             <Zap size={22} strokeWidth={3} fill="currentColor" />
-            {hud.nitroActive ? "BOOST! UNBREAKABLE · x2 POINTS" : nitroReady ? "NITRO READY — PRESS SPACE" : "NITRO — COLLECT JARS TO FILL"}
+            {racing
+              ? hud.nitroActive ? "¡TURBO!" : nitroReady ? "NITRO READY — SPACE" : "NITRO"
+              : hud.nitroActive ? "BOOST! UNBREAKABLE · x2 POINTS" : nitroReady ? "NITRO READY — PRESS SPACE" : "NITRO — COLLECT JARS TO FILL"}
           </div>
           <div
             style={{
@@ -676,6 +700,11 @@ export function GameHUD({ isFullscreen = false, onToggleFullscreen }: GameHUDPro
           }}
         >
           {countdown === 0 ? "GO" : countdown}
+        </div>
+      )}
+      {phase === "countdown" && racing && (
+        <div style={{ position: "absolute", left: "50%", top: touch ? warnTop : "calc(max(12px, env(safe-area-inset-top)) + 96px)", transform: "translateX(-50%)", ...panelStyle, padding: "8px 16px", fontWeight: 800, fontSize: touch ? 13 : 16, textAlign: "center", maxWidth: "min(560px, 86vw)" }}>
+          💡 {tip}
         </div>
       )}
     </div>

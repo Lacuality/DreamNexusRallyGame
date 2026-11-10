@@ -81,6 +81,7 @@ export function MobileControls() {
   const nitro = useRally((s) => s.hud.nitro);
   const battle = useRally((s) => s.hud.battle);
   const item = useRally((s) => s.hud.item);
+  const itemCount = useRally((s) => s.hud.itemCount);
   const nitroActive = useRally((s) => s.hud.nitroActive);
   const [show, setShow] = useState(isTouchDevice());
 
@@ -173,7 +174,10 @@ export function MobileControls() {
             glow={!!item}
           >
             {item ? (
-              <span style={{ fontSize: big * 0.4, lineHeight: 1 }}>{ITEMS[item as keyof typeof ITEMS]?.emoji ?? "❔"}</span>
+              <span style={{ fontSize: big * 0.4, lineHeight: 1 }}>
+                {ITEMS[item as keyof typeof ITEMS]?.emoji ?? "❔"}
+                {itemCount > 1 && <span style={{ fontFamily: UI.display, fontSize: big * 0.16, color: UI.white }}>×{itemCount}</span>}
+              </span>
             ) : (
               <span style={{ fontFamily: UI.display, fontSize: big * 0.15, opacity: 0.7 }}>ITEM</span>
             )}

@@ -42,6 +42,10 @@ export interface HudSnapshot {
   battle: boolean;
   gear: number; // endless speed gear (1..7)
   cupLabel: string; // e.g. "COPA ANDINA · 2/3"
+  coins: number; // jars carried in a race (0..10)
+  draft: number; // slipstream charge 0..1
+  itemCount: number;
+  powered: number; // seconds of Panela / Chiva left
   chaseGap: number; // -1 = no police chase
   chaseGoal: number;
   copAhead: number;
@@ -142,6 +146,10 @@ const emptyHud: HudSnapshot = {
   battle: false,
   gear: 1,
   cupLabel: "",
+  coins: 0,
+  draft: 0,
+  itemCount: 0,
+  powered: 0,
   chaseGap: -1,
   chaseGoal: 100,
   copAhead: -1,
@@ -516,6 +524,10 @@ export const useRally = create<RallyState>()(
         battle: isBattle(),
         gear: speedGear(run.z) + 1,
         cupLabel: session.mode === "gp" && cup ? `${cupById(cup.cupId).name.toUpperCase()} · ${cup.round + 1}/${cupById(cup.cupId).circuits.length} · ${cup.cc}cc` : session.mode === "timetrial" ? "CONTRARRELOJ" : "",
+        coins: run.coins,
+        draft: run.draft,
+        itemCount: run.itemCount,
+        powered: Math.max(run.star, run.bullet),
         chaseGap: run.chaseGap,
         chaseGoal: run.chaseGoal,
         copAhead: run.copAhead,

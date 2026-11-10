@@ -16,6 +16,9 @@ import { audioManager } from "@/lib/audio";
 import { room, myId } from "@/lib/game/net";
 import { burst, FX } from "@/lib/game/fx";
 import { cloneModel } from "@/lib/game/assets";
+import { loseCoins, untouchable } from "@/lib/game/run";
+import { taunt } from "@/lib/game/taunts";
+import { driverById } from "@/lib/game/garage";
 import { session } from "@/lib/game/session";
 
 /**
@@ -27,9 +30,12 @@ import { session } from "@/lib/game/session";
  *  👒 Sombrero  – sombrero vueltiao shield, blocks one hit
  *  🌧️ Aguacero  – tropical downpour slows everyone ahead
  */
-export type ItemId = "aguacate" | "platano" | "tinto" | "volador" | "sombrero" | "aguacero";
+export type ItemId = "aguacate" | "platano" | "tinto" | "volador" | "sombrero" | "aguacero" | "apagon" | "panela" | "chiva";
 
 export const ITEMS: Record<ItemId, { emoji: string; name: string; hint: string }> = {
+  apagon: { emoji: "⚡", name: "Apagón", hint: "Zaps and slows every rival" },
+  panela: { emoji: "🌟", name: "Panela Power", hint: "Invincible and flat out for 5 s" },
+  chiva: { emoji: "🚌", name: "Chiva Express", hint: "The chiva drives you up the field" },
   aguacate: { emoji: "🥑", name: "Aguacate", hint: "Throw it at the car ahead" },
   platano: { emoji: "🍌", name: "Cáscara de plátano", hint: "Drop it behind you" },
   tinto: { emoji: "☕", name: "Tinto Turbo", hint: "Coffee boost!" },
@@ -67,14 +73,15 @@ interface Cloud {
   obj: THREE.Object3D;
 }
 
-function rollItem(pos: number, total: number): ItemId {
+/** "aguacate3" is three avocados in one box. The further back you are, the better the box. */
+function rollItem(pos: number, total: number): ItemId | "aguacate3" {
   const back = (pos - 1) / Math.max(1, total - 1); // 0 = leader, 1 = last
-  const table: [ItemId, number][] =
+  const table: [ItemId | "aguacate3", number][] =
     back < 0.2
       ? [["platano", 35], ["aguacate", 30], ["sombrero", 25], ["tinto", 10]]
       : back < 0.6
-        ? [["aguacate", 30], ["platano", 20], ["tinto", 20], ["sombrero", 15], ["aguacero", 10], ["volador", 5]]
-        : [["tinto", 30], ["aguacero", 20], ["volador", 20], ["aguacate", 20], ["sombrero", 10]];
+        ? [["aguacate", 20], ["aguacate3", 12], ["platano", 16], ["tinto", 18], ["sombrero", 12], ["aguacero", 8], ["volador", 6], ["panela", 8]]
+        : [["tinto", 18], ["aguacate3", 14], ["volador", 14], ["aguacero", 10], ["panela", 18], ["apagon", 12], [back > 0.8 ? "chiva" : "panela", 14]];
   let sum = 0;
   table.forEach(([, w]) => (sum += w));
   let r = Math.random() * sum;
@@ -199,6 +206,7 @@ export function Battle() {
   const traps = useRef<Trap[]>([]);
   const clouds = useRef<Cloud[]>([]);
   const taken = useRef(new Map<string, number>()); // box key -> time it comes back
+  const useCd = useRef(0);
 
   // 6 rows of 3 boxes per lap: you're never far from your next weapon
   const rows = useMemo(() => {
@@ -241,7 +249,7 @@ export function Battle() {
     const victim = carsNow().find((c) => c.id === targetId);
     if (victim) burstAt(victim.z, victim.lat, 1.2, FX.hit, 20, 7, 6);
     if (targetId === "me") {
-      if (run.invulnerable > 0 || run.spin > 0) return false; // just been hit: brief immunity
+      if (run.invulnerable > 0 || run.spin > 0 || untouchable()) return false; // just been hit, or powered up
       if (run.shield) {
         run.shield = false;
         audioManager.playShieldBreak();
@@ -256,6 +264,11 @@ export function Battle() {
       audioManager.playCrash();
       if (navigator.vibrate) navigator.vibrate(100);
       gs.popup(label, COLORS.red, true);
+      run.hitStop = 0.07;
+      if (loseCoins()) burstAt(run.z, run.lat, 1.2, FX.jar, 14, 7, 7);
+      const who = racerById(by);
+      const line = who && !who.remote ? taunt(who.name, "hit") : null;
+      if (line && who) gs.popup(`${driverById(who.driver).emoji} ${who.name}: «${line}»`, COLORS.orange);
       if (online && racerById(by)?.remote) room.send({ t: "hit", id: myId, by });
       return true;
     }
@@ -270,7 +283,12 @@ export function Battle() {
       if (by === "me") gs.popup(`${r.name} blocked it! 👒`, COLORS.cyan);
       return false;
     }
-    if (r.spin > 0 || (r.immune ?? 0) > 0) return false;
+    if (r.spin > 0 || (r.immune ?? 0) > 0 || (r.star ?? 0) > 0) return false;
+    if (by === "me") {
+      run.hitStop = 0.05;
+      const line = taunt(r.name, "ouch");
+      if (line && Math.random() < 0.7) gs.popup(`${driverById(r.driver).emoji} ${r.name}: «${line}»`, COLORS.cyan);
+    }
     r.spin = 1.1;
     r.immune = 2.6;
     r.speed *= 0.35;
@@ -307,6 +325,60 @@ export function Battle() {
         audioManager.playClick();
         break;
       }
+      case "apagon": {
+        // lights out: everyone but the owner is zapped and slowed
+        let n = 0;
+        for (const c of cars) {
+          if (c.id === ownerId) continue;
+          if (c.id === "me") {
+            if (untouchable() || run.invulnerable > 0) continue;
+            if (run.shield) {
+              run.shield = false;
+              gs.popup("👒 El sombrero te salvó del apagón", COLORS.cyan, true);
+              continue;
+            }
+            run.slowTime = 3;
+            run.camFlash = 0.9;
+            run.shake = 0.8;
+            gs.popup("⚡ ¡APAGÓN! Se fue la luz", COLORS.red, true);
+          } else {
+            const r = racerById(c.id);
+            if (!r || r.remote || r.shield || (r.star ?? 0) > 0) {
+              if (r && r.shield) r.shield = false;
+              continue;
+            }
+            r.slow = 3;
+            n++;
+          }
+        }
+        if (mine) {
+          run.camFlash = 0.7;
+          gs.popup(`⚡ ¡APAGÓN! ${n} rivales a oscuras`, COLORS.gold, true);
+        }
+        audioManager.playCrash();
+        break;
+      }
+      case "panela":
+        if (mine) {
+          run.star = 5;
+          audioManager.playShield();
+          audioManager.playNitro();
+          gs.popup("🌟 ¡PANELA POWER! Invencible", COLORS.gold, true);
+        } else if (owner) {
+          owner.star = 5;
+          owner.nitro = 5;
+        }
+        break;
+      case "chiva":
+        if (mine) {
+          run.bullet = 3.5;
+          audioManager.playNitro();
+          gs.popup("🚌 ¡CHIVA EXPRESS! Agárrese", COLORS.gold, true);
+        } else if (owner) {
+          owner.star = 3.5;
+          owner.nitro = 3.5;
+        }
+        break;
       case "tinto":
         if (mine) {
           run.nitroTime = Math.max(run.nitroTime, 1.8);
@@ -401,9 +473,11 @@ export function Battle() {
               burstAt(z, lat, 1.1, FX.box, 12, 5, 5);
               if (holder) continue;
               const pos = c.id === "me" ? playerPosition(run.z, null) : 1 + carsNow().filter((o) => o.z > c.z).length;
-              const item = rollItem(pos, race.racers.length + 1);
+              const rolled = rollItem(pos, race.racers.length + 1);
+              const item: ItemId = rolled === "aguacate3" ? "aguacate" : rolled;
               if (c.id === "me") {
                 run.item = item;
+                run.itemCount = rolled === "aguacate3" ? 3 : 1;
                 audioManager.playPickup(6);
                 useRally.getState().popup(`${ITEMS[item].emoji} ${ITEMS[item].name.toUpperCase()}!`, COLORS.gold, true);
               } else {
@@ -425,10 +499,14 @@ export function Battle() {
 
     // --- player uses their item ---
     const want = input.item || input.touchItem || input.itemQueued;
-    input.itemQueued = false;
-    if (want && run.item && run.spin <= 0) {
+    // keep a tap that landed during the short re-fire delay; drop it otherwise
+    if (!(run.item && useCd.current > 0)) input.itemQueued = false;
+    useCd.current -= dt;
+    if (want && run.item && run.spin <= 0 && run.bullet <= 0 && useCd.current <= 0) {
       const it = run.item as ItemId;
-      run.item = null;
+      run.itemCount--;
+      if (run.itemCount <= 0) run.item = null;
+      useCd.current = 0.35; // so a held key doesn't fire all three avocados at once
       use("me", it);
     }
 

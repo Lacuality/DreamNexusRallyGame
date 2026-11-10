@@ -194,8 +194,25 @@ export function Rivals() {
             audioManager.playSmash();
             toWorld(run.z, run.lat + dlat * 0.5, 0.8, tmpV);
             burst(tmpV.x, tmpV.y, tmpV.z, ["#ffffff", "#ffd23f", "#aaaaaa"], hard ? 16 : 8, 5, 4, 0.14);
-            // a hard side hit from a heavier car (or with nitro) spins the lighter one out
-            if (hard && !rearEnd) {
+            if (run.star > 0 || run.bullet > 0) {
+              // powered up: whoever you touch goes spinning
+              if (r.spin <= 0 && (r.immune ?? 0) <= 0 && (r.star ?? 0) <= 0) {
+                r.spin = 1;
+                r.immune = 2.4;
+                r.speed *= 0.5;
+                run.hitsLanded++;
+                run.hitStop = 0.05;
+                useRally.getState().popup(`🌟 ¡Atropellaste a ${r.name}!`, "#ffd23f", true);
+              }
+            } else if ((r.star ?? 0) > 0) {
+              if (run.spin <= 0 && run.invulnerable <= 0 && !run.shield) {
+                run.spin = 0.9;
+                run.invulnerable = 2.4;
+                run.speed *= 0.5;
+                run.hitStop = 0.07;
+                useRally.getState().popup(`🌟 ¡${r.name} venía con panela!`, "#ff5a5f", true);
+              }
+            } else if (hard && !rearEnd) {
               if (mR > mP * 1.15 && run.spin <= 0 && run.invulnerable <= 0 && !run.shield) {
                 run.spin = 0.8;
                 run.invulnerable = 2.4;
@@ -252,7 +269,9 @@ export function Rivals() {
       rig.shield.visible = r.shield;
       rig.wheels.forEach((w) => (w.rotation.x += (r.speed * dt) / 0.42));
       animateWobble(rig, t + r.seed, r.speed, false);
-      rig.flames.visible = r.nitro > 0;
+      rig.flames.visible = r.nitro > 0 || (r.star ?? 0) > 0;
+      if ((r.star ?? 0) > 0) rig.body.scale.setScalar(1 + Math.sin(t * 18) * 0.05);
+      else if (rig.body.scale.x !== 1) rig.body.scale.setScalar(1);
       // fade remote cars that stopped sending
       rig.root.visible = !r.remote || Date.now() - r.lastSeen < 6000;
     }
@@ -285,8 +304,9 @@ export function Rivals() {
     if (r.spin > 0) r.spin -= dt;
     if (r.slow > 0) r.slow -= dt;
     if ((r.immune ?? 0) > 0) r.immune! -= dt;
+    if ((r.star ?? 0) > 0) r.star! -= dt;
     const hurt = r.spin > 0 ? 0.25 : r.slow > 0 ? 0.6 : 1;
-    const target = base * corner * band * (r.nitro > 0 ? 1.18 : 1) * hurt;
+    const target = base * corner * band * ((r.star ?? 0) > 0 ? 1.28 : r.nitro > 0 ? 1.18 : 1) * hurt;
     r.speed += (target - r.speed) * Math.min(1, dt * (target < r.speed ? 2.2 : 0.9 * c.accel));
     r.z += r.speed * dt;
 
