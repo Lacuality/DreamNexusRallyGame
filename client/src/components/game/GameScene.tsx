@@ -81,7 +81,7 @@ export function GameScene({ isFullscreen = false, onToggleFullscreen }: GameScen
       <Canvas
         camera={{ position: [0, 4, -9], fov: 62, near: 0.1, far: 900 }}
         dpr={touch ? [1, 1.5] : [1, 2]}
-        gl={{ antialias: !touch, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping }}
+        gl={{ antialias: !touch, powerPreference: "high-performance", toneMapping: THREE.NoToneMapping }}
         shadows={{ type: THREE.PCFSoftShadowMap }}
         style={{ position: "fixed", inset: 0 }}
         onCreated={({ gl }) => ((window as any).__gl = gl)}

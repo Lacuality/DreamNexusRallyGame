@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
 import { asset } from "../env";
+import { toonify } from "./toon";
 
 /**
  * Real 3D models (CC0: Kenney's Car Kit + Nature Kit, Quaternius props —
@@ -26,18 +27,7 @@ function prepare(root: THREE.Object3D) {
     m.castShadow = true;
     m.receiveShadow = true;
     const mats = Array.isArray(m.material) ? m.material : [m.material];
-    const fixed = mats.map((mat) => {
-      if ((mat as THREE.MeshBasicMaterial).isMeshBasicMaterial) {
-        const b = mat as THREE.MeshBasicMaterial;
-        return new THREE.MeshStandardMaterial({ color: b.color, map: b.map, roughness: 0.9, metalness: 0, vertexColors: b.vertexColors });
-      }
-      const s = mat as THREE.MeshStandardMaterial;
-      if (s.isMeshStandardMaterial) {
-        s.roughness = Math.max(0.45, s.roughness);
-        s.metalness = Math.min(0.15, s.metalness);
-      }
-      return mat;
-    });
+    const fixed = mats.map((mat) => toonify(mat));
     m.material = Array.isArray(m.material) ? fixed : fixed[0];
   });
 }

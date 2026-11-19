@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import { toonMat } from "@/lib/game/toon";
 import { race, playerPosition, type Racer } from "@/lib/game/race";
 import { run } from "@/lib/game/run";
 import { input } from "@/lib/input";
@@ -93,7 +94,7 @@ function rollItem(pos: number, total: number): ItemId | "aguacate3" {
 }
 
 /* ---------- small models ---------- */
-const m = (c: string, e: Partial<THREE.MeshStandardMaterialParameters> = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.5, ...e });
+const m = (c: string, e: Partial<THREE.MeshStandardMaterialParameters> = {}) => toonMat({ color: c, roughness: 0.5, ...e });
 
 function boxTexture() {
   const c = document.createElement("canvas");

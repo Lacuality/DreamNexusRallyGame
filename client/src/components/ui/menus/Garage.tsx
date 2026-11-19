@@ -27,7 +27,7 @@ function Preview({ car, paint, driver }: { car: CarId; paint: PaintId; driver: D
         <directionalLight position={[5, 8, 5]} intensity={1.6} />
         <mesh rotation={[-Math.PI / 2, 0, 0]}>
           <circleGeometry args={[5, 40]} />
-          <meshStandardMaterial color="#2f3640" />
+          <meshToonMaterial color="#2f3640" />
         </mesh>
         <Turntable>
           <ShowcaseCar car={car} paint={paint} driver={driver} />

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import { toonMat } from "@/lib/game/toon";
 import { run, speedGear } from "@/lib/game/run";
 import { car } from "@/lib/game/session";
 import { toWorld, headingAt, ROAD_HALF } from "@/lib/track";
@@ -21,7 +22,7 @@ const ESCAPE_GAP = 100;
 const SPEED_LIMIT = 150; // km/h past a patrol
 const COLORS = { gold: "#ffd23f", red: "#ff5a5f", cyan: "#5fd8ff", orange: "#ff9f43" };
 
-const m = (c: string, e: Partial<THREE.MeshStandardMaterialParameters> = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.55, ...e });
+const m = (c: string, e: Partial<THREE.MeshStandardMaterialParameters> = {}) => toonMat({ color: c, roughness: 0.55, ...e });
 
 function label() {
   const c = document.createElement("canvas");
@@ -55,7 +56,7 @@ function buildCop() {
   const tex = label();
   if (!realCar)
     [-1.02, 1.02].forEach((x) => {
-      const d = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 0.5), new THREE.MeshStandardMaterial({ map: tex }));
+      const d = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 0.5), toonMat({ map: tex }));
       d.position.set(x, 0.85, 0);
       d.rotation.y = x > 0 ? Math.PI / 2 : -Math.PI / 2;
       g.add(d);
@@ -98,7 +99,7 @@ function buildCop() {
     t.colorSpace = THREE.SRGBColorSpace;
     return t;
   })();
-  const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.8), new THREE.MeshStandardMaterial({ map: signTex, side: THREE.DoubleSide }));
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.8), toonMat({ map: signTex, side: THREE.DoubleSide }));
   sign.position.set(0, 2.2, -3.2);
   sign.rotation.y = Math.PI;
   sign.name = "sign";
@@ -125,7 +126,7 @@ function buildCop() {
     red.position.y = blue.position.y = top + 0.1;
     g.add(realCar, bar, red, blue, sign, post);
     [-1.02, 1.02].forEach((x) => {
-      const d = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 0.42), new THREE.MeshStandardMaterial({ map: tex, transparent: true }));
+      const d = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 0.42), toonMat({ map: tex, transparent: true }));
       d.position.set(x, 0.95, 0);
       d.rotation.y = x > 0 ? Math.PI / 2 : -Math.PI / 2;
       g.add(d);

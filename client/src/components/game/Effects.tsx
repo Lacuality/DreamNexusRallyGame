@@ -1,5 +1,4 @@
-import { EffectComposer, Bloom, Vignette, ToneMapping, SMAA } from "@react-three/postprocessing";
-import { ToneMappingMode } from "postprocessing";
+import { EffectComposer, Bloom, Vignette, HueSaturation, SMAA } from "@react-three/postprocessing";
 import { useSettings } from "@/lib/stores/useSettings";
 
 /**
@@ -11,9 +10,9 @@ export function Effects() {
   if (graphics !== "high") return null;
   return (
     <EffectComposer multisampling={0}>
-      <Bloom mipmapBlur intensity={0.55} luminanceThreshold={0.92} luminanceSmoothing={0.2} radius={0.7} />
-      <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
-      <Vignette offset={0.32} darkness={0.42} />
+      <Bloom mipmapBlur intensity={0.5} luminanceThreshold={1.02} luminanceSmoothing={0.2} radius={0.7} />
+      <HueSaturation saturation={0.12} />
+      <Vignette offset={0.32} darkness={0.34} />
       <SMAA />
     </EffectComposer>
   );

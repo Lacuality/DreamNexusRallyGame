@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import { toonMat } from "@/lib/game/toon";
 import { toWorld, headingAt, roadHalf, isCircuit } from "@/lib/track";
 import { useRally } from "@/lib/stores/useRally";
 import { RIVALS } from "@/lib/game/circuits";
@@ -11,7 +12,7 @@ import { burst } from "@/lib/game/fx";
  * track, painted grid boxes for the eight karts, and a start gantry whose
  * lights go red → yellow → green with the countdown.
  */
-const m = (c: string, e: Partial<THREE.MeshStandardMaterialParameters> = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.6, ...e });
+const m = (c: string, e: Partial<THREE.MeshStandardMaterialParameters> = {}) => toonMat({ color: c, roughness: 0.6, ...e });
 
 function checker() {
   const c = document.createElement("canvas");
@@ -67,14 +68,14 @@ export function StartLine() {
     };
 
     // checkered start/finish line across the full width
-    const line = new THREE.Mesh(new THREE.PlaneGeometry(half * 2 + 0.6, 2.2), new THREE.MeshStandardMaterial({ map: checker(), polygonOffset: true, polygonOffsetFactor: -4 }));
+    const line = new THREE.Mesh(new THREE.PlaneGeometry(half * 2 + 0.6, 2.2), toonMat({ map: checker(), polygonOffset: true, polygonOffsetFactor: -4 }));
     line.rotation.x = -Math.PI / 2;
     const lineWrap = new THREE.Group();
     lineWrap.add(line);
     place(lineWrap, 1.5, 0, 0.04);
 
     // painted grid boxes (same spots as the grid in Rivals.tsx: player at 0, rivals in rows of two)
-    const boxMat = new THREE.MeshStandardMaterial({ color: "#ffffff", emissive: "#ffffff", emissiveIntensity: 0.15, polygonOffset: true, polygonOffsetFactor: -3, side: THREE.DoubleSide });
+    const boxMat = toonMat({ color: "#ffffff", emissive: "#ffffff", emissiveIntensity: 0.15, polygonOffset: true, polygonOffsetFactor: -3, side: THREE.DoubleSide });
     const slots: [number, number][] = [[0, 0]];
     RIVALS.forEach((_, i) => slots.push([8 + Math.floor(i / 2) * 9, i % 2 ? 3 : -3]));
     for (const [z, lat] of slots) {
@@ -106,7 +107,7 @@ export function StartLine() {
     const bar = new THREE.Mesh(new THREE.BoxGeometry(half * 2 + 3.2, 0.3, 0.3), post);
     bar.position.set(0, 7, 0);
     gantry.add(bar);
-    const sign = new THREE.Mesh(new THREE.PlaneGeometry(10, 1.56), new THREE.MeshStandardMaterial({ map: signTex("DREAM NEXUS RALLY"), side: THREE.DoubleSide }));
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(10, 1.56), toonMat({ map: signTex("DREAM NEXUS RALLY"), side: THREE.DoubleSide }));
     sign.position.set(0, 8, 0);
     sign.rotation.y = Math.PI; // readable from the grid
     gantry.add(sign);

@@ -4,6 +4,7 @@ import * as THREE from "three";
 import { roadX, roadY, toWorld, roadCurvature, currentLoop, ROAD_HALF, roadHalf, hash, isCircuit } from "@/lib/track";
 import { blendedBiome, useBiome } from "@/lib/stores/useBiome";
 import { run } from "@/lib/game/run";
+import { toonMat } from "@/lib/game/toon";
 
 /**
  * Everything static-ish around the car: sky, fog, lights, the road strip,
@@ -57,10 +58,10 @@ function makeGravelTexture() {
   const c = document.createElement("canvas");
   c.width = c.height = 64;
   const g = c.getContext("2d")!;
-  g.fillStyle = "#c9b48a";
+  g.fillStyle = "#e3c88f";
   g.fillRect(0, 0, 64, 64);
-  for (let i = 0; i < 420; i++) {
-    const v = 150 + Math.floor(Math.random() * 90);
+  for (let i = 0; i < 160; i++) {
+    const v = 190 + Math.floor(Math.random() * 50);
     g.fillStyle = `rgb(${v},${v - 14},${v - 40})`;
     g.fillRect(Math.random() * 64, Math.random() * 64, 2, 2);
   }
@@ -74,15 +75,15 @@ function makeAsphaltTexture() {
   const c = document.createElement("canvas");
   c.width = c.height = 256;
   const ctx = c.getContext("2d")!;
-  ctx.fillStyle = "#4a4d52";
+  ctx.fillStyle = "#676b7c";
   ctx.fillRect(0, 0, 256, 256);
-  for (let i = 0; i < 2600; i++) {
-    const v = 60 + Math.random() * 50;
-    ctx.fillStyle = `rgb(${v},${v + 2},${v + 6})`;
+  for (let i = 0; i < 700; i++) {
+    const v = 92 + Math.random() * 26;
+    ctx.fillStyle = `rgb(${v},${v + 4},${v + 20})`;
     ctx.fillRect(Math.random() * 256, Math.random() * 256, 2, 2);
   }
   // subtle tyre tracks
-  ctx.fillStyle = "rgba(20,20,24,0.18)";
+  ctx.fillStyle = "rgba(30,30,50,0.12)";
   ctx.fillRect(40, 0, 36, 256);
   ctx.fillRect(180, 0, 36, 256);
   const tex = new THREE.CanvasTexture(c);
@@ -186,6 +187,10 @@ function SkyDome() {
         uniforms: {
           top: { value: new THREE.Color("#3d9be0") },
           horizon: { value: new THREE.Color("#bfe6f5") },
+          cloud: { value: new THREE.Color("#ffffff") },
+          cloudShade: { value: new THREE.Color("#c9dcf0") },
+          night: { value: 0 },
+          time: { value: 0 },
           sunDir: { value: new THREE.Vector3(-0.5, 0.42, 1).normalize() },
         },
         vertexShader: `
@@ -195,24 +200,62 @@ function SkyDome() {
             gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
           }`,
         fragmentShader: `
-          uniform vec3 top; uniform vec3 horizon; uniform vec3 sunDir;
+          uniform vec3 top; uniform vec3 horizon; uniform vec3 cloud; uniform vec3 cloudShade; uniform vec3 sunDir;
+          uniform float night; uniform float time;
           varying vec3 vDir;
+          float hash2(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+          float noise(vec2 p) {
+            vec2 i = floor(p), f = fract(p);
+            f = f * f * (3.0 - 2.0 * f);
+            return mix(mix(hash2(i), hash2(i + vec2(1, 0)), f.x), mix(hash2(i + vec2(0, 1)), hash2(i + vec2(1, 1)), f.x), f.y);
+          }
+          float fbm(vec2 p) { return noise(p) * 0.55 + noise(p * 2.1 + 7.3) * 0.3 + noise(p * 4.3 + 1.9) * 0.15; }
           void main() {
-            float h = clamp(vDir.y * 1.6 + 0.05, 0.0, 1.0);
-            vec3 col = mix(horizon, top, pow(h, 0.7));
-            float sun = max(dot(normalize(vDir), sunDir), 0.0);
-            col += vec3(1.0, 0.95, 0.8) * smoothstep(0.9985, 0.9995, sun);
-            col += vec3(1.0, 0.85, 0.6) * pow(sun, 24.0) * 0.22;
+            vec3 d = normalize(vDir);
+            float h = clamp(d.y * 1.6 + 0.05, 0.0, 1.0);
+            // painted sky: three flat-ish bands that melt into each other
+            vec3 mid = mix(horizon, top, 0.55);
+            vec3 col = mix(horizon, mid, smoothstep(0.0, 0.28, h));
+            col = mix(col, top, smoothstep(0.3, 0.85, h));
+            // sun: a hard cartoon disc with a soft halo
+            float sun = max(dot(d, sunDir), 0.0);
+            col += vec3(1.0, 0.88, 0.62) * pow(sun, 10.0) * 0.28 * (1.0 - night);
+            col = mix(col, vec3(1.0, 0.97, 0.82), smoothstep(0.9965, 0.9975, sun) * (1.0 - night * 0.2));
+            // stars at night
+            vec2 sp = d.xz / (abs(d.y) + 0.35) * 42.0;
+            float star = step(0.992, hash2(floor(sp))) * step(0.05, d.y);
+            col += vec3(1.0, 0.95, 0.85) * star * night * (0.6 + 0.4 * sin(time * 2.0 + hash2(floor(sp)) * 40.0));
+            // clouds: puffy cut-outs with a flat shaded underside
+            if (d.y > 0.015) {
+              vec2 cp = d.xz / (d.y + 0.22) * 1.25 + vec2(time * 0.012, time * 0.004);
+              float n = fbm(cp);
+              float body = smoothstep(0.56, 0.585, n);
+              float lit = smoothstep(0.6, 0.62, fbm(cp + vec2(0.06, 0.05)));
+              vec3 cc = mix(cloudShade, cloud, lit);
+              float fade = smoothstep(0.015, 0.14, d.y);
+              col = mix(col, cc, body * fade * mix(0.95, 0.55, night));
+            }
             gl_FragColor = vec4(col, 1.0);
+            #include <colorspace_fragment>
           }`,
       }),
     [],
   );
+  const tmpC = useMemo(() => new THREE.Color(), []);
 
-  useFrame(() => {
+  useFrame((state) => {
     const b = blendedBiome();
-    mat.uniforms.top.value.set(b.skyTop);
-    mat.uniforms.horizon.value.set(b.skyHorizon);
+    const u = mat.uniforms;
+    u.top.value.set(b.skyTop);
+    u.horizon.value.set(b.skyHorizon);
+    u.time.value = state.clock.elapsedTime;
+    const hsl = { h: 0, s: 0, l: 0 };
+    u.top.value.getHSL(hsl);
+    const night = THREE.MathUtils.clamp((0.22 - hsl.l) / 0.12, 0, 1);
+    u.night.value = night;
+    // clouds borrow the horizon's tint, so a sunset has peach clouds and the night has violet ones
+    u.cloud.value.set("#ffffff").lerp(u.horizon.value, 0.18 + night * 0.5);
+    u.cloudShade.value.copy(u.horizon.value).lerp(tmpC.set(b.skyTop), 0.35).lerp(tmpC.set("#ffffff"), 0.25 * (1 - night));
     if (ref.current) ref.current.position.copy(camera.position);
   });
 
@@ -249,19 +292,19 @@ function Atmosphere() {
     toWorld(run.z, run.lat, 0, tmpP);
     const x = tmpP.x, y = tmpP.y, zz = tmpP.z;
     if (sun.current) {
-      sun.current.intensity = b.sunIntensity;
+      sun.current.intensity = b.sunIntensity * 1.35;
       sun.current.color.set(b.sunColor);
       sun.current.position.set(x + 14, y + 26, zz - 10);
       target.position.set(x, y, zz + 8);
       sun.current.target = target;
     }
-    if (amb.current) amb.current.intensity = b.ambientIntensity;
+    if (amb.current) amb.current.intensity = b.ambientIntensity * 1.25;
     if (hemi.current) hemi.current.color.set(b.skyHorizon);
   });
 
   return (
     <>
-      <hemisphereLight ref={hemi} intensity={0.55} color="#bfe6f5" groundColor="#4a5a30" />
+      <hemisphereLight ref={hemi} intensity={0.7} color="#bfe6f5" groundColor="#4a5a30" />
       <ambientLight ref={amb} intensity={0.55} />
       <directionalLight
         ref={sun}
@@ -321,7 +364,18 @@ function RoadAndTerrain() {
     g.setAttribute("color", new THREE.BufferAttribute(new Float32Array(rows * cols.length * 3), 3));
     return g;
   }, [cols, rows]);
-  const groundMat = useMemo(() => new THREE.MeshStandardMaterial({ color: "#5a8f3a", roughness: 1, flatShading: true }), []);
+  const groundMat = useMemo(() => toonMat({ color: "#5a8f3a" }), []);
+  const mats = useMemo(
+    () => ({
+      terrain: toonMat({ vertexColors: true }),
+      road: toonMat({ map: asphalt }),
+      gravel: toonMat({ map: gravelTex }),
+      rail: toonMat({ map: railTex, side: THREE.DoubleSide }),
+      rumble: toonMat({ map: rumbleTex, polygonOffset: true, polygonOffsetFactor: -1 }),
+      dash: toonMat({ map: dashTex, transparent: true, alphaTest: 0.5, polygonOffset: true, polygonOffsetFactor: -2 }),
+    }),
+    [asphalt, gravelTex, railTex, rumbleTex, dashTex],
+  );
 
   const tmpA = useMemo(() => new THREE.Color(), []);
   const tmpB = useMemo(() => new THREE.Color(), []);
@@ -368,7 +422,7 @@ function RoadAndTerrain() {
         uv[i * 2] = lat / 8;
         uv[i * 2 + 1] = z / 8;
         const isShoulder = Math.abs(lat) < 9 ? 1 : 0;
-        const shade = 0.88 + hash(Math.floor(z / STEP) * 7 + c * 3) * 0.2;
+        const shade = isShoulder ? 1 : Math.floor(z / 12) % 2 === 0 ? 1.06 : 0.9;
         const cc = isShoulder ? tmpB : tmpA;
         col[i * 3] = cc.r * shade;
         col[i * 3 + 1] = cc.g * shade;
@@ -411,41 +465,23 @@ function RoadAndTerrain() {
           <planeGeometry args={[3000, 3000, 1, 1]} />
         </mesh>
       )}
-      <mesh geometry={terrainGeo} receiveShadow frustumCulled={false}>
-        <meshStandardMaterial vertexColors roughness={1} metalness={0} flatShading />
-      </mesh>
-      <mesh geometry={roadGeo} receiveShadow frustumCulled={false}>
-        <meshStandardMaterial map={asphalt} roughness={0.9} metalness={0.05} />
-      </mesh>
+      <mesh geometry={terrainGeo} material={mats.terrain} receiveShadow frustumCulled={false} />
+      <mesh geometry={roadGeo} material={mats.road} receiveShadow frustumCulled={false} />
       {circuit && (
         <>
-          <mesh geometry={leftGravel} receiveShadow frustumCulled={false}>
-            <meshStandardMaterial map={gravelTex} roughness={1} />
-          </mesh>
-          <mesh geometry={rightGravel} receiveShadow frustumCulled={false}>
-            <meshStandardMaterial map={gravelTex} roughness={1} />
-          </mesh>
+          <mesh geometry={leftGravel} material={mats.gravel} receiveShadow frustumCulled={false} />
+          <mesh geometry={rightGravel} material={mats.gravel} receiveShadow frustumCulled={false} />
         </>
       )}
       {circuit && (
         <>
-          <mesh geometry={leftRail} castShadow frustumCulled={false}>
-            <meshStandardMaterial map={railTex} roughness={0.6} side={THREE.DoubleSide} />
-          </mesh>
-          <mesh geometry={rightRail} castShadow frustumCulled={false}>
-            <meshStandardMaterial map={railTex} roughness={0.6} side={THREE.DoubleSide} />
-          </mesh>
+          <mesh geometry={leftRail} material={mats.rail} castShadow frustumCulled={false} />
+          <mesh geometry={rightRail} material={mats.rail} castShadow frustumCulled={false} />
         </>
       )}
-      <mesh geometry={leftRumble} receiveShadow frustumCulled={false}>
-        <meshStandardMaterial map={rumbleTex} roughness={0.7} polygonOffset polygonOffsetFactor={-1} />
-      </mesh>
-      <mesh geometry={rightRumble} receiveShadow frustumCulled={false}>
-        <meshStandardMaterial map={rumbleTex} roughness={0.7} polygonOffset polygonOffsetFactor={-1} />
-      </mesh>
-      <mesh geometry={dashGeo} frustumCulled={false}>
-        <meshStandardMaterial map={dashTex} transparent alphaTest={0.5} roughness={0.6} polygonOffset polygonOffsetFactor={-2} />
-      </mesh>
+      <mesh geometry={leftRumble} material={mats.rumble} receiveShadow frustumCulled={false} />
+      <mesh geometry={rightRumble} material={mats.rumble} receiveShadow frustumCulled={false} />
+      <mesh geometry={dashGeo} material={mats.dash} frustumCulled={false} />
     </group>
   );
 }
@@ -458,8 +494,8 @@ function Mountains() {
   const loop = currentLoop();
   const mats = useMemo(
     () => [
-      new THREE.MeshStandardMaterial({ color: "#3f7f5a", flatShading: true, roughness: 1, fog: false }),
-      new THREE.MeshStandardMaterial({ color: "#f4f8ff", flatShading: true, roughness: 1, fog: false }),
+      toonMat({ color: "#3f7f5a", fog: false }),
+      toonMat({ color: "#f4f8ff", fog: false }),
     ],
     [],
   );
@@ -494,7 +530,7 @@ function Mountains() {
     else group.current.position.set(roadX(run.z) * 0.85, roadY(run.z) - 8, run.z);
     const b = blendedBiome();
     // atmospheric haze: mix the mountain colour toward the horizon
-    mats[0].color.set(b.mountainColor).lerp(tmp.set(b.skyHorizon), 0.35);
+    mats[0].color.set(b.mountainColor).lerp(tmp.set(b.skyHorizon), 0.22);
   });
 
   return (

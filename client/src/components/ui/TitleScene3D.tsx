@@ -140,17 +140,17 @@ export function TitleScene3D() {
         {[-14, -6, 5, 13].map((x, i) => (
           <mesh key={i} position={[x, -1, -12 - (i % 2) * 4]} scale={[7 + i, 5 + (i % 3) * 2, 6]}>
             <sphereGeometry args={[1, 12, 8]} />
-            <meshStandardMaterial color={i % 2 ? "#3f7f5a" : "#4f9a3c"} flatShading />
+            <meshToonMaterial color={i % 2 ? "#3f7f5a" : "#4f9a3c"} />
           </mesh>
         ))}
         {/* ground + road piece */}
         <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow position={[0, 0, 0]}>
           <circleGeometry args={[30, 40]} />
-          <meshStandardMaterial color="#4f9a3c" />
+          <meshToonMaterial color="#4f9a3c" />
         </mesh>
         <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow position={[0, 0.01, 0]}>
           <circleGeometry args={[3.6, 40]} />
-          <meshStandardMaterial color="#3a3d42" />
+          <meshToonMaterial color="#3a3d42" />
         </mesh>
 
         <CameraFit />

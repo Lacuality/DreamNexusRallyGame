@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { cloneModel, tintModel, type ModelName } from "./assets";
+import { toonMat, addOutline } from "./toon";
 import { paintById, type CarId, type DriverId, type PaintId } from "./garage";
 
 /**
@@ -18,8 +19,7 @@ export interface CarRig {
   length: number;
 }
 
-const mat = (color: string, extra: Partial<THREE.MeshStandardMaterialParameters> = {}) =>
-  new THREE.MeshStandardMaterial({ color, roughness: 0.6, metalness: 0.1, ...extra });
+const mat = (color: string, extra: Partial<THREE.MeshStandardMaterialParameters> = {}) => toonMat({ color, ...extra });
 
 function mesh(geo: THREE.BufferGeometry, m: THREE.Material | THREE.Material[], shadow = true) {
   const me = new THREE.Mesh(geo, m as any);
@@ -766,7 +766,7 @@ export function buildVehicle(carId: CarId = "rally7", paintId: PaintId = "dn", d
 
   const shield = new THREE.Mesh(
     new THREE.SphereGeometry(2.6, 24, 16),
-    new THREE.MeshStandardMaterial({ color: "#5fd8ff", emissive: "#24A0CE", emissiveIntensity: 0.6, transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide }),
+    toonMat({ color: "#5fd8ff", emissive: "#24A0CE", emissiveIntensity: 0.6, transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide }),
   );
   shield.scale.set(0.85, 0.62, (b.length / 3.9) * 1.05);
   shield.position.y = 0.8;
@@ -782,5 +782,6 @@ export function buildVehicle(carId: CarId = "rally7", paintId: PaintId = "dn", d
   blob.name = "blob";
   root.add(blob);
 
+  addOutline(root, 0.05);
   return { root, body, wheels, frontWheels, wobble: d.wobble, flames, shield, length: b.length };
 }

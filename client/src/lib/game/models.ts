@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { cloneModel, type ModelName } from "./assets";
+import { toonMat, addOutline } from "./toon";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
 /**
@@ -7,8 +8,7 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
  * geometry + materials, so they're cheap). No external files needed.
  */
 
-const mat = (color: string, extra: Partial<THREE.MeshStandardMaterialParameters> = {}) =>
-  new THREE.MeshStandardMaterial({ color, roughness: 0.7, metalness: 0.05, ...extra });
+const mat = (color: string, extra: Partial<THREE.MeshStandardMaterialParameters> = {}) => toonMat({ color, ...extra });
 
 function mesh(geo: THREE.BufferGeometry, m: THREE.Material, shadow = true) {
   const me = new THREE.Mesh(geo, m);
@@ -106,7 +106,7 @@ function buildFotomulta() {
     ctx.font = "bold 30px sans-serif";
     ctx.fillText("FOTOMULTA 📸", 128, 168);
   });
-  const sign = mesh(new THREE.PlaneGeometry(1.5, 1.12), new THREE.MeshStandardMaterial({ map: signTex, side: THREE.DoubleSide }), false);
+  const sign = mesh(new THREE.PlaneGeometry(1.5, 1.12), toonMat({ map: signTex, side: THREE.DoubleSide }), false);
   sign.position.set(5.6, 3.1, -0.2);
   sign.rotation.y = Math.PI;
   g.add(pole, arm, cam, lens, flash, sign);
@@ -282,7 +282,7 @@ function buildBarrier() {
 
 function buildPuddle() {
   const g = new THREE.Group();
-  const water = new THREE.MeshStandardMaterial({
+  const water = toonMat({
     color: "#3d7fb0",
     roughness: 0.05,
     metalness: 0.4,
@@ -296,7 +296,7 @@ function buildPuddle() {
   p.position.y = 0.04;
   p.scale.set(1, 1.2, 1);
   p.receiveShadow = true;
-  const mud = new THREE.Mesh(new THREE.CircleGeometry(1.55, 20), new THREE.MeshStandardMaterial({ color: "#5a4230", roughness: 1, polygonOffset: true, polygonOffsetFactor: -2 }));
+  const mud = new THREE.Mesh(new THREE.CircleGeometry(1.55, 20), toonMat({ color: "#5a4230", roughness: 1, polygonOffset: true, polygonOffsetFactor: -2 }));
   mud.rotation.x = -Math.PI / 2;
   mud.position.y = 0.03;
   mud.scale.set(1, 1.2, 1);
@@ -474,7 +474,7 @@ function buildShield() {
   gem.scale.set(1, 1.3, 1);
   const bubble = new THREE.Mesh(
     new THREE.SphereGeometry(0.7, 18, 12),
-    new THREE.MeshStandardMaterial({ color: "#a8ecff", transparent: true, opacity: 0.25, emissive: "#24A0CE", emissiveIntensity: 0.4, depthWrite: false }),
+    toonMat({ color: "#a8ecff", transparent: true, opacity: 0.25, emissive: "#24A0CE", emissiveIntensity: 0.4, depthWrite: false }),
   );
   spin.add(gem, bubble);
   spin.scale.setScalar(1.2);
@@ -1151,7 +1151,7 @@ function buildBoost() {
   });
   const pad = new THREE.Mesh(
     new THREE.PlaneGeometry(2.6, 3.2),
-    new THREE.MeshStandardMaterial({ map: tex, emissive: "#ffffff", emissiveMap: tex, emissiveIntensity: 1.2, polygonOffset: true, polygonOffsetFactor: -4 }),
+    toonMat({ map: tex, emissive: "#ffffff", emissiveMap: tex, emissiveIntensity: 1.2, polygonOffset: true, polygonOffsetFactor: -4 }),
   );
   pad.rotation.set(-Math.PI / 2, 0, Math.PI); // chevrons point the way you're driving
   pad.position.y = 0.04;
@@ -1170,7 +1170,7 @@ export function makeFinishLine() {
   });
   const line = new THREE.Mesh(
     new THREE.PlaneGeometry(9.8, 1.4),
-    new THREE.MeshStandardMaterial({ map: checkerTex, polygonOffset: true, polygonOffsetFactor: -4 }),
+    toonMat({ map: checkerTex, polygonOffset: true, polygonOffsetFactor: -4 }),
   );
   line.rotation.x = -Math.PI / 2;
   line.position.y = 0.04;
@@ -1382,11 +1382,11 @@ function buildSea() {
   // +x local = away from the road
   const sea = new THREE.Mesh(
     new THREE.PlaneGeometry(70, 16),
-    new THREE.MeshStandardMaterial({ color: "#1fb5c9", roughness: 0.15, metalness: 0.3 }),
+    toonMat({ color: "#1fb5c9", roughness: 0.15, metalness: 0.3 }),
   );
   sea.rotation.x = -Math.PI / 2;
   sea.position.set(45, 0.25, 0);
-  const sand = new THREE.Mesh(new THREE.PlaneGeometry(10, 16), new THREE.MeshStandardMaterial({ color: "#f2dca5", roughness: 1 }));
+  const sand = new THREE.Mesh(new THREE.PlaneGeometry(10, 16), toonMat({ color: "#f2dca5", roughness: 1 }));
   sand.rotation.x = -Math.PI / 2;
   sand.position.set(6, 0.3, 0);
   g.add(sea, sand);
@@ -1587,7 +1587,7 @@ function buildWater() {
   const g = new THREE.Group();
   const sea = mesh(
     new THREE.PlaneGeometry(40, 14),
-    new THREE.MeshStandardMaterial({ color: "#1fb5c9", roughness: 0.15, metalness: 0.3, transparent: true, opacity: 0.9 }),
+    toonMat({ color: "#1fb5c9", roughness: 0.15, metalness: 0.3, transparent: true, opacity: 0.9 }),
     false,
   );
   sea.rotation.x = -Math.PI / 2;
@@ -1680,6 +1680,8 @@ for (let v = 0; v < 7; v++) BUILDERS[`colonial${v}`] = () => buildColonial(v);
 
 const templates = new Map<string, THREE.Object3D>();
 const SOLID_KINDS = ["cone", "rock", "sacks", "barrier", "cow", "limpiavidrios", "hueco"] as const;
+
+const PICKUP_KINDS = new Set(["jar", "nitro", "shield", "heart", "tunjo"]);
 
 /** Kinds whose parts are animated by name (spinning jars, blinking lights...): never merged. */
 const NO_MERGE = new Set(["jar", "nitro", "shield", "heart", "tunjo", "fotomulta", "semaforo", "limpiavidrios"]);
@@ -1791,6 +1793,7 @@ export class ModelPool {
         t.add(dangerMark(hw, hl));
       }
       if (!NO_MERGE.has(kind)) t = mergeStatic(t);
+      if (kind in OBSTACLE_SIZE || PICKUP_KINDS.has(kind)) addOutline(t, 0.05);
       templates.set(kind, t);
     }
     const o = t.clone(true);
