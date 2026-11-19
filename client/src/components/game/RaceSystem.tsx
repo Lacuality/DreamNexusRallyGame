@@ -10,7 +10,7 @@ import { input, steerInput } from "@/lib/input";
 import { toWorld, headingAt, frameAt, roadCurvature, roadHalf, lanes, hash, biomeAt, lapLength, isCircuit, roadY } from "@/lib/track";
 
 const tmpV = { x: 0, y: 0, z: 0 };
-import { ModelPool, OBSTACLE_SIZE, type ObstacleKind, type PickupKind, makeArch, makeFinishLine } from "@/lib/game/models";
+import { ModelPool, worldTime, crowdHype, OBSTACLE_SIZE, type ObstacleKind, type PickupKind, makeArch, makeFinishLine } from "@/lib/game/models";
 import { useRally, goalProgress } from "@/lib/stores/useRally";
 import { car, session, classSpeed, sessionCircuit } from "@/lib/game/session";
 import { circuitById } from "@/lib/game/circuits";
@@ -743,9 +743,11 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
           if (pos < run.lastPos) {
             const passed = race.racers.filter((r) => r.z < run.z && r.z > run.z - 12).sort((a, b) => b.z - a.z)[0];
             rally.getState().popup(passed ? `⬆️ ¡Pasaste a ${passed.name}!` : `⬆️ ${pos}º`, COLORS.gold);
+            run.cheer = 1.1;
             if (pos === 1) audioManager.playMilestone();
           } else {
             const by = race.racers.filter((r) => r.z > run.z && r.z < run.z + 12).sort((a, b) => a.z - b.z)[0];
+            if (by) by.cheer = 1.4;
             const line = by && Math.random() < 0.6 ? taunt(by.name, "pass") : null;
             rally.getState().popup(by ? (line ? `${driverById(by.driver).emoji} ${by.name}: «${line}»` : `⬇️ ¡${by.name} te pasó!`) : `⬇️ ${pos}º`, COLORS.red);
           }
@@ -1120,6 +1122,18 @@ export function RaceSystem({ carPositionRef, carSpeedRef }: {
         if (beam) beam.rotation.y = t;
       } else if (!e.pickup && e.fly <= 0 && !e.walk) {
         o.rotation.y = headingAt(z);
+        if (e.kind === "cow") {
+          // chewing, breathing, and a startled jump when you come flying at it
+          const near = e.z - run.z;
+          const scared = near > 0 && near < 30 && run.speed > 25 ? 1 - near / 30 : 0;
+          o.rotation.z = Math.sin(t * 2 + e.seed) * 0.04;
+          o.scale.y = 1 + Math.sin(t * 3 + e.seed) * 0.03 + scared * Math.abs(Math.sin(t * 16)) * 0.12;
+          o.position.y += scared * Math.abs(Math.sin(t * 16)) * 0.25;
+        } else if (e.kind === "cone" || e.kind === "barrier") {
+          // wobble in the wind of passing cars
+          const near = Math.abs(e.z - run.z);
+          if (near < 14) o.rotation.z = Math.sin(t * 20 + e.seed) * 0.12 * (1 - near / 14) * Math.min(1, run.speed / 40);
+        }
       }
     }
     run.camFlash = Math.max(0, run.camFlash - dt * 3);
@@ -1195,10 +1209,13 @@ function circuitLayout() {
 }
 
 /** Scenery along both sides of the road, recycled as you drive. */
+const SWAY = /palm|pine|ceiba|banana|fern|sugarcane|bush|frailejon|cactus/i;
+const FLAP = /bunting|banner/i;
+
 export function Scenery() {
   const group = useRef<THREE.Group>(null);
   const pool = useMemo(() => new ModelPool(), []);
-  const placed = useRef<{ z: number; obj: THREE.Object3D }[]>([]);
+  const placed = useRef<{ z: number; obj: THREE.Object3D; rotY: number; sway: number; seed: number }[]>([]);
   const nextZ = useRef(isCircuit() ? 0 : -30);
   const cullTick = useRef(0);
   const { scene } = useThree();
@@ -1213,10 +1230,28 @@ export function Scenery() {
     o.rotation.set(0, rotY, 0);
     o.scale.setScalar(scale);
     group.current?.add(o);
-    placed.current.push({ z, obj: o });
+    placed.current.push({ z, obj: o, rotY, sway: SWAY.test(kind) ? 1 : FLAP.test(kind) ? 2 : 0, seed: (z * 0.37 + lat * 1.3) % 6.28 });
   };
 
-  useFrame(() => {
+  useFrame((state) => {
+    const t = state.clock.elapsedTime;
+    worldTime.value = t;
+    // the crowd goes wild at the start, on the last lap and at the finish
+    const wild = run.time < 4 || race.finishedAt !== null || (race.active && race.lap >= race.laps - 1);
+    crowdHype.value += ((wild ? 1.5 : 0.8) - crowdHype.value) * 0.05;
+    // wind: palms and trees sway, flags and bunting flap (only the ones near you)
+    for (const p of placed.current) {
+      if (!p.sway || !p.obj.visible) continue;
+      const dx = p.obj.position.x - run.wx, dz = p.obj.position.z - run.wz;
+      if (dx * dx + dz * dz > 150 * 150) continue;
+      if (p.sway === 1) {
+        p.obj.rotation.x = Math.sin(t * 1.3 + p.seed) * 0.035 + Math.sin(t * 3.1 + p.seed * 2) * 0.012;
+        p.obj.rotation.z = Math.cos(t * 1.1 + p.seed * 1.7) * 0.04;
+      } else {
+        p.obj.rotation.x = Math.sin(t * 5 + p.seed) * 0.07;
+        p.obj.scale.y = 1 + Math.sin(t * 7 + p.seed) * 0.04;
+      }
+    }
     const circuitAll = isCircuit();
     const limit = circuitAll ? lapLength() : run.z + 250;
     while (nextZ.current < limit) {

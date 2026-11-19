@@ -4,26 +4,20 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { buildVehicle, type CarRig } from "@/lib/game/vehicles";
 import { run } from "@/lib/game/run";
+import { race } from "@/lib/game/race";
+import { animateRig, type RigPose } from "@/lib/game/rigAnim";
 import { roadPitch } from "@/lib/track";
 import { groundHeight } from "@/lib/game/physics";
 import { useProfile } from "@/lib/stores/useProfile";
 import type { CarId, DriverId, PaintId } from "@/lib/game/garage";
-
-/** Flap ears / crests: they stream back with speed and bounce on bumps. */
-export function animateWobble(rig: CarRig, t: number, speed: number, rough: boolean) {
-  const sp = Math.min(1, speed / 55);
-  rig.wobble.forEach((w, i) => {
-    const flop = Math.sin(t * 9 + i * 1.7) * 0.08 * (rough ? 2.5 : 1);
-    w.rotation.x = (w.userData.baseX ?? 0) - 0.25 - sp * 0.9 + flop;
-  });
-}
 
 /** The player's car. Purely visual: it reads the live `run` state. */
 export function Car() {
   const { car, paint, driver } = useProfile.getState();
   const rig = useMemo(() => buildVehicle(car, paint, driver), [car, paint, driver]);
   const blob = useMemo(() => rig.root.getObjectByName("blob") as THREE.Mesh, [rig]);
-  const anim = useRef({ prevSpeed: 0, pitch: 0, wasAir: false, squash: 0 });
+  const anim = useRef<RigPose>({ speed: 0, steer: 0, pitch: 0, air: false, vy: 0, hopY: 0, offroad: false, nitro: false, drift: 0, dizzy: false, star: false, cheer: 0, throwing: 0 });
+  const smoke = useRef(0);
 
   useFrame((state, delta) => {
     const t = state.clock.elapsedTime;
@@ -36,36 +30,31 @@ export function Car() {
     const slide = run.driftDir * 0.55 * Math.min(1, run.drift * 4);
     const trickSpin = run.trick > 0 ? (1 - run.trick / 0.55) * Math.PI * 2 : 0; // a full 360 in the air
     rig.root.rotation.set(0, run.heading + run.rel + slide + trickSpin + (run.spin > 0 ? (1 - run.spin) * Math.PI * 4 : 0), 0);
-    // weight transfer: nose lifts when you accelerate / use nitro, dips when you brake or crash
-    const a = anim.current;
-    const accel = (run.speed - a.prevSpeed) / Math.max(delta, 1e-3);
-    a.prevSpeed = run.speed;
-    const want = THREE.MathUtils.clamp(-accel * 0.006, -0.09, 0.07) - (run.nitroTime > 0 ? 0.05 : 0);
-    a.pitch += (want - a.pitch) * Math.min(1, delta * 6);
-    // landing: squash and a puff of dust
-    if (a.wasAir && !run.airborne) {
-      a.squash = 1;
-      burst(x, y + 0.2, rig.root.position.z, ["#c9a46a", "#e6d2a8", "#8b6b3e"], 14, 5, 2.5, 0.22);
-    }
-    a.wasAir = run.airborne;
-    a.squash = Math.max(0, a.squash - delta * 4);
-    const sq = Math.sin(a.squash * Math.PI) * 0.16;
-    rig.body.scale.set(1 + sq * 0.5, 1 - sq, 1 + sq * 0.3);
-    // hop into a drift (visual only)
     if (run.hop > 0) run.hop = Math.max(0, run.hop - delta);
-    const hopY = run.hop > 0 ? Math.sin((1 - run.hop / 0.28) * Math.PI) * 0.45 : 0;
-    rig.body.rotation.x = -roadPitch(z) + (run.airborne ? -run.vy * 0.025 : a.pitch);
-    rig.body.rotation.z = THREE.MathUtils.lerp(rig.body.rotation.z, run.steer * 0.06, Math.min(1, delta * 8));
-
-    // suspension bounce (more off-road)
-    const bounce = run.airborne ? 0 : Math.sin(t * 22) * (run.offroad ? 0.06 : 0.012) * Math.min(1, run.speed / 20);
-    rig.body.position.y = bounce + hopY;
-
-    const spin = (run.speed * delta) / 0.42;
-    rig.wheels.forEach((w) => (w.rotation.x += spin));
-    rig.frontWheels.forEach((w) => (w.rotation.y = run.steer * 0.35));
-
-    animateWobble(rig, t, run.speed, run.offroad);
+    if (run.cheer > 0) run.cheer -= delta;
+    if (run.throwT > 0) run.throwT -= delta;
+    const pose = anim.current;
+    pose.speed = run.speed;
+    pose.steer = run.steer;
+    pose.pitch = roadPitch(z);
+    pose.air = run.airborne;
+    pose.vy = run.vy;
+    pose.hopY = run.hop > 0 ? Math.sin((1 - run.hop / 0.28) * Math.PI) * 0.45 : 0;
+    pose.offroad = run.offroad;
+    pose.nitro = run.nitroTime > 0;
+    pose.drift = run.driftDir * Math.min(1, run.drift * 4);
+    pose.dizzy = run.spin > 0;
+    pose.star = run.star > 0;
+    pose.cheer = race.finishedAt !== null && run.lastPos > 0 && run.lastPos <= 3 ? 1 : run.cheer;
+    pose.throwing = run.throwT;
+    // landing: a puff of dust
+    if (animateRig(rig, pose, t, delta)) burst(x, y + 0.2, rig.root.position.z, ["#c9a46a", "#e6d2a8", "#8b6b3e"], 14, 5, 2.5, 0.22);
+    // wheel-spin smoke off the line and tyre smoke in a slide
+    smoke.current -= delta;
+    if (smoke.current <= 0 && !run.airborne && ((run.speed > 3 && run.speed < 22 && rig.anim.pitch < -0.02) || Math.abs(pose.drift) > 0.6)) {
+      smoke.current = 0.09;
+      burst(x - Math.sin(rig.root.rotation.y) * 1.5, y + 0.25, rig.root.position.z - Math.cos(rig.root.rotation.y) * 1.5, ["#ffffff", "#dfe6ee", "#c5ccd6"], 1, 1, 1.4, 0.13);
+    }
 
     // blink while invulnerable after a hit
     rig.body.visible = run.invulnerable > 0 && run.invulnerable < 50 ? Math.floor(t * 14) % 2 === 0 : true;
@@ -107,6 +96,16 @@ export function ShowcaseCar({
     const t = state.clock.elapsedTime;
     rig.wobble.forEach((w, i) => (w.rotation.x = (w.userData.baseX ?? 0) - 0.3 + Math.sin(t * 2 + i) * 0.12));
     rig.wheels.forEach((w) => (w.rotation.x = t * 3));
+    // idling: the engine shakes the kart, the driver looks around and waves now and then
+    rig.body.position.y = Math.sin(t * 40) * 0.008;
+    rig.driver.rotation.y = Math.sin(t * 0.9) * 0.5;
+    rig.driver.rotation.z = Math.sin(t * 1.7) * 0.08;
+    const wave = Math.max(0, Math.sin(t * 0.8)) ** 4;
+    rig.hands.forEach((h, i) => {
+      const b = h.userData.base as THREE.Vector3;
+      const up = i === 1 ? wave : 0;
+      h.position.set(b.x - (i === 1 ? up * 0.25 : 0), b.y + up * (0.75 + Math.sin(t * 12) * 0.08), b.z - up * 0.4);
+    });
   });
   return (
     <group {...props}>

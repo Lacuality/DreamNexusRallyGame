@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import { THROW_TIME } from "@/lib/game/rigAnim";
 import { toonMat } from "@/lib/game/toon";
 import { race, playerPosition, type Racer } from "@/lib/game/race";
 import { run } from "@/lib/game/run";
@@ -227,7 +228,8 @@ export function Battle() {
     return room.onMessage((msg) => {
       if (msg.t === "hit" && msg.by === myId) {
         const r = racerById(msg.id);
-        run.hitsLanded++;
+        run.cheer = 1.3;
+      run.hitsLanded++;
         run.score += 100;
         audioManager.playSmash();
         useRally.getState().popup(`¡Le diste a ${r?.name ?? "tu amigo"}!`, COLORS.gold, true);
@@ -268,6 +270,7 @@ export function Battle() {
       run.hitStop = 0.07;
       if (loseCoins()) burstAt(run.z, run.lat, 1.2, FX.jar, 14, 7, 7);
       const who = racerById(by);
+      if (who) who.cheer = 1.6;
       const line = who && !who.remote ? taunt(who.name, "hit") : null;
       if (line && who) gs.popup(`${driverById(who.driver).emoji} ${who.name}: «${line}»`, COLORS.orange);
       if (online && racerById(by)?.remote) room.send({ t: "hit", id: myId, by });
@@ -310,6 +313,9 @@ export function Battle() {
     const mine = ownerId === "me";
     const owner = mine ? null : racerById(ownerId);
     let sentTarget: string | undefined;
+    // the driver's arm swings as they use it
+    if (mine) run.throwT = THROW_TIME;
+    else if (owner) owner.throwT = THROW_TIME;
     switch (item) {
       case "aguacate": {
         const obj = makeAguacate();

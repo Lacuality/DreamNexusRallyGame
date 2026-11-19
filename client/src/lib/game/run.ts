@@ -32,6 +32,8 @@ export interface RunState {
   star: number; // seconds of Panela Power left (invincible + fast)
   bullet: number; // seconds of Chiva Express left (autopilot rocket)
   itemCount: number; // uses left of the held item (triple aguacate)
+  cheer: number; // seconds of celebrating left (driver pumps their fists)
+  throwT: number; // seconds left of the throwing gesture
   hitStop: number; // real seconds of freeze-frame left after a big hit
   timeScale: number; // 1 normally; <1 for the slow-motion photo finish
   finishing: number; // seconds of slow-mo left after the flag (0 = racing)
@@ -115,6 +117,8 @@ export function freshRun(): RunState {
     star: 0,
     bullet: 0,
     itemCount: 0,
+    cheer: 0,
+    throwT: 0,
     hitStop: 0,
     timeScale: 1,
     finishing: 0,

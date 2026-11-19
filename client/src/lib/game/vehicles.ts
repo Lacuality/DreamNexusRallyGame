@@ -8,12 +8,33 @@ import { paintById, type CarId, type DriverId, type PaintId } from "./garage";
  * buildVehicle() returns a "rig" the game animates (wheels, ears, flames...).
  */
 
+/** Per-car animation memory (see rigAnim.ts). */
+export interface RigAnim {
+  prevSpeed: number;
+  pitch: number;
+  steer: number;
+  drift: number;
+  squash: number;
+  kick: number;
+  cheer: number;
+  dizzy: number;
+  wasAir: boolean;
+  wasDizzy: boolean;
+  wasNitro: boolean;
+  driverY: number;
+  seed: number;
+}
+
 export interface CarRig {
   root: THREE.Group;
   body: THREE.Group;
   wheels: THREE.Object3D[];
   frontWheels: THREE.Object3D[];
   wobble: THREE.Object3D[]; // ears / crests / antennas that flap with speed
+  driver: THREE.Group; // the driver (head), for leaning and bouncing
+  hands: THREE.Object3D[]; // [left, right] gloves
+  stars: THREE.Group; // dizzy stars that circle the head after a hit
+  anim: RigAnim;
   flames: THREE.Object3D;
   shield: THREE.Mesh;
   length: number;
@@ -720,6 +741,29 @@ export function buildVehicle(carId: CarId = "rally7", paintId: PaintId = "dn", d
   body.add(d.group);
   d.wobble.forEach((w) => (w.userData.baseX = w.rotation.x));
 
+  // white cartoon gloves: on the wheel, in the air, or throwing
+  const glove = mat("#ffffff");
+  const hands = [1, -1].map((side) => {
+    const h = mesh(new THREE.SphereGeometry(0.13, 10, 8), glove, false);
+    h.userData.base = new THREE.Vector3(side * 0.3, -0.02, 0.5);
+    h.position.copy(h.userData.base);
+    d.group.add(h);
+    return h as THREE.Object3D;
+  });
+  // dizzy stars
+  const stars = new THREE.Group();
+  const starMat = new THREE.MeshBasicMaterial({ color: "#ffd23f" });
+  for (let i = 0; i < 3; i++) {
+    const st = new THREE.Mesh(new THREE.OctahedronGeometry(0.12, 0), starMat);
+    const a = (i / 3) * Math.PI * 2;
+    st.position.set(Math.cos(a) * 0.55, 0, Math.sin(a) * 0.55);
+    st.scale.set(1, 1.5, 1);
+    stars.add(st);
+  }
+  stars.position.y = 1.0;
+  stars.visible = false;
+  d.group.add(stars);
+
   // wheels
   const tyre = mat("#1b1b1f", { roughness: 0.9 });
   const rim = c.accent;
@@ -783,5 +827,9 @@ export function buildVehicle(carId: CarId = "rally7", paintId: PaintId = "dn", d
   root.add(blob);
 
   addOutline(root, 0.05);
-  return { root, body, wheels, frontWheels, wobble: d.wobble, flames, shield, length: b.length };
+  const anim: RigAnim = {
+    prevSpeed: 0, pitch: 0, steer: 0, drift: 0, squash: 0, kick: 0, cheer: 0, dizzy: 0,
+    wasAir: false, wasDizzy: false, wasNitro: false, driverY: d.group.position.y, seed: Math.random() * 10,
+  };
+  return { root, body, wheels, frontWheels, wobble: d.wobble, driver: d.group, hands, stars, anim, flames, shield, length: b.length };
 }

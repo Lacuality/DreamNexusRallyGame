@@ -1177,20 +1177,68 @@ export function makeFinishLine() {
   return line;
 }
 
+/** Clock for shader-driven animation (the crowd), and how excited the crowd is (1 = normal). */
+export const worldTime = { value: 0 };
+export const crowdHype = { value: 1 };
+
+const fanMats = new Map<string, THREE.Material>();
+/** A material whose meshes jump up and down; each fan's rhythm is stored in its uv.x. */
+function fanMat(color: string) {
+  let m = fanMats.get(color);
+  if (!m) {
+    const mm = toonMat({ color });
+    mm.onBeforeCompile = (shader) => {
+      shader.uniforms.uTime = worldTime;
+      shader.uniforms.uHype = crowdHype;
+      shader.vertexShader = shader.vertexShader
+        .replace("#include <common>", "#include <common>\nuniform float uTime;\nuniform float uHype;")
+        .replace(
+          "#include <begin_vertex>",
+          `#include <begin_vertex>
+           float fanJump = abs(sin(uTime * (5.0 + uv.y * 3.0) + uv.x * 6.2832));
+           transformed.y += fanJump * fanJump * 0.34 * uHype;`,
+        );
+    };
+    mm.customProgramCacheKey = () => "fan";
+    m = mm;
+    fanMats.set(color, m);
+  }
+  return m;
+}
+
 function buildGrandstand() {
   // stepped stands full of colourful fans, along the road (+x local is away)
   const g = new THREE.Group();
   const concrete = mat("#9aa0a8", { roughness: 1 });
   const roof = mat("#24A0CE");
   const fanColors = ["#FCD116", "#003893", "#CE1126", "#ffffff", "#ff9f43", "#7bd389"];
+  const skins = ["#f1c9a5", "#c98d5e", "#8a5a3c"];
+  const phase = (geo: THREE.BufferGeometry, ph: number, tempo: number) => {
+    const uv = geo.attributes.uv;
+    for (let n = 0; n < uv.count; n++) uv.setXY(n, ph, tempo);
+    return geo;
+  };
   for (let i = 0; i < 5; i++) {
     const step = mesh(new THREE.BoxGeometry(1.2, 0.6 + i * 0.6, 14), concrete);
     step.position.set(i * 1.2, (0.6 + i * 0.6) / 2, 0);
     g.add(step);
     for (let k = 0; k < 12; k++) {
-      const fan = mesh(new THREE.BoxGeometry(0.4, 0.55, 0.4), mat(fanColors[(i * 5 + k) % fanColors.length]), false);
-      fan.position.set(i * 1.2 - 0.2, 0.6 + i * 0.6 + 0.28, -6.5 + k * 1.15 + (i % 2) * 0.3);
-      g.add(fan);
+      // a wave runs along the stand, with everyone slightly off the beat
+      const ph = k / 12 + i * 0.13 + hashN(i * 31 + k) * 0.25;
+      const tempo = hashN(i * 17 + k * 3);
+      const x = i * 1.2 - 0.2, y = 0.6 + i * 0.6, z = -6.5 + k * 1.15 + (i % 2) * 0.3;
+      const fan = mesh(phase(new THREE.BoxGeometry(0.42, 0.5, 0.36), ph, tempo), fanMat(fanColors[(i * 5 + k) % fanColors.length]), false);
+      fan.position.set(x, y + 0.25, z);
+      const head = mesh(phase(new THREE.SphereGeometry(0.17, 7, 5), ph, tempo), fanMat(skins[(i + k * 2) % skins.length]), false);
+      head.position.set(x, y + 0.66, z);
+      g.add(fan, head);
+      // some wave their arms / a flag
+      if ((i * 7 + k * 3) % 4 === 0) {
+        const arm = mesh(phase(new THREE.BoxGeometry(0.1, 0.42, 0.1), ph, tempo), fanMat(skins[(i + k * 2) % skins.length]), false);
+        arm.position.set(x, y + 0.85, z + 0.26);
+        arm.rotation.x = 0.35;
+        g.add(arm);
+      }
     }
   }
   const r = mesh(new THREE.BoxGeometry(7, 0.15, 14.5), roof);
@@ -1680,6 +1728,11 @@ for (let v = 0; v < 7; v++) BUILDERS[`colonial${v}`] = () => buildColonial(v);
 
 const templates = new Map<string, THREE.Object3D>();
 const SOLID_KINDS = ["cone", "rock", "sacks", "barrier", "cow", "limpiavidrios", "hueco"] as const;
+
+const hashN = (n: number) => {
+  const x = Math.sin(n * 127.1) * 43758.5453;
+  return x - Math.floor(x);
+};
 
 const PICKUP_KINDS = new Set(["jar", "nitro", "shield", "heart", "tunjo"]);
 

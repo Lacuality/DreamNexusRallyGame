@@ -8,10 +8,10 @@ import { RIVALS } from "@/lib/game/circuits";
 import { carById, type CarId, type DriverId, type PaintId } from "@/lib/game/garage";
 import { buildVehicle, type CarRig } from "@/lib/game/vehicles";
 import { room, myId } from "@/lib/game/net";
-import { toWorld, headingAt, roadCurvature, roadHalf, bendAhead, cornerSpeed } from "@/lib/track";
+import { toWorld, headingAt, roadCurvature, roadHalf, bendAhead, cornerSpeed, roadPitch, isCircuit } from "@/lib/track";
 import { useRally } from "@/lib/stores/useRally";
 import { audioManager } from "@/lib/audio";
-import { animateWobble } from "./Car";
+import { animateRig, type RigPose } from "@/lib/game/rigAnim";
 import { shoveLat } from "@/lib/game/physics";
 import { burst } from "@/lib/game/fx";
 import { useProfile } from "@/lib/stores/useProfile";
@@ -46,6 +46,8 @@ function nameTag(text: string, color: string) {
 export function Rivals() {
   const group = useRef<THREE.Group>(null);
   const rigs = useRef(new Map<string, CarRig>());
+  const steerOf = useRef(new Map<string, { h: number; s: number }>());
+  const pose = useMemo<RigPose>(() => ({ speed: 0, steer: 0, pitch: 0, air: false, vy: 0, hopY: 0, offroad: false, nitro: false, drift: 0, dizzy: false, star: false, cheer: 0, throwing: 0 }), []);
   const bumpCd = useRef(new Map<string, number>());
   const targets = useRef(new Map<string, { z: number; lat: number; y: number; speed: number }>());
   const online = session.mode === "online";
@@ -256,7 +258,6 @@ export function Rivals() {
       let rig = rigs.current.get(r.id);
       if (!rig) {
         rig = buildVehicle(r.car as CarId, r.paint as PaintId, r.driver as DriverId);
-        rig.wobble.forEach((w) => (w.userData.baseX = w.rotation.x));
         const tag = nameTag(r.name, r.remote ? "#7bd389" : "#ffd23f");
         tag.position.y = carById(r.car).id === "chiva" ? 4.4 : 3.1;
         rig.root.add(tag);
@@ -267,11 +268,30 @@ export function Rivals() {
       toWorld(z, r.lat, r.y, rig.root.position);
       rig.root.rotation.set(0, (r.remote && r.heading !== undefined ? r.heading : headingAt(z)) + (r.spin > 0 ? (1 - r.spin) * Math.PI * 4 : 0), 0);
       rig.shield.visible = r.shield;
-      rig.wheels.forEach((w) => (w.rotation.x += (r.speed * dt) / 0.42));
-      animateWobble(rig, t + r.seed, r.speed, false);
-      rig.flames.visible = r.nitro > 0 || (r.star ?? 0) > 0;
-      if ((r.star ?? 0) > 0) rig.body.scale.setScalar(1 + Math.sin(t * 18) * 0.05);
-      else if (rig.body.scale.x !== 1) rig.body.scale.setScalar(1);
+      // how hard is it turning? (from how fast its heading changes)
+      const st = steerOf.current.get(r.id) ?? { h: rig.root.rotation.y, s: 0 };
+      const hNow = r.remote && r.heading !== undefined ? r.heading : headingAt(z);
+      let dh = hNow - st.h;
+      dh = Math.atan2(Math.sin(dh), Math.cos(dh));
+      st.h = hNow;
+      st.s = THREE.MathUtils.clamp(dt > 0 ? (dh / dt) * 1.4 : 0, -1, 1);
+      steerOf.current.set(r.id, st);
+      if ((r.cheer ?? 0) > 0) r.cheer! -= dt;
+      if ((r.throwT ?? 0) > 0) r.throwT! -= dt;
+      const sliding = Math.abs(st.s) > 0.55 && r.speed > 30 ? st.s : 0; // they drift through the tight ones
+      pose.speed = r.speed;
+      pose.steer = st.s;
+      pose.pitch = isCircuit() ? roadPitch(z) : 0;
+      pose.air = r.y > 0.05;
+      pose.nitro = r.nitro > 0 || (r.star ?? 0) > 0;
+      pose.drift = sliding;
+      pose.dizzy = r.spin > 0;
+      pose.star = (r.star ?? 0) > 0;
+      pose.cheer = r.finishedAt !== null && race.racers.filter((o) => o.finishedAt !== null && o.finishedAt < r.finishedAt!).length < 3 ? 1 : r.cheer ?? 0;
+      pose.throwing = r.throwT ?? 0;
+      animateRig(rig, pose, t, dt);
+      rig.root.rotation.y += rig.anim.drift * 0.32;
+      rig.flames.visible = pose.nitro;
       // fade remote cars that stopped sending
       rig.root.visible = !r.remote || Date.now() - r.lastSeen < 6000;
     }
