@@ -41,17 +41,17 @@ import { session } from "@/lib/game/session";
 export type ItemId = "aguacate" | "platano" | "tinto" | "volador" | "sombrero" | "aguacero" | "apagon" | "panela" | "chiva" | "arepa" | "mecha";
 
 export const ITEMS: Record<ItemId, { emoji: string; name: string; hint: string }> = {
-  apagon: { emoji: "⚡", name: "Apagón", hint: "Lightning shrinks every rival" },
-  panela: { emoji: "🌟", name: "Panela Power", hint: "Invincible and flat out for 6 s" },
-  chiva: { emoji: "🚌", name: "Chiva Express", hint: "Become a chiva and fly up the field" },
-  aguacate: { emoji: "🥑", name: "Aguacate", hint: "Fire it ahead (look back to fire behind)" },
-  platano: { emoji: "🍌", name: "Cáscara de plátano", hint: "Drop it behind you" },
-  mecha: { emoji: "🧨", name: "Mecha de tejo", hint: "Lob it ahead: it blows when a kart comes near" },
-  tinto: { emoji: "☕", name: "Tinto Turbo", hint: "Coffee boost!" },
-  volador: { emoji: "🎆", name: "Volador", hint: "Rocket that hunts the leader" },
-  sombrero: { emoji: "👒", name: "Sombrero Vueltiao", hint: "Blocks the next hit" },
-  arepa: { emoji: "🫓", name: "Arepa con queso", hint: "Cheese in the face of everyone ahead" },
-  aguacero: { emoji: "🌧️", name: "Aguacero", hint: "Rain slows everyone ahead" },
+  apagon: { emoji: "⚡", name: "Apagón", hint: "Un rayo encoge a todos los rivales" },
+  panela: { emoji: "🌟", name: "Panela Power", hint: "Invencible y a fondo por 6 s" },
+  chiva: { emoji: "🚌", name: "Chiva Express", hint: "Te vuelves chiva y remontas solo" },
+  aguacate: { emoji: "🥑", name: "Aguacate", hint: "Dispáralo (mira atrás para tirarlo atrás)" },
+  platano: { emoji: "🍌", name: "Cáscara de plátano", hint: "Déjala atrás tuyo" },
+  mecha: { emoji: "🧨", name: "Mecha de tejo", hint: "Lánzala adelante: explota si alguien se acerca" },
+  tinto: { emoji: "☕", name: "Tinto Turbo", hint: "¡Turbo de café!" },
+  volador: { emoji: "🎆", name: "Volador", hint: "Cohete que persigue al primero" },
+  sombrero: { emoji: "👒", name: "Sombrero Vueltiao", hint: "Bloquea el próximo golpe" },
+  arepa: { emoji: "🫓", name: "Arepa con queso", hint: "Queso en la cara a los de adelante" },
+  aguacero: { emoji: "🌧️", name: "Aguacero", hint: "Lluvia que frena a los de adelante" },
 };
 
 const COLORS = { gold: "#ffd23f", orange: "#ff9f43", red: "#ff5a5f", green: "#7bd389", cyan: "#5fd8ff" };

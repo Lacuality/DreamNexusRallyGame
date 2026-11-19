@@ -12,8 +12,7 @@ export function MenuShell({ title, onClose, children, wide = false }: { title: s
         position: "absolute",
         inset: 0,
         zIndex: 40,
-        background: "rgba(14,27,36,0.9)",
-        backdropFilter: "blur(6px)",
+        background: "linear-gradient(180deg, rgba(28,36,82,0.96) 0%, rgba(14,18,44,0.97) 100%)",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
@@ -24,7 +23,7 @@ export function MenuShell({ title, onClose, children, wide = false }: { title: s
       }}
     >
       <div style={{ width: wide ? "min(1100px, 100%)" : "min(760px, 100%)", display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-        <h2 style={{ fontFamily: UI.display, fontSize: "clamp(22px, 5vw, 40px)", margin: 0, flex: 1, minWidth: 0, color: UI.cyanBright }}>{title}</h2>
+        <h2 style={{ fontFamily: UI.display, fontSize: "clamp(22px, 5vw, 40px)", margin: 0, flex: 1, minWidth: 0, color: UI.gold, textShadow: "0 4px 0 #0a0c1e" }}>{title}</h2>
         <div style={{ ...panelStyle, padding: "6px 14px", fontFamily: UI.display, fontSize: 20, color: UI.gold }} title="Arequipe jars to spend">
           🍯 {wallet.toLocaleString()}
         </div>
@@ -47,8 +46,9 @@ export function Card({ children, active, onClick, locked, style }: { children: R
         ...panelStyle,
         padding: 12,
         cursor: onClick ? "pointer" : "default",
-        borderColor: active ? UI.gold : locked ? "rgba(255,255,255,0.12)" : "rgba(95,216,255,0.35)",
-        background: active ? "rgba(255,210,63,0.14)" : locked ? "rgba(20,24,30,0.8)" : UI.panel,
+        borderColor: active ? UI.gold : locked ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.55)",
+        background: active ? "linear-gradient(180deg, rgba(252,209,22,0.32), rgba(252,209,22,0.12))" : locked ? "rgba(20,24,40,0.8)" : panelStyle.background,
+        boxShadow: active ? "0 6px 0 #a8860a" : locked ? "none" : panelStyle.boxShadow,
         opacity: locked ? 0.75 : 1,
         ...style,
       }}
@@ -65,7 +65,7 @@ export function StatBar({ label, value }: { label: string; value: number }) {
     <div style={{ display: "grid", gridTemplateColumns: "70px 1fr", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 800 }}>
       <span style={{ opacity: 0.8 }}>{label}</span>
       <div style={{ height: 7, borderRadius: 4, background: "rgba(0,0,0,0.45)", overflow: "hidden" }}>
-        <div style={{ width: `${pct}%`, height: "100%", background: "linear-gradient(90deg,#24A0CE,#5fd8ff)" }} />
+        <div style={{ width: `${pct}%`, height: "100%", background: "linear-gradient(90deg,#FCD116,#ff9f43)" }} />
       </div>
     </div>
   );

@@ -126,31 +126,65 @@ export function TitleScene3D() {
         camera={{ position: [0, 2.6, 10], fov: 45 }}
         onCreated={({ camera }) => camera.lookAt(-0.6, 0.2, 0)}
       >
-        <color attach="background" args={["#3d9be0"]} />
-        <fog attach="fog" args={["#bfe6f5", 14, 40]} />
-        <hemisphereLight intensity={0.8} color="#bfe6f5" groundColor="#4f9a3c" />
-        <directionalLight position={[6, 10, 6]} intensity={1.8} castShadow shadow-mapSize-width={1024} shadow-mapSize-height={1024} />
+        <color attach="background" args={["#2f8fee"]} />
+        <fog attach="fog" args={["#cfeaff", 16, 46]} />
+        <hemisphereLight intensity={0.95} color="#ffffff" groundColor="#7fd06a" />
+        <ambientLight intensity={0.2} />
+        <directionalLight position={[6, 10, 6]} intensity={1.9} castShadow shadow-mapSize-width={1024} shadow-mapSize-height={1024} />
+        <directionalLight position={[-5, 4, -6]} intensity={0.9} color="#ffe9b0" />
 
-        {/* sky gradient backdrop */}
-        <mesh position={[0, 8, -20]}>
-          <planeGeometry args={[120, 40]} />
-          <meshBasicMaterial color="#8fd0f0" fog={false} />
+        {/* painted sky: bands, a big sun and fat clouds */}
+        <mesh position={[0, 14, -24]}>
+          <planeGeometry args={[160, 30]} />
+          <meshBasicMaterial color="#2f8fee" fog={false} />
         </mesh>
+        <mesh position={[0, 3.5, -23.9]}>
+          <planeGeometry args={[160, 9]} />
+          <meshBasicMaterial color="#8fd0ff" fog={false} />
+        </mesh>
+        <mesh position={[0, 0.5, -23.8]}>
+          <planeGeometry args={[160, 5]} />
+          <meshBasicMaterial color="#d6f1ff" fog={false} />
+        </mesh>
+        <mesh position={[9, 8.5, -23.5]}>
+          <circleGeometry args={[2.2, 32]} />
+          <meshBasicMaterial color="#fff3b0" fog={false} />
+        </mesh>
+        {[[-12, 8, 1.5], [-3, 10.5, 1.1], [5, 6.2, 1.3], [14, 10, 1.6], [-19, 5.5, 1.2]].map(([x, y, sc], i) => (
+          <group key={i} position={[x, y, -23]} scale={sc}>
+            {[[0, 0, 1.3], [1.4, -0.2, 1], [-1.4, -0.25, 0.95], [0.6, 0.55, 0.9]].map(([cx, cy, r], k) => (
+              <mesh key={k} position={[cx, cy, 0]}>
+                <circleGeometry args={[r, 20]} />
+                <meshBasicMaterial color="#ffffff" fog={false} />
+              </mesh>
+            ))}
+          </group>
+        ))}
         {/* hills */}
         {[-14, -6, 5, 13].map((x, i) => (
           <mesh key={i} position={[x, -1, -12 - (i % 2) * 4]} scale={[7 + i, 5 + (i % 3) * 2, 6]}>
             <sphereGeometry args={[1, 12, 8]} />
-            <meshToonMaterial color={i % 2 ? "#3f7f5a" : "#4f9a3c"} />
+            <meshToonMaterial color={i % 2 ? "#3fae5a" : "#58c83e"} />
           </mesh>
         ))}
-        {/* ground + road piece */}
+        {/* ground + a podium with a checkered edge */}
         <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow position={[0, 0, 0]}>
           <circleGeometry args={[30, 40]} />
-          <meshToonMaterial color="#4f9a3c" />
+          <meshToonMaterial color="#4fb83a" />
         </mesh>
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.008, 0]}>
+          <ringGeometry args={[3.7, 4.15, 48]} />
+          <meshBasicMaterial color="#141a2e" />
+        </mesh>
+        {Array.from({ length: 24 }, (_, i) => (
+          <mesh key={i} rotation={[-Math.PI / 2, 0, (i / 24) * Math.PI * 2]} position={[0, 0.012, 0]}>
+            <ringGeometry args={[3.72, 4.13, 4, 1, 0, Math.PI / 24]} />
+            <meshBasicMaterial color="#ffffff" />
+          </mesh>
+        ))}
         <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow position={[0, 0.01, 0]}>
-          <circleGeometry args={[3.6, 40]} />
-          <meshToonMaterial color="#3a3d42" />
+          <circleGeometry args={[3.7, 40]} />
+          <meshToonMaterial color="#7a7f92" />
         </mesh>
 
         <CameraFit />

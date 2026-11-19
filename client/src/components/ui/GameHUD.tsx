@@ -5,7 +5,7 @@ import { TIPS } from "@/lib/game/taunts";
 import { MAX_HEARTS, run } from "@/lib/game/run";
 import { audioManager } from "@/lib/audio";
 import { isTouchDevice } from "@/lib/input";
-import { IconButton, UI, panelStyle, useAudioSettings } from "./gameUi";
+import { IconButton, UI, panelStyle, useAudioSettings, inkText } from "./gameUi";
 import { formatTime, ordinal, race } from "@/lib/game/race";
 import { getTrack, outlinePoint, lapLength, type CircuitShape } from "@/lib/track";
 import { ITEMS } from "../game/Battle";
@@ -84,6 +84,24 @@ export function loopPoint(u: number, shape: CircuitShape): [number, number] {
 interface GameHUDProps {
   isFullscreen?: boolean;
   onToggleFullscreen?: () => void;
+}
+
+/** Ten little jars: how many you carry (each one makes you faster). */
+function JarPips({ n, size = 13 }: { n: number; size?: number }) {
+  return (
+    <span style={{ display: "inline-flex", gap: 2, alignItems: "center", verticalAlign: "middle" }}>
+      <span style={{ fontSize: size + 5, lineHeight: 1, marginRight: 3 }}>🍯</span>
+      {Array.from({ length: 10 }, (_, i) => (
+        <span
+          key={i}
+          style={{
+            width: size * 0.62, height: size, borderRadius: 4, boxSizing: "border-box", border: `2px solid ${UI.ink}`,
+            background: i < n ? UI.gold : "rgba(255,255,255,0.22)", transform: i < n ? "none" : "scale(0.85)", transition: "all 0.15s",
+          }}
+        />
+      ))}
+    </span>
+  );
 }
 
 // cheese blobs: [left %, top %, size vmin, height ratio, rotation]
@@ -245,9 +263,9 @@ export function GameHUD({ isFullscreen = false, onToggleFullscreen }: GameHUDPro
           minWidth: touch ? 130 : 180,
         }}
       >
-        <div style={{ fontSize: touch ? 12 : 14, fontWeight: 800, color: UI.warm, letterSpacing: "0.12em" }}>{hud.laps > 0 ? "JARS" : "SCORE"}</div>
+        <div style={{ fontSize: touch ? 12 : 14, fontWeight: 800, color: UI.warm, letterSpacing: "0.12em" }}>{hud.laps > 0 ? "TARROS · +VELOCIDAD" : "PUNTOS"}</div>
         <div style={{ fontFamily: UI.display, fontSize: touch ? 28 : 40, lineHeight: 1.05, color: UI.gold, textShadow: "0 3px 0 rgba(0,0,0,0.4)" }}>
-          {hud.laps > 0 ? `🍯 ${hud.coins}/10` : hud.score.toLocaleString()}
+          {hud.laps > 0 ? <JarPips n={hud.coins} size={touch ? 14 : 18} /> : hud.score.toLocaleString()}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
           <span
@@ -264,11 +282,11 @@ export function GameHUD({ isFullscreen = false, onToggleFullscreen }: GameHUDPro
             x{hud.multiplier}
           </span>
           {hud.combo > 0 && (
-            <span style={{ fontWeight: 800, fontSize: touch ? 13 : 15, color: UI.warm }}>{hud.combo} combo</span>
+            <span style={{ fontWeight: 800, fontSize: touch ? 13 : 15, color: UI.warm }}>combo {hud.combo}</span>
           )}
         </div>
         {!touch && hud.mode === "endless" && (
-          <div style={{ fontSize: 13, opacity: 0.75, marginTop: 4, fontWeight: 700 }}>Best {Math.max(highScore, hud.score).toLocaleString()}</div>
+          <div style={{ fontSize: 13, opacity: 0.75, marginTop: 4, fontWeight: 700 }}>Récord {Math.max(highScore, hud.score).toLocaleString()}</div>
         )}
       </div>
 
@@ -309,31 +327,45 @@ export function GameHUD({ isFullscreen = false, onToggleFullscreen }: GameHUDPro
       {hud.laps > 0 && (
         <div
           style={{
-            ...panelStyle,
             position: "absolute",
             top: touch && !landscape ? "calc(max(12px, env(safe-area-inset-top)) + 72px)" : "max(12px, env(safe-area-inset-top))",
             left: "50%",
             transform: "translateX(-50%)",
-            padding: touch ? "4px 12px" : "6px 18px",
             display: "flex",
             alignItems: "center",
-            gap: touch ? 10 : 18,
+            gap: touch ? 8 : 14,
             whiteSpace: "nowrap",
           }}
         >
-          <div style={{ textAlign: "center" }}>
-            <div key={hud.position} style={{ fontFamily: UI.display, fontSize: touch ? 26 : 38, lineHeight: 1, color: hud.position === 1 ? UI.gold : UI.white, animation: "dnrPop 0.45s ease-out" }}>
-              {ordinal(hud.position)}
-            </div>
-            <div style={{ fontSize: 12, fontWeight: 800, opacity: 0.8 }}>of {hud.racers}</div>
+          {/* your place: a big sticker that slams in every time it changes */}
+          <div
+            key={hud.position}
+            style={{
+              display: "flex", alignItems: "flex-start", gap: 1, padding: touch ? "0 10px 2px" : "0 14px 4px",
+              background: hud.position === 1 ? UI.gold : hud.position <= 3 ? UI.white : "#c9d2ee",
+              color: UI.ink, border: `${touch ? 3 : 4}px solid ${UI.ink}`, borderRadius: touch ? 14 : 18,
+              boxShadow: `0 ${touch ? 4 : 6}px 0 ${UI.ink}`, fontFamily: UI.display, animation: "dnrSlam 0.4s cubic-bezier(.2,.9,.3,1.3) both",
+            }}
+          >
+            <span style={{ fontSize: touch ? 34 : 56, lineHeight: 1 }}>{hud.position}</span>
+            <span style={{ fontSize: touch ? 15 : 24, lineHeight: 1.2 }}>º</span>
+            <span style={{ fontFamily: UI.body, fontWeight: 900, fontSize: touch ? 11 : 14, alignSelf: "flex-end", marginBottom: touch ? 4 : 8, marginLeft: 2, opacity: 0.7 }}>/{hud.racers}</span>
           </div>
-          <div style={{ textAlign: "center" }}>
-            <div style={{ fontFamily: UI.display, fontSize: touch ? 18 : 24, color: UI.cyanBright }}>
-              LAP {hud.lap}/{hud.laps}
+          <div
+            style={{
+              ...panelStyle,
+              borderRadius: 16,
+              padding: touch ? "3px 12px" : "5px 16px",
+              textAlign: "center",
+              background: hud.lap >= hud.laps ? "linear-gradient(180deg, #ff5a66, #c81e36)" : panelStyle.background,
+            }}
+          >
+            <div style={{ fontFamily: UI.display, fontSize: touch ? 15 : 20, lineHeight: 1.1, color: hud.lap >= hud.laps ? UI.white : UI.gold }}>
+              {hud.lap >= hud.laps && hud.laps > 1 ? "¡ÚLTIMA VUELTA!" : `VUELTA ${hud.lap}/${hud.laps}`}
             </div>
-            <div style={{ fontWeight: 800, fontSize: touch ? 13 : 15 }}>{formatTime(hud.lapTime)}</div>
+            <div style={{ fontWeight: 900, fontSize: touch ? 13 : 16, fontVariantNumeric: "tabular-nums" }}>{formatTime(hud.lapTime)}</div>
+            {hud.cupLabel && !touch && <div style={{ fontWeight: 900, fontSize: 10, color: UI.warm, letterSpacing: "0.08em" }}>{hud.cupLabel}</div>}
           </div>
-          {hud.cupLabel && !touch && <div style={{ fontWeight: 900, fontSize: 11, color: UI.warm, letterSpacing: "0.08em" }}>{hud.cupLabel}</div>}
         </div>
       )}
       {hud.laps > 0 && <MiniMap touch={touch} />}
@@ -448,30 +480,41 @@ export function GameHUD({ isFullscreen = false, onToggleFullscreen }: GameHUDPro
         >
           <div
             style={{
-              width: touch ? 64 : 78,
-              height: touch ? 64 : 78,
-              borderRadius: "50%",
-              background: hud.item ? "rgba(255,210,63,0.25)" : "rgba(14,27,36,0.7)",
-              border: `4px solid ${hud.item ? UI.gold : "rgba(255,255,255,0.35)"}`,
+              width: 84,
+              height: 84,
+              borderRadius: 22,
+              position: "relative",
+              background: hud.item || spin ? `repeating-linear-gradient(-55deg, rgba(255,255,255,0.25) 0 10px, rgba(255,255,255,0) 10px 20px), ${UI.gold}` : "rgba(26,33,68,0.85)",
+              border: `4px solid ${hud.item || spin ? UI.ink : "rgba(255,255,255,0.6)"}`,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              fontSize: touch ? 34 : 42,
-              animation: hud.item ? "dnrPulse 0.8s ease-in-out infinite" : "none",
-              boxShadow: hud.item ? "0 0 24px rgba(255,210,63,0.7)" : "none",
+              fontSize: 46,
+              transform: "rotate(-4deg)",
+              animation: hud.item && !spin ? "dnrPulse 0.8s ease-in-out infinite" : "none",
+              boxShadow: hud.item || spin ? `0 6px 0 ${UI.ink}, 0 0 26px rgba(252,209,22,0.8)` : "0 5px 0 rgba(10,12,30,0.5)",
             }}
           >
-            {spin ? ITEMS[spin as keyof typeof ITEMS].emoji : hud.item ? ITEMS[hud.item as keyof typeof ITEMS].emoji : "❔"}
+            <span key={spin ?? hud.item ?? "none"} style={{ animation: spin ? "dnrPop 0.07s linear" : hud.item ? "dnrPop 0.35s ease-out" : "none", filter: "drop-shadow(0 3px 0 rgba(20,26,46,0.35))" }}>
+              {spin ? ITEMS[spin as keyof typeof ITEMS].emoji : hud.item ? ITEMS[hud.item as keyof typeof ITEMS].emoji : "❔"}
+            </span>
             {!spin && hud.item && hud.itemCount > 1 && (
-              <span style={{ position: "absolute", marginLeft: 54, marginTop: 44, fontFamily: UI.display, fontSize: 18, color: UI.gold, textShadow: "0 2px 3px #000" }}>×{hud.itemCount}</span>
+              <span style={{ position: "absolute", right: -12, bottom: -10, fontFamily: UI.display, fontSize: 17, color: UI.ink, background: UI.white, border: `3px solid ${UI.ink}`, borderRadius: 999, padding: "0 7px" }}>×{hud.itemCount}</span>
             )}
           </div>
           {!touch && (
-            <div style={{ fontWeight: 900, textShadow: "0 2px 4px #000" }}>
-              <div style={{ fontFamily: UI.display, color: hud.item ? UI.gold : "rgba(255,255,255,0.7)" }}>
-                {spin ? "..." : hud.item ? ITEMS[hud.item as keyof typeof ITEMS].name : "Drive through a ? box"}
+            <div style={{ fontWeight: 900, ...inkText(1.5) }}>
+              <div style={{ fontFamily: UI.display, fontSize: 17, color: hud.item ? UI.gold : UI.white }}>
+                {spin ? "…" : hud.item ? ITEMS[hud.item as keyof typeof ITEMS].name.toUpperCase() : "PASA POR UNA CAJA ?"}
               </div>
-              <div style={{ fontSize: 13 }}>{spin ? "" : hud.item ? `${ITEMS[hud.item as keyof typeof ITEMS].hint} — press E` : "to get a power-up"}</div>
+              <div style={{ fontSize: 13 }}>
+                {spin ? "" : hud.item ? (
+                  <>
+                    {ITEMS[hud.item as keyof typeof ITEMS].hint} ·{" "}
+                    <span style={{ background: UI.white, color: UI.ink, borderRadius: 6, padding: "0 6px", textShadow: "none", border: `2px solid ${UI.ink}` }}>E</span>
+                  </>
+                ) : "para ganar un poder"}
+              </div>
             </div>
           )}
         </div>
@@ -552,7 +595,7 @@ export function GameHUD({ isFullscreen = false, onToggleFullscreen }: GameHUDPro
           <span style={{ fontWeight: 800, fontSize: touch ? 12 : 16, color: UI.warm }}>km/h</span>
         </div>
         <div style={{ fontWeight: 800, fontSize: touch ? 13 : 17, color: UI.cyanBright }}>
-          {racing ? `🍯 ${hud.coins}/10` : `${hud.distance.toLocaleString()} m`}
+          {racing ? (touch ? <JarPips n={hud.coins} size={11} /> : "") : `${hud.distance.toLocaleString()} m`}
           {hud.mode === "endless" && (
             <span key={hud.gear} style={{ marginLeft: 8, color: UI.orange, display: "inline-block", animation: "dnrPop 0.5s ease-out" }}>
               ⚡{hud.gear}
@@ -578,8 +621,8 @@ export function GameHUD({ isFullscreen = false, onToggleFullscreen }: GameHUDPro
               fontFamily: UI.display,
               fontSize: 18,
               marginBottom: 6,
-              color: nitroReady ? UI.orange : "rgba(255,255,255,0.8)",
-              textShadow: "0 2px 0 rgba(0,0,0,0.5)",
+              color: nitroReady ? UI.gold : UI.white,
+              ...inkText(1.5),
               animation: nitroReady ? "dnrPulse 0.7s ease-in-out infinite" : "none",
               display: "flex",
               alignItems: "center",
@@ -589,15 +632,17 @@ export function GameHUD({ isFullscreen = false, onToggleFullscreen }: GameHUDPro
           >
             <Zap size={22} strokeWidth={3} fill="currentColor" />
             {racing
-              ? hud.nitroActive ? "¡TURBO!" : nitroReady ? "NITRO READY — SPACE" : "NITRO"
-              : hud.nitroActive ? "BOOST! UNBREAKABLE · x2 POINTS" : nitroReady ? "NITRO READY — PRESS SPACE" : "NITRO — COLLECT JARS TO FILL"}
+              ? hud.nitroActive ? "¡TURBO!" : nitroReady ? "NITRO LISTO · ESPACIO" : "NITRO"
+              : hud.nitroActive ? "¡TURBO! IRROMPIBLE · PUNTOS x2" : nitroReady ? "NITRO LISTO · ESPACIO" : "NITRO · JUNTA TARROS"}
           </div>
           <div
             style={{
-              height: 22,
-              borderRadius: 12,
-              background: "rgba(0,0,0,0.45)",
-              border: `3px solid ${nitroReady ? UI.orange : "rgba(255,255,255,0.4)"}`,
+              height: 24,
+              borderRadius: 14,
+              background: "rgba(20,26,46,0.75)",
+              border: `4px solid ${UI.ink}`,
+              outline: `2px solid ${nitroReady ? UI.gold : "rgba(255,255,255,0.75)"}`,
+              boxShadow: `0 5px 0 rgba(10,12,30,0.55)`,
               overflow: "hidden",
               animation: nitroReady ? "dnrGlow 0.8s ease-in-out infinite" : "none",
             }}
@@ -606,7 +651,9 @@ export function GameHUD({ isFullscreen = false, onToggleFullscreen }: GameHUDPro
               style={{
                 width: `${Math.round((hud.nitroActive ? 1 : hud.nitro) * 100)}%`,
                 height: "100%",
-                background: "linear-gradient(90deg, #ffd23f, #ff6a3a)",
+                background: "repeating-linear-gradient(-55deg, rgba(255,255,255,0.3) 0 14px, rgba(255,255,255,0) 14px 28px), linear-gradient(90deg, #FCD116, #ff7a2a 70%, #ff3d5a)",
+                backgroundSize: "56px 100%, 100% 100%",
+                animation: nitroReady || hud.nitroActive ? "dnrStripes 0.5s linear infinite" : "none",
                 transition: "width 0.15s linear",
               }}
             />
@@ -624,11 +671,10 @@ export function GameHUD({ isFullscreen = false, onToggleFullscreen }: GameHUDPro
             fontFamily: UI.display,
             fontSize: touch ? 18 : 24,
             color: UI.warm,
-            textShadow: "0 3px 0 rgba(0,0,0,0.5)",
-            opacity: 0.9,
+            ...inkText(2),
           }}
         >
-          OFF ROAD — SLOWING DOWN
+          FUERA DE PISTA · PIERDES VELOCIDAD
         </div>
       )}
 
