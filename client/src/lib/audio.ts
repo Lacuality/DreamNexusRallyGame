@@ -2,7 +2,7 @@ import { asset } from "./env";
 /**
  * Sound for Dream Nexus Rally.
  *
- * - Music: the background.mp3 track, looping through menu AND races.
+ * - Music: real recorded Latin tracks (cumbia, salsa, merengue...), one per place.
  * - Engine + every sound effect is synthesized with the Web Audio API,
  *   so there are no missing files and everything reacts to gameplay.
  * - Browsers block sound until the player touches/clicks/presses a key,
@@ -23,7 +23,24 @@ function loadSettings(): Settings {
   return { muted: false, music: 0.55, sfx: 0.8 };
 }
 
-export type MusicTheme = "default" | "synthwave" | "cumbia" | "salsa";
+/** Music by place. "default" is the menu track. */
+export type MusicTheme = "default" | "cumbia" | "salsa" | "merengue" | "arroz" | "pepe" | "neon" | "synthwave";
+
+// Real recorded tracks (Kevin MacLeod, incompetech.com, CC BY 4.0 — credited in the game)
+const TRACKS: Record<MusicTheme, string> = {
+  default: "cumbia_suave", // menu: laid-back cumbia
+  cumbia: "cumbia", // coffee hills, Cartagena
+  salsa: "salsa", // Cali
+  merengue: "merengue", // Tatacoa, Ciudad Perdida
+  arroz: "arroz", // the Andes: fast Latin jazz
+  pepe: "pepe", // Guatapé
+  neon: "neon", // Comuna 13 at night
+  synthwave: "neon",
+};
+
+/** Sound-effect samples (Kenney, CC0) layered with the synthesized effects. */
+const SAMPLES = ["coin", "gem", "hit", "hurt", "impact", "kill", "big_kill", "land", "dash", "shoot", "level_up", "revive", "downed", "boss", "ui", "confirm", "step"] as const;
+type SampleName = (typeof SAMPLES)[number];
 
 export class AudioManager {
   private ctx: AudioContext | null = null;
@@ -53,7 +70,7 @@ export class AudioManager {
 
   constructor() {
     if (typeof window === "undefined") return;
-    this.music = new Audio(asset("/sounds/background.mp3"));
+    this.music = new Audio(asset(`/sounds/music/${TRACKS.default}.mp3`));
     this.music.loop = true;
     this.music.preload = "auto";
     this.music.crossOrigin = "anonymous";
@@ -103,7 +120,7 @@ export class AudioManager {
         }
       }
       this.applyVolumes();
-      if (this.theme === "synthwave") this.applyTheme();
+      this.loadSamples();
     }
     if (this.ctx.state === "suspended") this.ctx.resume().catch(() => {});
     if (this.wantMusic) this.tryPlayMusic();
@@ -203,19 +220,70 @@ export class AudioManager {
    * Am – F – C – G. Crossfades with the normal music track. */
 
   setMusicTheme(theme: MusicTheme) {
-    if (theme === this.theme) return;
+    if (TRACKS[theme] === TRACKS[this.theme]) {
+      this.theme = theme;
+      return;
+    }
     this.theme = theme;
-    this.applyTheme();
+    this.swapTrack();
   }
 
-  private applyTheme() {
-    if (!this.ctx) return;
-    const t = this.ctx.currentTime;
-    const synthOn = this.theme !== "default";
-    if (this.mp3Gain) this.mp3Gain.gain.setTargetAtTime(synthOn ? 0 : 1, t, 0.9);
-    else if (this.music) this.music.muted = synthOn;
-    if (synthOn) this.startSynth();
-    else this.stopSynth();
+  private swapTimer = 0;
+  /** Fade the current track out, switch file, fade the new one in. */
+  private swapTrack() {
+    const el = this.music;
+    if (!el) return;
+    const url = asset(`/sounds/music/${TRACKS[this.theme]}.mp3`);
+    const swap = () => {
+      el.src = url;
+      el.load();
+      el.playbackRate = 1;
+      if (this.mp3Gain && this.ctx) {
+        this.mp3Gain.gain.cancelScheduledValues(this.ctx.currentTime);
+        this.mp3Gain.gain.setValueAtTime(0.0001, this.ctx.currentTime);
+        this.mp3Gain.gain.linearRampToValueAtTime(1, this.ctx.currentTime + 0.6);
+      }
+      if (this.wantMusic) this.tryPlayMusic();
+    };
+    window.clearTimeout(this.swapTimer);
+    if (this.mp3Gain && this.ctx && !el.paused) {
+      this.mp3Gain.gain.cancelScheduledValues(this.ctx.currentTime);
+      this.mp3Gain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.1);
+      this.swapTimer = window.setTimeout(swap, 380);
+    } else swap();
+  }
+
+  /* ---------------- samples ---------------- */
+  private samples = new Map<string, AudioBuffer>();
+  private samplesLoading = false;
+
+  private loadSamples() {
+    if (this.samplesLoading || !this.ctx) return;
+    this.samplesLoading = true;
+    const ctx = this.ctx;
+    for (const name of SAMPLES) {
+      fetch(asset(`/sounds/sfx/${name}.mp3`))
+        .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(String(r.status)))))
+        .then((buf) => new Promise<AudioBuffer>((res, rej) => ctx.decodeAudioData(buf, res, rej)))
+        .then((audio) => this.samples.set(name, audio))
+        .catch(() => {
+          /* the synthesized version still plays */
+        });
+    }
+  }
+
+  /** Play a sample if it has loaded. Returns false when it hasn't (caller falls back to synth). */
+  private sample(name: SampleName, vol = 0.6, rate = 1, delay = 0) {
+    const buf = this.samples.get(name);
+    if (!buf || !this.ctx || !this.sfxGain) return false;
+    const src = this.ctx.createBufferSource();
+    src.buffer = buf;
+    src.playbackRate.value = rate;
+    const g = this.ctx.createGain();
+    g.gain.value = vol;
+    src.connect(g).connect(this.sfxGain);
+    src.start(this.ctx.currentTime + delay);
+    return true;
   }
 
   private startSynth() {
@@ -775,6 +843,8 @@ export class AudioManager {
   /** Jar pickup: pitch climbs with the combo for that "ding ding DING" feel. */
   playPickup(combo = 0) {
     const step = Math.min(combo, 12);
+    // real coin sound, pitched up as the combo climbs
+    if (this.sample("coin", 0.5, Math.pow(2, step / 12))) return;
     const base = 660 * Math.pow(2, step / 12);
     this.tone(base, 0.12, { type: "triangle", vol: 0.25 });
     this.tone(base * 1.5, 0.18, { type: "sine", vol: 0.2, delay: 0.05 });
@@ -785,6 +855,7 @@ export class AudioManager {
   }
 
   playNitro() {
+    this.sample("dash", 0.55);
     this.noise(0.9, { vol: 0.35, type: "bandpass", from: 300, to: 4000, q: 2 });
     this.tone(110, 0.6, { type: "sawtooth", vol: 0.15, slideTo: 440 });
   }
@@ -795,6 +866,7 @@ export class AudioManager {
   }
 
   playShield() {
+    this.sample("revive", 0.5);
     [523, 659, 784, 1047].forEach((f, i) =>
       this.tone(f, 0.4, { type: "triangle", vol: 0.15, delay: i * 0.05 }),
     );
@@ -805,17 +877,24 @@ export class AudioManager {
   }
 
   playShieldBreak() {
+    this.sample("downed", 0.45);
     this.noise(0.3, { vol: 0.3, type: "highpass", from: 2000 });
     this.tone(1200, 0.3, { type: "triangle", vol: 0.15, slideTo: 300 });
   }
 
   playCrash() {
+    this.sample("hurt", 0.7);
+    this.sample("impact", 0.6, 0.8);
     this.noise(0.6, { vol: 0.6, type: "lowpass", from: 3000, to: 200 });
     this.tone(120, 0.45, { type: "sine", vol: 0.5, slideTo: 40 });
     this.tone(70, 0.3, { type: "square", vol: 0.12, slideTo: 35 });
   }
 
   playSmash() {
+    if (this.sample("impact", 0.6, 0.95 + Math.random() * 0.2)) {
+      this.tone(200, 0.15, { type: "square", vol: 0.06, slideTo: 80 });
+      return;
+    }
     this.noise(0.35, { vol: 0.45, type: "bandpass", from: 1500, to: 300, q: 0.8 });
     this.tone(200, 0.2, { type: "square", vol: 0.12, slideTo: 80 });
   }
@@ -835,6 +914,7 @@ export class AudioManager {
   }
 
   playLand() {
+    this.sample("land", 0.6);
     this.tone(90, 0.2, { type: "sine", vol: 0.4, slideTo: 45 });
     this.noise(0.15, { vol: 0.25, type: "lowpass", from: 800 });
   }
@@ -846,6 +926,7 @@ export class AudioManager {
   }
 
   playMilestone() {
+    if (this.sample("level_up", 0.5)) return;
     [523, 659, 784, 1047].forEach((f, i) =>
       this.tone(f, i === 3 ? 0.5 : 0.14, { type: "square", vol: 0.09, delay: i * 0.1 }),
     );
@@ -864,7 +945,36 @@ export class AudioManager {
   }
 
   playClick() {
+    if (this.sample("ui", 0.4)) return;
     this.tone(1000, 0.05, { type: "square", vol: 0.06 });
+  }
+
+  /* ---- item sounds ---- */
+  /** Picked up an item box. */
+  playBox() {
+    if (!this.sample("gem", 0.55)) this.playPickup(6);
+  }
+  /** Threw / launched something. */
+  playThrow() {
+    if (!this.sample("shoot", 0.55)) this.playJump();
+  }
+  /** Your item landed on a rival. */
+  playHitLanded() {
+    this.sample("big_kill", 0.55);
+    this.sample("hit", 0.6);
+  }
+  /** Something big went off (apagón, volador). */
+  playBoom() {
+    this.sample("boss", 0.6);
+    this.noise(0.7, { vol: 0.5, type: "lowpass", from: 2500, to: 150 });
+    this.tone(90, 0.5, { type: "sine", vol: 0.45, slideTo: 35 });
+  }
+  /** Guacharaca scrape: the drift sound. */
+  playScrape(level = 0) {
+    this.noise(0.09, { vol: 0.16 + level * 0.05, type: "bandpass", from: 2600 + level * 900, to: 5200 + level * 900, q: 4 });
+  }
+  playConfirm() {
+    if (!this.sample("confirm", 0.5)) this.playClick();
   }
 
   cleanup() {
@@ -873,3 +983,4 @@ export class AudioManager {
 }
 
 export const audioManager = new AudioManager();
+if (typeof window !== "undefined") (window as any).__audio = audioManager; // debug

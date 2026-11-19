@@ -61,10 +61,21 @@ const COLORS = {
 
 /** Music style for each region. */
 function themeFor(b: string) {
-  if (b === "comuna_13") return "synthwave" as const;
-  if (b === "pueblo" || b === "cartagena") return "cumbia" as const;
-  if (b === "cali") return "salsa" as const;
-  return "default" as const;
+  switch (b) {
+    case "comuna_13":
+      return "neon" as const;
+    case "cali":
+      return "salsa" as const;
+    case "andes_highland":
+      return "arroz" as const;
+    case "pueblo":
+      return "pepe" as const;
+    case "tatacoa":
+    case "ciudad_perdida":
+      return "merengue" as const;
+    default:
+      return "cumbia" as const; // coffee hills, Cartagena
+  }
 }
 
 export function RaceSystem({ carPositionRef, carSpeedRef }: {
