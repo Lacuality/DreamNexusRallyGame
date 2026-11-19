@@ -26,6 +26,8 @@ export interface Racer {
   itemCd: number;
   heading?: number; // online friends: which way their car is pointing
   immune?: number; // seconds of immunity after being hit
+  tiny?: number; // seconds left shrunk by an apagón
+  splat?: number; // seconds left blinded by an arepa (weaving about)
   cheer?: number; // seconds of celebrating left
   throwT?: number; // seconds left of the throwing gesture
   star?: number; // seconds of Panela Power / Chiva Express left (untouchable and fast)

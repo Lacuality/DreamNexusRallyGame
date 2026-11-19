@@ -86,6 +86,9 @@ interface GameHUDProps {
   onToggleFullscreen?: () => void;
 }
 
+// cheese blobs: [left %, top %, size vmin, height ratio, rotation]
+const SPLATS = [[27, 32, 27, 0.8, -12], [68, 28, 24, 0.9, 18], [52, 60, 31, 0.7, 4], [15, 68, 17, 0.85, 30], [84, 66, 20, 0.8, -24], [44, 18, 14, 0.9, 40]];
+
 export function GameHUD({ isFullscreen = false, onToggleFullscreen }: GameHUDProps) {
   const hud = useRally((s) => s.hud);
   const phase = useRally((s) => s.phase);
@@ -119,6 +122,9 @@ export function GameHUD({ isFullscreen = false, onToggleFullscreen }: GameHUDPro
     prevItem.current = hud.item;
   }, [hud.item]);
   const washRef = useRef<HTMLDivElement>(null);
+  const darkRef = useRef<HTMLDivElement>(null);
+  const splatRef = useRef<HTMLDivElement>(null);
+  const rocketRef = useRef<HTMLDivElement>(null);
 
   // red hit flash + nitro tint driven straight from the live run state
   useEffect(() => {
@@ -129,6 +135,16 @@ export function GameHUD({ isFullscreen = false, onToggleFullscreen }: GameHUDPro
       }
       if (camRef.current) camRef.current.style.opacity = String(Math.min(1, run.camFlash * 0.9));
       if (washRef.current) washRef.current.style.display = run.washing > 0 ? "block" : "none";
+      if (darkRef.current) darkRef.current.style.opacity = String(Math.min(1, Math.max(0, run.blackout) * 2));
+      if (splatRef.current) splatRef.current.style.opacity = String(Math.min(0.93, Math.max(0, run.splat) * 1.2));
+      if (rocketRef.current) {
+        rocketRef.current.style.display = run.incoming > 0 ? "flex" : "none";
+        if (run.incoming > 0) {
+          const fast = run.incoming > 0.7;
+          rocketRef.current.style.opacity = Math.floor(performance.now() / (fast ? 90 : 220)) % 2 ? "1" : "0.55";
+          rocketRef.current.style.transform = `translateX(-50%) scale(${1 + run.incoming * 0.25})`;
+        }
+      }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
@@ -169,6 +185,33 @@ export function GameHUD({ isFullscreen = false, onToggleFullscreen }: GameHUDPro
       />
       {/* speed camera flash */}
       <div ref={camRef} style={{ position: "absolute", inset: 0, opacity: 0, background: "rgba(255,255,255,0.95)" }} />
+      {/* apagón: the lights go out, you only see a pool of light around your kart */}
+      <div ref={darkRef} style={{ position: "absolute", inset: 0, opacity: 0, transition: "opacity 0.25s", background: "radial-gradient(ellipse at 50% 62%, rgba(6,8,20,0) 12%, rgba(6,8,20,0.82) 34%, rgba(4,5,14,0.97) 70%)" }} />
+      {/* arepazo: melted cheese on the windscreen */}
+      <div ref={splatRef} style={{ position: "absolute", inset: 0, opacity: 0, transition: "opacity 0.3s" }}>
+        {SPLATS.map((sp, i) => (
+          <div
+            key={i}
+            style={{
+              position: "absolute", left: `${sp[0]}%`, top: `${sp[1]}%`, width: `${sp[2]}vmin`, height: `${sp[2] * sp[3]}vmin`,
+              transform: `translate(-50%,-50%) rotate(${sp[4]}deg)`, borderRadius: "46% 54% 58% 42% / 52% 44% 56% 48%",
+              background: "radial-gradient(circle at 38% 32%, #fff8cf 0%, #ffe27a 45%, #f2b84b 100%)",
+              boxShadow: "inset -6px -8px 0 rgba(180,120,20,0.25), 0 4px 0 rgba(0,0,0,0.18)",
+            }}
+          />
+        ))}
+      </div>
+      {/* a volador is chasing you */}
+      <div
+        ref={rocketRef}
+        style={{
+          position: "absolute", left: "50%", bottom: "30%", display: "none", alignItems: "center", gap: 8, padding: "8px 18px",
+          borderRadius: 999, background: "#ff3b3b", border: "3px solid #fff", color: "#fff", fontFamily: "'Bungee', sans-serif",
+          fontSize: 18, letterSpacing: 1, boxShadow: "0 0 24px rgba(255,60,60,0.8)", whiteSpace: "nowrap",
+        }}
+      >
+        🚨 ¡VOLADOR! 🎆
+      </div>
       {/* el mono que limpia los vidrios */}
       <div ref={washRef} style={{ position: "absolute", inset: 0, display: "none", overflow: "hidden" }}>
         <style>{`

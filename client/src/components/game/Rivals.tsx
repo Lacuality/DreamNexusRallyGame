@@ -291,6 +291,9 @@ export function Rivals() {
       pose.throwing = r.throwT ?? 0;
       animateRig(rig, pose, t, dt);
       rig.root.rotation.y += rig.anim.drift * 0.32;
+      // struck by an apagón: tiny for a while
+      const size = (r.tiny ?? 0) > 0 ? 0.55 : 1;
+      if (Math.abs(rig.root.scale.x - size) > 0.005) rig.root.scale.setScalar(THREE.MathUtils.lerp(rig.root.scale.x, size, Math.min(1, dt * 9)));
       rig.flames.visible = pose.nitro;
       // fade remote cars that stopped sending
       rig.root.visible = !r.remote || Date.now() - r.lastSeen < 6000;
@@ -325,7 +328,7 @@ export function Rivals() {
     if (r.slow > 0) r.slow -= dt;
     if ((r.immune ?? 0) > 0) r.immune! -= dt;
     if ((r.star ?? 0) > 0) r.star! -= dt;
-    const hurt = r.spin > 0 ? 0.25 : r.slow > 0 ? 0.6 : 1;
+    const hurt = r.spin > 0 ? 0.25 : r.slow > 0 ? 0.6 : (r.splat ?? 0) > 0 ? 0.88 : 1;
     const target = base * corner * band * ((r.star ?? 0) > 0 ? 1.28 : r.nitro > 0 ? 1.18 : 1) * hurt;
     r.speed += (target - r.speed) * Math.min(1, dt * (target < r.speed ? 2.2 : 0.9 * c.accel));
     r.z += r.speed * dt;
@@ -333,6 +336,8 @@ export function Rivals() {
     // racing line: hug the inside of bends, dodge whoever is ahead
     const edge = roadHalf() - 2.2;
     let line = THREE.MathUtils.clamp(-roadCurvature(r.z + 25) * 450, -edge, edge) + Math.sin(r.z * 0.01 + r.seed) * 0.9;
+    // cheese in the eyes: they weave all over the road
+    if ((r.splat ?? 0) > 0) line += Math.sin(run.time * 5 + r.seed) * 3.2;
     const others = [{ z: run.z, lat: run.lat }, ...race.racers.filter((o) => o !== r)];
     for (const o of others) {
       const dz = o.z - r.z;

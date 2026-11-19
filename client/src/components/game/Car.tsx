@@ -16,6 +16,10 @@ export function Car() {
   const { car, paint, driver } = useProfile.getState();
   const rig = useMemo(() => buildVehicle(car, paint, driver), [car, paint, driver]);
   const blob = useMemo(() => rig.root.getObjectByName("blob") as THREE.Mesh, [rig]);
+  // Chiva Express: for a few seconds you ARE a chiva
+  const chiva = useMemo(() => (car === "chiva" ? null : buildVehicle("chiva", paint, driver)), [car, paint, driver]);
+  const wasChiva = useRef(false);
+  const tmpCol = useMemo(() => new THREE.Color(), []);
   const anim = useRef<RigPose>({ speed: 0, steer: 0, pitch: 0, air: false, vy: 0, hopY: 0, offroad: false, nitro: false, drift: 0, dizzy: false, star: false, cheer: 0, throwing: 0 });
   const smoke = useRef(0);
 
@@ -56,15 +60,45 @@ export function Car() {
       burst(x - Math.sin(rig.root.rotation.y) * 1.5, y + 0.25, rig.root.position.z - Math.cos(rig.root.rotation.y) * 1.5, ["#ffffff", "#dfe6ee", "#c5ccd6"], 1, 1, 1.4, 0.13);
     }
 
+    // shrunk by an apagón
+    const size = run.tiny > 0 ? 0.55 : 1;
+    if (Math.abs(rig.root.scale.x - size) > 0.005) rig.root.scale.setScalar(THREE.MathUtils.lerp(rig.root.scale.x, size, Math.min(1, delta * 9)));
+    // transformed into a chiva
+    const isChiva = !!chiva && run.bullet > 0;
+    if (isChiva !== wasChiva.current) {
+      wasChiva.current = isChiva;
+      burst(x, y + 1.2, rig.root.position.z, ["#ffffff", "#FCD116", "#CE1126", "#003893"], 26, 8, 7, 0.17);
+    }
+    if (chiva) {
+      chiva.root.visible = isChiva;
+      rig.root.visible = !isChiva;
+      if (isChiva) {
+        chiva.root.position.copy(rig.root.position);
+        chiva.root.rotation.copy(rig.root.rotation);
+        pose.cheer = 1;
+        animateRig(chiva, pose, t, delta);
+        chiva.flames.visible = true;
+        chiva.flames.scale.set(1.4, 1.4, 1.2 + Math.random() * 0.8);
+      }
+    }
+
     // blink while invulnerable after a hit
     rig.body.visible = run.invulnerable > 0 && run.invulnerable < 50 ? Math.floor(t * 14) % 2 === 0 : true;
 
     rig.flames.visible = run.nitroTime > 0;
     if (rig.flames.visible) rig.flames.scale.set(1, 1, 0.8 + Math.random() * 0.6);
 
-    rig.shield.visible = run.shield || run.star > 0 || run.bullet > 0;
-    (rig.shield.material as THREE.MeshStandardMaterial).color.set(run.star > 0 || run.bullet > 0 ? "#ffd23f" : "#5fd8ff");
-    (rig.shield.material as THREE.MeshStandardMaterial).emissive.set(run.star > 0 || run.bullet > 0 ? "#ff9f1c" : "#24A0CE");
+    rig.shield.visible = run.shield || run.star > 0;
+    // panela: the aura cycles through the rainbow
+    const sm = rig.shield.material as THREE.MeshStandardMaterial;
+    if (run.star > 0) {
+      tmpCol.setHSL((t * 1.6) % 1, 1, 0.6);
+      sm.color.copy(tmpCol);
+      sm.emissive.copy(tmpCol);
+    } else {
+      sm.color.set("#5fd8ff");
+      sm.emissive.set("#24A0CE");
+    }
     if (rig.shield.visible) {
       const p = 1 + Math.sin(t * 5) * 0.04;
       rig.shield.scale.set(0.85 * p, 0.62 * p, (rig.length / 3.9) * 1.05 * p);
@@ -77,7 +111,12 @@ export function Car() {
     }
   });
 
-  return <primitive object={rig.root} />;
+  return (
+    <>
+      <primitive object={rig.root} />
+      {chiva && <primitive object={chiva.root} visible={false} />}
+    </>
+  );
 }
 
 /** Showcase car for the title screen and garage. */
